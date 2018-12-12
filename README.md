@@ -1,5 +1,10 @@
 # Payum QuickPay Gateway
 
+[![Latest Version on Packagist][ico-version]][link-packagist]
+[![Build Status][ico-travis]][link-travis]
+[![Coverage Status][ico-scrutinizer]][link-scrutinizer]
+[![Quality Score][ico-code-quality]][link-code-quality]
+
 This component enables the use of QuickPay with Payum.
 
 ## Installation
