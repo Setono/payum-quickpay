@@ -1,0 +1,26 @@
+language: php
+
+sudo: false
+
+dist: trusty
+
+cache:
+    directories:
+        - $HOME/.composer/cache
+
+matrix:
+    include:
+        - php: 7.2
+
+before_script:
+    - travis_retry composer update ${COMPOSER_FLAGS} --no-interaction --prefer-dist
+    - vendor/bin/phpunit --version
+
+script:
+    - vendor/bin/php-cs-fixer fix --verbose
+    - vendor/bin/phpunit --coverage-text --coverage-clover=coverage.clover
+
+after_script:
+    - |
+        wget https://scrutinizer-ci.com/ocular.phar
+        php ocular.phar code-coverage:upload --format=php-clover coverage.clover
