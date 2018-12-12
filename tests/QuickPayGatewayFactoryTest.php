@@ -25,7 +25,8 @@ class QuickPayGatewayFactoryTest extends TestCase
      */
     public function couldBeConstructedWithoutAnyArguments()
     {
-        new QuickPayGatewayFactory();
+        $factory = new QuickPayGatewayFactory();
+        $this->assertInstanceOf(QuickPayGatewayFactory::class, $factory);
     }
 
     /**
