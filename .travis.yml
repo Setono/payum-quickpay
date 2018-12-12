@@ -14,11 +14,10 @@ matrix:
 
 before_script:
     - travis_retry composer update ${COMPOSER_FLAGS} --no-interaction --prefer-dist
-    - vendor/bin/phpunit --version
+    - vendor/phpunit/phpunit/phpunit --version
 
 script:
-    - vendor/bin/php-cs-fixer fix --verbose
-    - vendor/bin/phpunit --coverage-text --coverage-clover=coverage.clover
+    - vendor/phpunit/phpunit/phpunit --coverage-text --coverage-clover=coverage.clover
 
 after_script:
     - |
