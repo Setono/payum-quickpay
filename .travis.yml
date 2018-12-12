@@ -17,7 +17,7 @@ before_script:
     - vendor/phpunit/phpunit/phpunit --version
 
 script:
-    - vendor/phpunit/phpunit/phpunit --coverage-text --coverage-clover=coverage.clover
+    - vendor/phpunit/phpunit/phpunit --no-coverage
 
 after_script:
     - |
