@@ -3,11 +3,12 @@
 namespace Setono\Payum\QuickPay\Tests;
 
 use Setono\Payum\QuickPay\QuickPayGatewayFactory;
+use PHPUnit\Framework\TestCase;
 
 /**
  * @author jdk
  */
-class QuickPayGatewayFactoryTest extends \PHPUnit_Framework_TestCase
+class QuickPayGatewayFactoryTest extends TestCase
 {
     /**
      * @test
