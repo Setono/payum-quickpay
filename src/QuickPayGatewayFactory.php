@@ -45,7 +45,6 @@ class QuickPayGatewayFactory extends GatewayFactory
                 'syncronized' => false
             );
             $config->defaults($config['payum.default_options']);
-            $config['payum.required_options'] = ['apikey', 'merchant', 'agreement', 'privatekey'];
 
             $config['payum.api'] = function (ArrayObject $config) {
                 $config->validateNotEmpty($config['payum.required_options']);
