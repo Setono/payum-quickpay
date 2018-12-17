@@ -2,16 +2,14 @@
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 use Setono\Payum\QuickPay\Action\StatusAction;
-use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\GetHumanStatus;
-use Payum\Core\Tests\Action\GatewayAwareActionTest;
 
-class StatusActionTest extends GatewayAwareActionTest
+class StatusActionTest extends ActionTestAbstract
 {
-    use GatewayAwareTrait;
-    use ApiAwareTrait;
+    protected $requestClass = GetHumanStatus::class;
+
+    protected $actionClass = StatusAction::class;
 
     /**
      * @test
@@ -27,11 +25,10 @@ class StatusActionTest extends GatewayAwareActionTest
      */
     public function shouldMarkAsNew()
     {
-        $request = new GetHumanStatus([
-            'status' => 'NEW'
-        ]);
+        $statusRequest = new GetHumanStatus([]);
+
         $action = new StatusAction();
-        $action->execute($request);
-        $this->assertTrue($request->isNew(), 'Request should be marked as new');
+        $action->execute($statusRequest);
+        $this->assertTrue($statusRequest->isNew(), 'Request should be marked as new');
     }
 }
