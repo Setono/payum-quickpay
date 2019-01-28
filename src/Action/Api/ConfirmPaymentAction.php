@@ -38,8 +38,8 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
 
         $quickpayPayment = $this->api->getPayment($model, false);
 
-        if ($quickpayPayment->getLatestOperation()->getType() == QuickPayPaymentOperation::TYPE_AUTHORIZE) {
-            if ($this->api->getOption('auto_capture') == 1 && intval($quickpayPayment->getAuthorizedAmount()) == intval($model['amount'])) {
+        if ($this->api->getOption('auto_capture') == 1 && $quickpayPayment->getLatestOperation()->getType() == QuickPayPaymentOperation::TYPE_AUTHORIZE) {
+            if (intval($quickpayPayment->getAuthorizedAmount()) == intval($model['amount'])) {
                 $this->api->capturePayment($quickpayPayment, $model);
             } else {
                 throw new LogicException(sprintf("Authorized amount does not match. Authorized %s expected %s", $quickpayPayment->getAuthorizedAmount(), $model['amount']));
