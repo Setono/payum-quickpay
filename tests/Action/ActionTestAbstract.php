@@ -72,6 +72,7 @@ abstract class ActionTestAbstract extends GenericActionTest
 
     /**
      * @return Payment
+     *
      * @throws \Exception
      */
     protected function createPayment(): Payment

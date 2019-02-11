@@ -13,7 +13,7 @@ class QuickPayPaymentLink extends QuickPayModel
      *
      * @return QuickPayPaymentLink
      */
-    public static function createFromResponse(ResponseInterface $response): QuickPayPaymentLink
+    public static function createFromResponse(ResponseInterface $response): self
     {
         $data = json_decode((string) $response->getBody());
 

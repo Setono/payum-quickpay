@@ -16,7 +16,7 @@ class QuickPayPaymentOperation extends QuickPayModel
      *
      * @return QuickPayPaymentOperation
      */
-    public static function createFromObject(\stdClass $operations): QuickPayPaymentOperation
+    public static function createFromObject(\stdClass $operations): self
     {
         return new self($operations);
     }

@@ -19,7 +19,7 @@ class QuickPayPayment extends QuickPayModel
      *
      * @return QuickPayPayment
      */
-    public static function createFromResponse(ResponseInterface $response): QuickPayPayment
+    public static function createFromResponse(ResponseInterface $response): self
     {
         $data = json_decode((string) $response->getBody());
 
