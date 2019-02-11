@@ -53,9 +53,9 @@ $quickpay->execute(new Capture($model));
 
 [ico-version]: https://img.shields.io/packagist/v/setono/payum-quickpay.svg?style=flat-square
 [ico-license]: https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square
-[ico-travis]: https://travis-ci.com/Setono/payum-quickpay.svg?branch=master
+[ico-travis]: https://travis-ci.org/Setono/payum-quickpay.svg?branch=master
 [ico-code-quality]: https://img.shields.io/scrutinizer/g/Setono/payum-quickpay.svg?style=flat-square
 
 [link-packagist]: https://packagist.org/packages/setono/payum-quickpay
-[link-travis]: https://travis-ci.com/Setono/payum-quickpay
+[link-travis]: https://travis-ci.org/Setono/payum-quickpay
 [link-code-quality]: https://scrutinizer-ci.com/g/Setono/payum-quickpay
