@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Action;
 
-use Payum\Core\Exception\LogicException;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
@@ -46,8 +45,8 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             case QuickPayPayment::STATE_NEW:
-                $latestOperation = $this->getLatestOperation($quickpayPayment);
-                if (QuickPayPaymentOperation::TYPE_AUTHORIZE === $latestOperation->getType() && $latestOperation->isApproved()) {
+                $latestOperation = $quickpayPayment->getLatestOperation();
+                if (null !== $latestOperation && QuickPayPaymentOperation::TYPE_AUTHORIZE === $latestOperation->getType() && $latestOperation->isApproved()) {
                     $request->markAuthorized();
                 } else {
                     $request->markFailed();
@@ -63,8 +62,8 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             case QuickPayPayment::STATE_PROCESSED:
-                $latestOperation = $this->getLatestOperation($quickpayPayment);
-                if (QuickPayPaymentOperation::TYPE_CAPTURE === $latestOperation->getType() && $latestOperation->isApproved()) {
+                $latestOperation = $quickpayPayment->getLatestOperation();
+                if (null !== $latestOperation && QuickPayPaymentOperation::TYPE_CAPTURE === $latestOperation->getType() && $latestOperation->isApproved()) {
                     $request->markCaptured();
                 } else {
                     $request->markCanceled();
@@ -84,16 +83,5 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         return
             $request instanceof GetStatusInterface &&
             $request->getModel() instanceof \ArrayAccess;
-    }
-
-    private function getLatestOperation(QuickPayPayment $quickPayPayment): QuickPayPaymentOperation
-    {
-        $latestOperation = $quickPayPayment->getLatestOperation();
-
-        if (null === $latestOperation) {
-            throw new LogicException('No latest operation available');
-        }
-
-        return $latestOperation;
     }
 }
