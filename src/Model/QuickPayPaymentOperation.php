@@ -1,26 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Model;
 
-use phpDocumentor\Reflection\Types\Object_;
-use Psr\Http\Message\ResponseInterface;
-
-/**
- * @author jdk
- */
 class QuickPayPaymentOperation extends QuickPayModel
 {
-    const TYPE_AUTHORIZE = 'authorize';
-    const TYPE_CAPTURE = 'capture';
+    public const TYPE_AUTHORIZE = 'authorize';
+    public const TYPE_CAPTURE = 'capture';
 
-    const STATUS_CODE_APPROVED = 20000;
+    public const STATUS_CODE_APPROVED = 20000;
 
     /**
      * @param \stdClass $operations
      *
      * @return QuickPayPaymentOperation
      */
-    public static function createFromObject(\stdClass $operations)
+    public static function createFromObject(\stdClass $operations): self
     {
         return new self($operations);
     }
@@ -30,18 +26,20 @@ class QuickPayPaymentOperation extends QuickPayModel
      *
      * @return array
      */
-    public static function createFromArray(array $operations) {
+    public static function createFromArray(array $operations): array
+    {
         $ret = [];
         foreach ($operations as $operation) {
             $ret[] = self::createFromObject($operation);
         }
+
         return $ret;
     }
 
     /**
      * @return int
      */
-    public function getId()
+    public function getId(): int
     {
         return $this->data->id;
     }
@@ -49,7 +47,7 @@ class QuickPayPaymentOperation extends QuickPayModel
     /**
      * @return string
      */
-    public function getType()
+    public function getType(): string
     {
         return $this->data->type;
     }
@@ -57,7 +55,7 @@ class QuickPayPaymentOperation extends QuickPayModel
     /**
      * @return int
      */
-    public function getAmount()
+    public function getAmount(): int
     {
         return $this->data->amount;
     }
@@ -65,7 +63,7 @@ class QuickPayPaymentOperation extends QuickPayModel
     /**
      * @return int
      */
-    public function getStatusCode()
+    public function getStatusCode(): int
     {
         return $this->data->qp_status_code;
     }
@@ -73,7 +71,8 @@ class QuickPayPaymentOperation extends QuickPayModel
     /**
      * @return bool
      */
-    public function isApproved() {
-        return $this->getStatusCode() == self::STATUS_CODE_APPROVED;
+    public function isApproved(): bool
+    {
+        return self::STATUS_CODE_APPROVED === $this->getStatusCode();
     }
 }

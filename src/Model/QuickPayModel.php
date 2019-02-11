@@ -1,10 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Model;
 
-/**
- * @author jdk
- */
 abstract class QuickPayModel
 {
     /**

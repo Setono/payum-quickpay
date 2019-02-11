@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay;
 
 use Setono\Payum\QuickPay\Action\Api\ConfirmPaymentAction;
@@ -16,9 +18,9 @@ use Payum\Core\GatewayFactory;
 class QuickPayGatewayFactory extends GatewayFactory
 {
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
-    protected function populateConfig(ArrayObject $config)
+    protected function populateConfig(ArrayObject $config): void
     {
         $config->defaults([
             'payum.factory_name' => 'quickpay',
@@ -33,7 +35,7 @@ class QuickPayGatewayFactory extends GatewayFactory
             'payum.action.api.confirm_payment' => new ConfirmPaymentAction(),
         ]);
 
-        if (false == $config['payum.api']) {
+        if (!$config->offsetExists('payum.api')) {
             $config['payum.default_options'] = array(
                 'apikey' => '',
                 'merchant' => '',
@@ -42,14 +44,14 @@ class QuickPayGatewayFactory extends GatewayFactory
                 'payment_methods' => '',
                 'auto_capture' => 0,
                 'order_prefix' => '',
-                'syncronized' => false
+                'syncronized' => false,
             );
             $config->defaults($config['payum.default_options']);
 
             $config['payum.api'] = function (ArrayObject $config) {
                 $config->validateNotEmpty($config['payum.required_options']);
 
-                return new Api((array)$config, $config['payum.http_client'], $config['httplug.message_factory']);
+                return new Api((array) $config, $config['payum.http_client'], $config['httplug.message_factory']);
             };
         }
     }

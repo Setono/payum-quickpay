@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Tests\Action;
 
 use Payum\Core\Action\ActionInterface;
@@ -20,19 +22,24 @@ abstract class ActionTestAbstract extends GenericActionTest
     protected $api;
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
+     *
+     * @throws \ReflectionException
      */
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
+
         $this->gateway = $this->createGatewayMock();
         $this->api = $this->getApi();
     }
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementActionInterface()
+    public function shouldImplementActionInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 
@@ -41,8 +48,10 @@ abstract class ActionTestAbstract extends GenericActionTest
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementApiAwareInterface()
+    public function shouldImplementApiAwareInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 
@@ -51,8 +60,10 @@ abstract class ActionTestAbstract extends GenericActionTest
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementGatewayAwareInterface()
+    public function shouldImplementGatewayAwareInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 
@@ -61,12 +72,14 @@ abstract class ActionTestAbstract extends GenericActionTest
 
     /**
      * @return Payment
+     *
+     * @throws \Exception
      */
-    protected function createPayment()
+    protected function createPayment(): Payment
     {
         $payment = new Payment();
-        $payment->setNumber(uniqid());
-        $payment->setTotalAmount(rand(1,100) * 100);
+        $payment->setNumber(time());
+        $payment->setTotalAmount(random_int(1, 100) * 100);
         $payment->setCurrencyCode('DKK');
 
         return $payment;
@@ -75,7 +88,7 @@ abstract class ActionTestAbstract extends GenericActionTest
     /**
      * @return GatewayInterface
      */
-    protected function createGatewayMock()
+    protected function createGatewayMock(): GatewayInterface
     {
         $factory = new QuickPayGatewayFactory();
         $gateway = $factory->create([
@@ -84,17 +97,19 @@ abstract class ActionTestAbstract extends GenericActionTest
             'merchant' => '75015',
             'agreement' => '266017',
             'order_prefix' => 'ut',
-            'payment_methods' => 'visa'
+            'payment_methods' => 'visa',
         ]);
+
         return $gateway;
     }
 
     /**
      * @return mixed
+     *
      * @throws \ReflectionException
      * @throws \Exception
      */
-    private function getApi()
+    private function getApi(): Api
     {
         $attribute = new \ReflectionProperty($this->gateway, 'apis');
 
@@ -107,6 +122,7 @@ abstract class ActionTestAbstract extends GenericActionTest
                 return $api;
             }
         }
-        throw new \Exception('No api found in gateway');
+
+        throw new \RuntimeException('No api found in gateway');
     }
 }

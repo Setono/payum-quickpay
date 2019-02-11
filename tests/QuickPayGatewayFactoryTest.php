@@ -1,29 +1,32 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Tests;
 
+use Payum\Core\CoreGatewayFactory;
+use Payum\Core\Gateway;
+use Payum\Core\GatewayFactory;
 use Setono\Payum\QuickPay\QuickPayGatewayFactory;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @author jdk
- */
 class QuickPayGatewayFactoryTest extends TestCase
 {
     /**
      * @test
+     *
      * @throws \ReflectionException
      */
-    public function shouldSubClassGatewayFactory()
+    public function shouldSubClassGatewayFactory(): void
     {
         $rc = new \ReflectionClass(QuickPayGatewayFactory::class);
-        $this->assertTrue($rc->isSubclassOf('Payum\Core\GatewayFactory'));
+        $this->assertTrue($rc->isSubclassOf(GatewayFactory::class));
     }
 
     /**
      * @test
      */
-    public function couldBeConstructedWithoutAnyArguments()
+    public function couldBeConstructedWithoutAnyArguments(): void
     {
         $factory = new QuickPayGatewayFactory();
         $this->assertInstanceOf(QuickPayGatewayFactory::class, $factory);
@@ -32,16 +35,16 @@ class QuickPayGatewayFactoryTest extends TestCase
     /**
      * @test
      */
-    public function shouldCreateCoreGatewayFactoryIfNotPassed()
+    public function shouldCreateCoreGatewayFactoryIfNotPassed(): void
     {
         $factory = new QuickPayGatewayFactory();
-        $this->assertAttributeInstanceOf('Payum\Core\CoreGatewayFactory', 'coreGatewayFactory', $factory);
+        $this->assertAttributeInstanceOf(CoreGatewayFactory::class, 'coreGatewayFactory', $factory);
     }
 
     /**
      * @test
      */
-    public function shouldAllowCreateGateway()
+    public function shouldAllowCreateGateway(): void
     {
         $factory = new QuickPayGatewayFactory();
         $gateway = $factory->create([
@@ -50,7 +53,7 @@ class QuickPayGatewayFactoryTest extends TestCase
             'merchant' => '1234',
             'agreement' => '1234',
         ]);
-        $this->assertInstanceOf('Payum\Core\Gateway', $gateway);
+        $this->assertInstanceOf(Gateway::class, $gateway);
         $this->assertAttributeNotEmpty('apis', $gateway);
         $this->assertAttributeNotEmpty('actions', $gateway);
         $extensions = $this->readAttribute($gateway, 'extensions');
@@ -60,7 +63,7 @@ class QuickPayGatewayFactoryTest extends TestCase
     /**
      * @test
      */
-    public function shouldAllowCreateGatewayConfig()
+    public function shouldAllowCreateGatewayConfig(): void
     {
         $factory = new QuickPayGatewayFactory();
         $config = $factory->createConfig();
@@ -71,7 +74,7 @@ class QuickPayGatewayFactoryTest extends TestCase
     /**
      * @test
      */
-    public function shouldConfigContainFactoryNameAndTitle()
+    public function shouldConfigContainFactoryNameAndTitle(): void
     {
         $factory = new QuickPayGatewayFactory();
         $config = $factory->createConfig();

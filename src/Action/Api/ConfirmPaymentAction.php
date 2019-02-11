@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Action\Api;
 
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
@@ -11,19 +13,14 @@ use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
-use Payum\Core\Model\Payment;
-use Payum\Core\Reply\HttpResponse;
 
-/**
- * @author jdk
- */
 class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, ApiAwareInterface
 {
     use GatewayAwareTrait;
     use ApiAwareTrait;
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      *
      * @param ConfirmPayment $request
      */
@@ -32,23 +29,31 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
         RequestNotSupportedException::assertSupports($this, $request);
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
-        if (false == $model['quickpayPaymentId']) {
+        if (!$model->offsetExists('quickpayPaymentId')) {
             throw new LogicException('The payment has not been created');
         }
 
         $quickpayPayment = $this->api->getPayment($model, false);
 
-        if ($this->api->getOption('auto_capture') == 1 && $quickpayPayment->getLatestOperation()->getType() == QuickPayPaymentOperation::TYPE_AUTHORIZE) {
-            if (intval($quickpayPayment->getAuthorizedAmount()) == intval($model['amount'])) {
+        $latestOperation = $quickpayPayment->getLatestOperation();
+
+        if (null === $latestOperation) {
+            throw new LogicException('The payment does not have a `latest operation`');
+        }
+
+        if (1 === (int) $this->api->getOption('auto_capture') && QuickPayPaymentOperation::TYPE_AUTHORIZE === $latestOperation->getType()) {
+            if ($quickpayPayment->getAuthorizedAmount() === (int) $model['amount']) {
                 $this->api->capturePayment($quickpayPayment, $model);
             } else {
-                throw new LogicException(sprintf("Authorized amount does not match. Authorized %s expected %s", $quickpayPayment->getAuthorizedAmount(), $model['amount']));
+                throw new LogicException(sprintf('Authorized amount does not match. Authorized %s expected %s', $quickpayPayment->getAuthorizedAmount(), $model['amount']));
             }
         }
+
         return 'OK';
     }
+
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function supports($request)
     {

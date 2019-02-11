@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
@@ -11,8 +14,7 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Notify;
 
 /**
- * @author jdk
- * Handles callback from QuickPay
+ * Handles callback from QuickPay.
  */
 class NotifyAction implements ActionInterface, GatewayAwareInterface
 {
@@ -20,11 +22,11 @@ class NotifyAction implements ActionInterface, GatewayAwareInterface
     use GatewayAwareTrait;
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      *
      * @param Notify $request
      */
-    public function execute($request)
+    public function execute($request): void
     {
         RequestNotSupportedException::assertSupports($this, $request);
 
@@ -34,9 +36,9 @@ class NotifyAction implements ActionInterface, GatewayAwareInterface
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
-    public function supports($request)
+    public function supports($request): bool
     {
         return
             $request instanceof Notify &&

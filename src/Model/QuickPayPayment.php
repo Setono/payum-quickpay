@@ -1,28 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Model;
 
 use Psr\Http\Message\ResponseInterface;
 
-/**
- * @author jdk
- */
 class QuickPayPayment extends QuickPayModel
 {
-    const STATE_INITIAL = 'initial';
-    const STATE_PENDING = 'pending';
-    const STATE_NEW = 'new';
-    const STATE_REJECTED = 'rejected';
-    const STATE_PROCESSED = 'processed';
+    public const STATE_INITIAL = 'initial';
+    public const STATE_PENDING = 'pending';
+    public const STATE_NEW = 'new';
+    public const STATE_REJECTED = 'rejected';
+    public const STATE_PROCESSED = 'processed';
 
     /**
      * @param ResponseInterface $response
      *
-     * @return self
+     * @return QuickPayPayment
      */
-    public static function createFromResponse(ResponseInterface $response)
+    public static function createFromResponse(ResponseInterface $response): self
     {
-        $data = json_decode($response->getBody());
+        $data = json_decode((string) $response->getBody());
 
         return new self($data);
     }
@@ -30,7 +29,7 @@ class QuickPayPayment extends QuickPayModel
     /**
      * @return int
      */
-    public function getId()
+    public function getId(): int
     {
         return $this->data->id;
     }
@@ -38,7 +37,7 @@ class QuickPayPayment extends QuickPayModel
     /**
      * @return string
      */
-    public function getOrderId()
+    public function getOrderId(): string
     {
         return $this->data->order_id;
     }
@@ -46,7 +45,7 @@ class QuickPayPayment extends QuickPayModel
     /**
      * @return string
      */
-    public function getCurrency()
+    public function getCurrency(): string
     {
         return $this->data->currency;
     }
@@ -54,7 +53,7 @@ class QuickPayPayment extends QuickPayModel
     /**
      * @return string initial, pending, new, rejected, processed
      */
-    public function getState()
+    public function getState(): string
     {
         return $this->data->state;
     }
@@ -62,36 +61,41 @@ class QuickPayPayment extends QuickPayModel
     /**
      * @return int
      */
-    public function getAuthorizedAmount() {
+    public function getAuthorizedAmount(): int
+    {
         /** @var QuickPayPaymentOperation[] $operations */
         $operations = array_reverse($this->getOperations());
+
         foreach ($operations as $operation) {
-            if ($operation->getType() == QuickPayPaymentOperation::TYPE_AUTHORIZE && $operation->isApproved()) {
+            if (QuickPayPaymentOperation::TYPE_AUTHORIZE === $operation->getType() && $operation->isApproved()) {
                 return $operation->getAmount();
             }
         }
+
         return 0;
     }
 
     /**
      * @return QuickPayPaymentOperation[]
      */
-    public function getOperations()
+    public function getOperations(): array
     {
         if (count($this->data->operations) > 0) {
             return QuickPayPaymentOperation::createFromArray($this->data->operations);
         }
+
         return [];
     }
 
     /**
      * @return QuickPayPaymentOperation|null
      */
-    public function getLatestOperation()
+    public function getLatestOperation(): ?QuickPayPaymentOperation
     {
         if (count($this->data->operations) > 0) {
             return QuickPayPaymentOperation::createFromObject(end($this->data->operations));
         }
+
         return null;
     }
 }

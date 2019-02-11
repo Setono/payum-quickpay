@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Action\Api;
 
 use Setono\Payum\QuickPay\Api;
@@ -16,7 +19,7 @@ trait ApiAwareTrait
      */
     public function setApi($api): void
     {
-        if (false == $api instanceof Api) {
+        if (!$api instanceof Api) {
             throw new UnsupportedApiException(sprintf('Not supported api given. It must be an instance of %s', Api::class));
         }
 

@@ -1,22 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Model;
 
 use Psr\Http\Message\ResponseInterface;
 
-/**
- * @author jdk
- */
 class QuickPayPaymentLink extends QuickPayModel
 {
     /**
      * @param ResponseInterface $response
      *
-     * @return self
+     * @return QuickPayPaymentLink
      */
-    public static function createFromResponse(ResponseInterface $response)
+    public static function createFromResponse(ResponseInterface $response): self
     {
-        $data = json_decode($response->getBody());
+        $data = json_decode((string) $response->getBody());
 
         return new self($data);
     }
@@ -24,7 +23,7 @@ class QuickPayPaymentLink extends QuickPayModel
     /**
      * @return string
      */
-    public function getUrl()
+    public function getUrl(): string
     {
         return $this->data->url;
     }

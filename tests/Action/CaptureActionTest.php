@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Tests\Action;
 
 use Payum\Core\Request\Capture;
@@ -13,8 +16,10 @@ class CaptureActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementGenericTokenFactoryAwareInterface()
+    public function shouldImplementGenericTokenFactoryAwareInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 

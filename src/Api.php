@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay;
 
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
@@ -15,7 +17,7 @@ use Payum\Core\Model\Payment;
 
 class Api
 {
-    const VERSION = 'v10';
+    public const VERSION = 'v10';
 
     /**
      * @var HttpClientInterface
@@ -60,14 +62,14 @@ class Api
             return $params['quickpayPayment'];
         }
 
-        if (is_integer($params['quickpayPaymentId'])) {
-            $response = $this->doRequest('GET', 'payments/' . $params['quickpayPaymentId']);
+        if (is_int($params['quickpayPaymentId'])) {
+            $response = $this->doRequest('GET', 'payments/'.$params['quickpayPaymentId']);
         } else {
             /** @var Payment $paymentModel */
             $paymentModel = $params['payment'];
             if ($create) {
                 $response = $this->doRequest('POST', 'payments', [
-                    'order_id' => $this->getOption('order_prefix', '') . $paymentModel->getNumber(),
+                    'order_id' => $this->getOption('order_prefix').$paymentModel->getNumber(),
                     'currency' => $paymentModel->getCurrencyCode(),
                 ]);
             } else {
@@ -84,16 +86,16 @@ class Api
      *
      * @return QuickPayPaymentLink
      */
-    public function createPaymentLink(QuickPayPayment $payment, ArrayObject $params)
+    public function createPaymentLink(QuickPayPayment $payment, ArrayObject $params): QuickPayPaymentLink
     {
         $params = ArrayObject::ensureArrayObject($params);
         $params->validateNotEmpty([
-            'continue_url', 'cancel_url', 'callback_url', 'amount'
+            'continue_url', 'cancel_url', 'callback_url', 'amount',
         ]);
 
-        $response = $this->doRequest('PUT', 'payments/' . $payment->getId() . '/link', $params->getArrayCopy() + [
+        $response = $this->doRequest('PUT', 'payments/'.$payment->getId().'/link', $params->getArrayCopy() + [
             'payment_methods' => $this->options['payment_methods'],
-            'auto_capture' => $this->options['auto_capture']
+            'auto_capture' => $this->options['auto_capture'],
         ]);
 
         return QuickPayPaymentLink::createFromResponse($response);
@@ -105,7 +107,7 @@ class Api
      *
      * @thorws LogicException
      */
-    public function authorizePayment(QuickPayPayment $payment, ArrayObject $params)
+    public function authorizePayment(QuickPayPayment $payment, ArrayObject $params): void
     {
         throw new \LogicException('Not implemented, use payment link.');
     }
@@ -116,14 +118,14 @@ class Api
      *
      * @return QuickPayPayment
      */
-    public function capturePayment(QuickPayPayment $payment, ArrayObject $params)
+    public function capturePayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
         $params = ArrayObject::ensureArrayObject($params);
         $params->validateNotEmpty([
-            'amount'
+            'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/capture', $params->getArrayCopy());
+        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/capture', $params->getArrayCopy());
 
         return QuickPayPayment::createFromResponse($response);
     }
@@ -134,14 +136,14 @@ class Api
      *
      * @return QuickPayPayment
      */
-    public function refundPayment(QuickPayPayment $payment, ArrayObject $params)
+    public function refundPayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
         $params = ArrayObject::ensureArrayObject($params);
         $params->validateNotEmpty([
-            'amount'
+            'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/refund', $params->getArrayCopy());
+        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/refund', $params->getArrayCopy());
 
         return QuickPayPayment::createFromResponse($response);
     }
@@ -152,18 +154,17 @@ class Api
      *
      * @return QuickPayPayment
      */
-    public function cancelPayment(QuickPayPayment $payment, ArrayObject $params)
+    public function cancelPayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
         $params = ArrayObject::ensureArrayObject($params);
         $params->validateNotEmpty([
-            'amount'
+            'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/cancel', $params->getArrayCopy());
+        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/cancel', $params->getArrayCopy());
 
         return QuickPayPayment::createFromResponse($response);
     }
-
 
     /**
      * @param string $method
@@ -172,28 +173,34 @@ class Api
      *
      * @return ResponseInterface
      */
-    protected function doRequest($method, string $path, array $params = [])
+    protected function doRequest($method, string $path, array $params = []): ResponseInterface
     {
         $headers = [
-            'Authorization' => 'Basic ' . base64_encode(":" . $this->getOption('apikey')),
+            'Authorization' => 'Basic '.base64_encode(':'.$this->getOption('apikey')),
             'Accept-Version' => self::VERSION,
             'Content-Type' => 'application/json',
         ];
 
+        $encodedParams = json_encode($params);
+        if (false === $encodedParams) {
+            throw new \InvalidArgumentException('Could not encode $params');
+        }
+
         $request = $this->messageFactory->createRequest(
             $method,
-            $this->getApiEndpoint() . '/' . ltrim($path, '/'),
+            $this->getApiEndpoint().'/'.ltrim($path, '/'),
             $headers,
-            json_encode($params)
+            $encodedParams
         );
 
         $response = $this->client->send($request);
+        $statusCode = $response->getStatusCode();
 
-        if (false == ($response->getStatusCode() >= 200 && $response->getStatusCode() < 300)) {
-            throw new HttpException($response->getBody(), $response->getStatusCode());
+        if ($statusCode < 200 || $statusCode > 299) {
+            throw new HttpException((string) $response->getBody(), $response->getStatusCode());
         }
 
-        self::assertValidResponse($response, $this->getOption('privatekey'));
+        self::assertValidResponse($response, (string) $this->getOption('privatekey'));
 
         return $response;
     }
@@ -201,48 +208,47 @@ class Api
     /**
      * @return string
      */
-    protected function getApiEndpoint()
+    protected function getApiEndpoint(): string
     {
         return 'https://api.quickpay.net';
     }
 
     /**
-     * Generates a checksum based on response body
+     * Generates a checksum based on response body.
      *
      * @param string $requestBody
      * @param string $privateKey
      *
      * @return string
      */
-    public static function checksum($requestBody, $privateKey)
+    public static function checksum($requestBody, $privateKey): string
     {
-        return hash_hmac("sha256", $requestBody, $privateKey);
+        return hash_hmac('sha256', $requestBody, $privateKey);
     }
 
     /**
      * @param ResponseInterface $response
      * @param string            $privateKey
      */
-    public static function assertValidResponse(ResponseInterface $response, string $privateKey)
+    public static function assertValidResponse(ResponseInterface $response, string $privateKey): void
     {
-        if ($response->hasHeader("QuickPay-Checksum-Sha256")) {
-            $checksum = self::checksum($response->getBody(), $privateKey);
-            $qp_checksum = $response->getHeader("QuickPay-Checksum-Sha256");
-            if ($checksum != $qp_checksum) {
-                throw new \LogicException("Invalid checksum");
+        if ($response->hasHeader('QuickPay-Checksum-Sha256')) {
+            $checksum = self::checksum((string) $response->getBody(), $privateKey);
+            $qp_checksum = $response->getHeader('QuickPay-Checksum-Sha256');
+            if ($checksum !== $qp_checksum) {
+                throw new \LogicException('Invalid checksum');
             }
         }
     }
 
     /**
      * @param string $option
-     *
-     * @param mixed $default
+     * @param mixed  $default
      *
      * @return mixed|null
      */
     public function getOption(string $option, $default = '')
     {
-        return isset($this->options[$option]) ? $this->options[$option] : $default;
+        return $this->options[$option] ?? $default;
     }
 }

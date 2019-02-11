@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
@@ -19,7 +21,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     use ApiAwareTrait;
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      *
      * @param GetStatusInterface $request
      */
@@ -31,6 +33,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         if (!$model['quickpayPaymentId']) {
             $request->markNew();
+
             return;
         }
 
@@ -39,28 +42,33 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         switch ($quickpayPayment->getState()) {
             case QuickPayPayment::STATE_INITIAL:
                 $request->markNew();
+
                 break;
             case QuickPayPayment::STATE_NEW:
                 $latestOperation = $quickpayPayment->getLatestOperation();
-                if ($latestOperation && $latestOperation->getType() == QuickPayPaymentOperation::TYPE_AUTHORIZE && $latestOperation->isApproved()) {
+                if (null !== $latestOperation && QuickPayPaymentOperation::TYPE_AUTHORIZE === $latestOperation->getType() && $latestOperation->isApproved()) {
                     $request->markAuthorized();
                 } else {
                     $request->markFailed();
                 }
+
                 break;
             case QuickPayPayment::STATE_PENDING:
                 $request->markPending();
+
                 break;
             case QuickPayPayment::STATE_REJECTED:
                 $request->markFailed();
+
                 break;
             case QuickPayPayment::STATE_PROCESSED:
                 $latestOperation = $quickpayPayment->getLatestOperation();
-                if ($latestOperation->getType() == QuickPayPaymentOperation::TYPE_CAPTURE && $latestOperation->isApproved()) {
+                if (null !== $latestOperation && QuickPayPaymentOperation::TYPE_CAPTURE === $latestOperation->getType() && $latestOperation->isApproved()) {
                     $request->markCaptured();
                 } else {
                     $request->markCanceled();
                 }
+
                 break;
             default:
                 $request->markUnknown();
@@ -68,7 +76,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function supports($request)
     {

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
@@ -19,7 +21,7 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
     use ApiAwareTrait;
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      *
      * @param Convert $request
      */
@@ -46,13 +48,13 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function supports($request)
     {
         return
             $request instanceof Convert &&
             $request->getSource() instanceof PaymentInterface &&
-            $request->getTo() == 'array';
+            'array' === $request->getTo();
     }
 }
