@@ -41,7 +41,7 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
             throw new LogicException('The payment does not have a `latest operation`');
         }
 
-        if (1 === $this->api->getOption('auto_capture') && QuickPayPaymentOperation::TYPE_AUTHORIZE === $latestOperation->getType()) {
+        if (1 === (int) $this->api->getOption('auto_capture') && QuickPayPaymentOperation::TYPE_AUTHORIZE === $latestOperation->getType()) {
             if ($quickpayPayment->getAuthorizedAmount() === (int) $model['amount']) {
                 $this->api->capturePayment($quickpayPayment, $model);
             } else {

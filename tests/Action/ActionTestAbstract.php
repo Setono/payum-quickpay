@@ -78,7 +78,7 @@ abstract class ActionTestAbstract extends GenericActionTest
     protected function createPayment(): Payment
     {
         $payment = new Payment();
-        $payment->setNumber(uniqid('payment', true));
+        $payment->setNumber(time());
         $payment->setTotalAmount(random_int(1, 100) * 100);
         $payment->setCurrencyCode('DKK');
 
