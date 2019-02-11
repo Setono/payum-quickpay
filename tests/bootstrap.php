@@ -14,6 +14,6 @@ EOM;
 use Payum\Core\GatewayInterface;
 
 $rc = new \ReflectionClass(GatewayInterface::class);
-$coreDir = dirname($rc->getFileName()).'/Tests';
+$coreDir = dirname($rc->getFileName()).'/tests';
 $loader->add('Payum\Core\Tests', $coreDir);
 $loader->add('Setono\Payum\QuickPay\Tests', $coreDir);
