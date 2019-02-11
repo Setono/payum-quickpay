@@ -10,3 +10,8 @@ build:
 
 filter:
     excluded_paths: [spec/*, tests/*]
+
+
+tools:
+    external_code_coverage:
+        timeout: 600
