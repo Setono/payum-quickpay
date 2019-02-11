@@ -29,7 +29,7 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
         RequestNotSupportedException::assertSupports($this, $request);
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
-        if (false === $model['quickpayPaymentId']) {
+        if (!$model->offsetExists('quickpayPaymentId')) {
             throw new LogicException('The payment has not been created');
         }
 
