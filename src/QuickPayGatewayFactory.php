@@ -35,7 +35,7 @@ class QuickPayGatewayFactory extends GatewayFactory
             'payum.action.api.confirm_payment' => new ConfirmPaymentAction(),
         ]);
 
-        if (!array_key_exists('payum.api', $config)) {
+        if (!$config->offsetExists('payum.api')) {
             $config['payum.default_options'] = array(
                 'apikey' => '',
                 'merchant' => '',
