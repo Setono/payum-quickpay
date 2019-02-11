@@ -9,14 +9,20 @@ cache:
         - $HOME/.composer/cache
 
 matrix:
+    fast_finish: true
     include:
-        - php: 7.2
+        -   php: 7.1
+        -   php: 7.1
+            env: 'COMPOSER_FLAGS="--prefer-stable --prefer-lowest"'
+        -   php: 7.2
+        -   php: 7.2
+            env: 'COMPOSER_FLAGS="--prefer-stable --prefer-lowest"'
 
-before_script:
-    - travis_retry composer update ${COMPOSER_FLAGS} --no-interaction --prefer-dist
-    - vendor/phpunit/phpunit/phpunit --version
+install:
+    - composer update --no-interaction --prefer-dist ${COMPOSER_FLAGS}
 
 script:
+    - composer validate --strict
     - composer check-style
     - composer analyse
     - vendor/phpunit/phpunit/phpunit --coverage-text --coverage-clover=coverage.clover
