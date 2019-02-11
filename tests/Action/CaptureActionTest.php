@@ -16,8 +16,10 @@ class CaptureActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementGenericTokenFactoryAwareInterface()
+    public function shouldImplementGenericTokenFactoryAwareInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 

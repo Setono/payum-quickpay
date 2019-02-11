@@ -23,18 +23,23 @@ abstract class ActionTestAbstract extends GenericActionTest
 
     /**
      * {@inheritdoc}
+     *
+     * @throws \ReflectionException
      */
-    public function setUp()
+    public function setUp(): void
     {
         parent::setUp();
+
         $this->gateway = $this->createGatewayMock();
         $this->api = $this->getApi();
     }
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementActionInterface()
+    public function shouldImplementActionInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 
@@ -43,8 +48,10 @@ abstract class ActionTestAbstract extends GenericActionTest
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementApiAwareInterface()
+    public function shouldImplementApiAwareInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 
@@ -53,8 +60,10 @@ abstract class ActionTestAbstract extends GenericActionTest
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementGatewayAwareInterface()
+    public function shouldImplementGatewayAwareInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 
@@ -65,7 +74,7 @@ abstract class ActionTestAbstract extends GenericActionTest
      * @return Payment
      * @throws \Exception
      */
-    protected function createPayment()
+    protected function createPayment(): Payment
     {
         $payment = new Payment();
         $payment->setNumber(uniqid('payment', true));
@@ -78,7 +87,7 @@ abstract class ActionTestAbstract extends GenericActionTest
     /**
      * @return GatewayInterface
      */
-    protected function createGatewayMock()
+    protected function createGatewayMock(): GatewayInterface
     {
         $factory = new QuickPayGatewayFactory();
         $gateway = $factory->create([
@@ -99,7 +108,7 @@ abstract class ActionTestAbstract extends GenericActionTest
      * @throws \ReflectionException
      * @throws \Exception
      */
-    private function getApi()
+    private function getApi(): Api
     {
         $attribute = new \ReflectionProperty($this->gateway, 'apis');
 
@@ -113,6 +122,6 @@ abstract class ActionTestAbstract extends GenericActionTest
             }
         }
 
-        throw new \Exception('No api found in gateway');
+        throw new \RuntimeException('No api found in gateway');
     }
 }

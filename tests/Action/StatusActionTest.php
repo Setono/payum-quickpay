@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
+use Payum\Core\Action\ActionInterface;
 use Setono\Payum\QuickPay\Action\StatusAction;
 use Payum\Core\Request\GetHumanStatus;
 
@@ -15,17 +16,19 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldBeSubClassOfGatewayAwareAction()
+    public function shouldBeSubClassOfGatewayAwareAction(): void
     {
         $rc = new \ReflectionClass(StatusAction::class);
-        $this->assertTrue($rc->implementsInterface('Payum\Core\Action\ActionInterface'));
+        $this->assertTrue($rc->implementsInterface(ActionInterface::class));
     }
 
     /**
      * @test
      */
-    public function shouldMarkAsNew()
+    public function shouldMarkAsNew(): void
     {
         $statusRequest = new GetHumanStatus([]);
 

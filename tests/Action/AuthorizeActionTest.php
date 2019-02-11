@@ -22,8 +22,10 @@ class AuthorizeActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
+     * @throws \ReflectionException
      */
-    public function shouldImplementGenericTokenFactoryAwareInterface()
+    public function shouldImplementGenericTokenFactoryAwareInterface(): void
     {
         $rc = new \ReflectionClass($this->actionClass);
 
@@ -32,8 +34,10 @@ class AuthorizeActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
+     * @throws \Exception
      */
-    public function shouldRedirectToPaymentLink()
+    public function shouldRedirectToPaymentLink(): void
     {
         $payment = $this->createPayment();
 
@@ -61,7 +65,7 @@ class AuthorizeActionTest extends ActionTestAbstract
             ->expects($this->once())
             ->method('createNotifyToken')
             ->with('quickpay', $this->identicalTo($details))
-            ->will($this->returnValue($token))
+            ->willReturn($token)
         ;
 
         $action = new AuthorizeAction();
