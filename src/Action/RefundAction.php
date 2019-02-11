@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
@@ -32,15 +31,13 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $quickpayPayment = $this->api->getPayment($model);
 
-        if ($quickpayPayment instanceof QuickPayPayment) {
-            $this->api->refundPayment($quickpayPayment, $model);
-        }
+        $this->api->refundPayment($quickpayPayment, $model);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function supports($request)
+    public function supports($request): bool
     {
         return
             $request instanceof Refund &&

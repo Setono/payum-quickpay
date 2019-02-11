@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentLink;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
@@ -29,7 +27,7 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
      *
      * @param Authorize $request
      */
-    public function execute($request)
+    public function execute($request): void
     {
         RequestNotSupportedException::assertSupports($this, $request);
 
@@ -38,29 +36,23 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
 
         $quickpayPayment = $this->api->getPayment($model);
 
-        if ($quickpayPayment instanceof QuickPayPayment) {
-            // Create callback url
-            $model['callback_url'] = $this->tokenFactory->createNotifyToken(
-                $token->getGatewayName(),
-                $token->getDetails()
-            )->getTargetUrl();
+        // Create callback url
+        $model['callback_url'] = $this->tokenFactory->createNotifyToken(
+            $token->getGatewayName(),
+            $token->getDetails()
+        )->getTargetUrl();
 
-            // Create payment link
-            $paymentLink = $this->api->createPaymentLink($quickpayPayment, $model);
+        // Create payment link
+        $paymentLink = $this->api->createPaymentLink($quickpayPayment, $model);
 
-            // Redirect to payment
-            if ($paymentLink instanceof QuickPayPaymentLink) {
-                throw new HttpRedirect($paymentLink->getUrl());
-            }
-        }
-
-        throw new \LogicException('Payment could not be initialized');
+        // Redirect to payment
+        throw new HttpRedirect($paymentLink->getUrl());
     }
 
     /**
      * {@inheritdoc}
      */
-    public function supports($request)
+    public function supports($request): bool
     {
         return
             $request instanceof Authorize &&

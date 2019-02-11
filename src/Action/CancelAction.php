@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
@@ -24,7 +23,7 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
      *
      * @param Cancel $request
      */
-    public function execute($request)
+    public function execute($request): void
     {
         RequestNotSupportedException::assertSupports($this, $request);
 
@@ -32,15 +31,13 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $quickpayPayment = $this->api->getPayment($model);
 
-        if ($quickpayPayment instanceof QuickPayPayment) {
-            $this->api->cancelPayment($quickpayPayment, $model);
-        }
+        $this->api->cancelPayment($quickpayPayment, $model);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function supports($request)
+    public function supports($request): bool
     {
         return
             $request instanceof Cancel &&

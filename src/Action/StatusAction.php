@@ -25,7 +25,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
      *
      * @param GetStatusInterface $request
      */
-    public function execute($request)
+    public function execute($request): void
     {
         RequestNotSupportedException::assertSupports($this, $request);
 
@@ -78,7 +78,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     /**
      * {@inheritdoc}
      */
-    public function supports($request)
+    public function supports($request): bool
     {
         return
             $request instanceof GetStatusInterface &&

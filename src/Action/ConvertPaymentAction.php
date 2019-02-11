@@ -25,7 +25,7 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
      *
      * @param Convert $request
      */
-    public function execute($request)
+    public function execute($request): void
     {
         RequestNotSupportedException::assertSupports($this, $request);
 
@@ -50,7 +50,7 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
     /**
      * {@inheritdoc}
      */
-    public function supports($request)
+    public function supports($request): bool
     {
         return
             $request instanceof Convert &&

@@ -105,7 +105,7 @@ class Api
      * @param QuickPayPayment $payment
      * @param ArrayObject     $params
      *
-     * @thorws LogicException
+     * @throws LogicException
      */
     public function authorizePayment(QuickPayPayment $payment, ArrayObject $params): void
     {
