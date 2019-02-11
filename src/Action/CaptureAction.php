@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
@@ -21,7 +23,7 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
     use GenericTokenFactoryAwareTrait;
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      *
      * @param Capture $request
      */
@@ -41,7 +43,7 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function supports($request)
     {

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Tests\Action;
 
 use Payum\Core\Request\Capture;

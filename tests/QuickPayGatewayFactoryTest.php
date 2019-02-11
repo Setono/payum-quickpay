@@ -1,17 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Tests;
 
 use Setono\Payum\QuickPay\QuickPayGatewayFactory;
 use PHPUnit\Framework\TestCase;
 
-/**
- * @author jdk
- */
 class QuickPayGatewayFactoryTest extends TestCase
 {
     /**
      * @test
+     *
      * @throws \ReflectionException
      */
     public function shouldSubClassGatewayFactory()

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Tests\Action;
 
 use Setono\Payum\QuickPay\Action\StatusAction;

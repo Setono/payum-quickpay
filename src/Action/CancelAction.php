@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
@@ -17,7 +20,7 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     use ApiAwareTrait;
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      *
      * @param Cancel $request
      */
@@ -35,7 +38,7 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function supports($request)
     {

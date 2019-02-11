@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Tests\Action;
 
 use Payum\Core\Action\ActionInterface;
@@ -20,7 +22,7 @@ abstract class ActionTestAbstract extends GenericActionTest
     protected $api;
 
     /**
-     * @inheritdoc
+     * {@inheritdoc}
      */
     public function setUp()
     {
@@ -61,12 +63,13 @@ abstract class ActionTestAbstract extends GenericActionTest
 
     /**
      * @return Payment
+     * @throws \Exception
      */
     protected function createPayment()
     {
         $payment = new Payment();
-        $payment->setNumber(uniqid());
-        $payment->setTotalAmount(rand(1,100) * 100);
+        $payment->setNumber(uniqid('payment', true));
+        $payment->setTotalAmount(random_int(1, 100) * 100);
         $payment->setCurrencyCode('DKK');
 
         return $payment;
@@ -84,13 +87,15 @@ abstract class ActionTestAbstract extends GenericActionTest
             'merchant' => '75015',
             'agreement' => '266017',
             'order_prefix' => 'ut',
-            'payment_methods' => 'visa'
+            'payment_methods' => 'visa',
         ]);
+
         return $gateway;
     }
 
     /**
      * @return mixed
+     *
      * @throws \ReflectionException
      * @throws \Exception
      */
@@ -107,6 +112,7 @@ abstract class ActionTestAbstract extends GenericActionTest
                 return $api;
             }
         }
+
         throw new \Exception('No api found in gateway');
     }
 }

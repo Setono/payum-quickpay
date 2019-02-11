@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Setono\Payum\QuickPay\Action;
 
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
@@ -23,7 +25,7 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
     use GenericTokenFactoryAwareTrait;
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      *
      * @param Authorize $request
      */
@@ -51,11 +53,12 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
                 throw new HttpRedirect($paymentLink->getUrl());
             }
         }
+
         throw new \LogicException('Payment could not be initialized');
     }
 
     /**
-     * {@inheritDoc}
+     * {@inheritdoc}
      */
     public function supports($request)
     {

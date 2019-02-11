@@ -17,6 +17,8 @@ before_script:
     - vendor/phpunit/phpunit/phpunit --version
 
 script:
+    - composer check-style
+    - composer analyse
     - vendor/phpunit/phpunit/phpunit --coverage-text --coverage-clover=coverage.clover
 
 after_script:
