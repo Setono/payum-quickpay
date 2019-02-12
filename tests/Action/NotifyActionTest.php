@@ -6,14 +6,7 @@ namespace Setono\Payum\QuickPay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
-use Payum\Core\Model\Token;
-use Payum\Core\Reply\HttpRedirect;
-use Payum\Core\Request\Authorize;
-use Payum\Core\Request\Convert;
 use Payum\Core\Request\Notify;
-use Payum\Core\Security\GenericTokenFactoryInterface;
-use Setono\Payum\QuickPay\Action\AuthorizeAction;
-use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
 use Setono\Payum\QuickPay\Action\NotifyAction;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
@@ -60,7 +53,7 @@ class NotifyActionTest extends ActionTestAbstract
         // Use incorrect amount to trigger error
         $notify->setModel(new ArrayObject([
             'quickpayPaymentId' => $quickpayPayment->getId(),
-            'amount' => $params['payment']->getTotalAmount() - 1
+            'amount' => $params['payment']->getTotalAmount() - 1,
         ]));
 
         try {
@@ -71,13 +64,13 @@ class NotifyActionTest extends ActionTestAbstract
 
         $notify->setModel(new ArrayObject([
             'quickpayPaymentId' => $quickpayPayment->getId(),
-            'amount' => $params['payment']->getTotalAmount()
+            'amount' => $params['payment']->getTotalAmount(),
         ]));
 
         $action->execute($notify);
 
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $this->assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());

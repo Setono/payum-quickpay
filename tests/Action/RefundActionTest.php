@@ -5,18 +5,13 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Exception\Http\HttpException;
 use Payum\Core\Model\Token;
 use Payum\Core\Request\Authorize;
 use Payum\Core\Request\Capture;
 use Payum\Core\Request\Convert;
 use Payum\Core\Request\Refund;
-use Payum\Core\Security\GenericTokenFactoryAwareInterface;
-use Payum\Core\Security\GenericTokenFactoryInterface;
-use Setono\Payum\QuickPay\Action\CaptureAction;
 use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
 use Setono\Payum\QuickPay\Action\RefundAction;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 
 class RefundActionTest extends ActionTestAbstract

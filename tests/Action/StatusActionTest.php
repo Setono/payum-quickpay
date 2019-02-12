@@ -18,6 +18,7 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function shouldMarkEmptyAsNew(): void
@@ -31,6 +32,7 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function shouldMarkInitialAsNew(): void
@@ -42,7 +44,7 @@ class StatusActionTest extends ActionTestAbstract
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $action = new StatusAction();
@@ -53,6 +55,7 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function shouldMarkNewAsAuthorized(): void
@@ -70,7 +73,7 @@ class StatusActionTest extends ActionTestAbstract
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $action = new StatusAction();
@@ -81,6 +84,7 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function shouldMarkNewAsFailed(): void
@@ -102,7 +106,7 @@ class StatusActionTest extends ActionTestAbstract
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $action = new StatusAction();
@@ -113,6 +117,7 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function shouldMarkPendingAsPending(): void
@@ -142,6 +147,7 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function shouldMarkRejectedAsFailed(): void
@@ -158,7 +164,7 @@ class StatusActionTest extends ActionTestAbstract
         ]));
 
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $this->assertEquals(QuickpayPayment::STATE_REJECTED, $quickpayPayment->getState());
@@ -166,7 +172,7 @@ class StatusActionTest extends ActionTestAbstract
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
-            'quickpayPayment' => $quickpayPayment
+            'quickpayPayment' => $quickpayPayment,
         ]));
 
         $action = new StatusAction();
@@ -177,6 +183,7 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function shouldMarkProcessedAsCaptured(): void
@@ -198,7 +205,7 @@ class StatusActionTest extends ActionTestAbstract
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $action = new StatusAction();
@@ -209,6 +216,7 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function shouldMarkProcessedAsAuthorized(): void
@@ -230,7 +238,7 @@ class StatusActionTest extends ActionTestAbstract
         ]));
 
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $this->assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());

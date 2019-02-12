@@ -11,7 +11,7 @@ class QuickpayCard extends QuickPayModel
      *
      * @return QuickpayCard
      */
-    public static function createFromArray(array $data): QuickpayCard
+    public static function createFromArray(array $data): self
     {
         $data = json_decode(json_encode($data));
 

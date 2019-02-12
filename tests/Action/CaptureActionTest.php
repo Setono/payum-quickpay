@@ -11,7 +11,6 @@ use Payum\Core\Request\Authorize;
 use Payum\Core\Request\Capture;
 use Payum\Core\Request\Convert;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
-use Payum\Core\Security\GenericTokenFactoryInterface;
 use Setono\Payum\QuickPay\Action\CaptureAction;
 use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
@@ -88,7 +87,7 @@ class CaptureActionTest extends ActionTestAbstract
         $action->execute($capture);
 
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $this->assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());

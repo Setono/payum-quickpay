@@ -16,6 +16,7 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function quickpayCard(): void
@@ -30,6 +31,7 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function quickpayPayment(): void
@@ -39,7 +41,7 @@ class QuickpayModelTest extends TestCase
             'order_id' => 't100',
             'operations' => [],
             'currency' => 'DKK',
-            'state' => QuickpayPayment::STATE_NEW
+            'state' => QuickpayPayment::STATE_NEW,
         ]));
         $quickpayPayment = QuickpayPayment::createFromObject($data);
 
@@ -48,6 +50,7 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function quickpayEmptyPayment(): void
@@ -84,6 +87,7 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function quickpayPaymentOperation(): void
@@ -100,7 +104,7 @@ class QuickpayModelTest extends TestCase
         ]));
 
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId()
+            'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
         $quickpayPaymentOperation = $quickpayPayment->getLatestOperation();
@@ -119,6 +123,7 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
+     *
      * @throws \Exception
      */
     public function quickpayPaymentLink(): void
