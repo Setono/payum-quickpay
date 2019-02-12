@@ -8,6 +8,8 @@ class QuickPayPaymentOperation extends QuickPayModel
 {
     public const TYPE_AUTHORIZE = 'authorize';
     public const TYPE_CAPTURE = 'capture';
+    public const TYPE_REFUND = 'refund';
+    public const TYPE_CANCEL = 'cancel';
 
     public const STATUS_CODE_APPROVED = 20000;
 
@@ -65,7 +67,7 @@ class QuickPayPaymentOperation extends QuickPayModel
      */
     public function getStatusCode(): int
     {
-        return $this->data->qp_status_code;
+        return (int) $this->data->qp_status_code;
     }
 
     /**

@@ -27,6 +27,16 @@ class QuickPayPayment extends QuickPayModel
     }
 
     /**
+     * @param $data
+     *
+     * @return QuickPayPayment
+     */
+    public static function createFromObject($data): self
+    {
+        return new self($data);
+    }
+
+    /**
      * @return int
      */
     public function getId(): int

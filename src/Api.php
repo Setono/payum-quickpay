@@ -109,7 +109,7 @@ class Api
      */
     public function authorizePayment(QuickPayPayment $payment, ArrayObject $params): void
     {
-        throw new \LogicException('Not implemented, use payment link.');
+        throw new LogicException('Not implemented, use payment link.');
     }
 
     /**
@@ -183,7 +183,7 @@ class Api
 
         $encodedParams = json_encode($params);
         if (false === $encodedParams) {
-            throw new \InvalidArgumentException('Could not encode $params');
+            throw new InvalidArgumentException('Could not encode $params');
         }
 
         $request = $this->messageFactory->createRequest(
@@ -236,7 +236,7 @@ class Api
             $checksum = self::checksum((string) $response->getBody(), $privateKey);
             $qp_checksum = $response->getHeader('QuickPay-Checksum-Sha256');
             if ($checksum !== $qp_checksum) {
-                throw new \LogicException('Invalid checksum');
+                throw new LogicException('Invalid checksum');
             }
         }
     }

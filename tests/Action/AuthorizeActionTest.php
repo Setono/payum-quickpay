@@ -13,6 +13,7 @@ use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryInterface;
 use Setono\Payum\QuickPay\Action\AuthorizeAction;
 use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
+use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 
 class AuthorizeActionTest extends ActionTestAbstract
 {
@@ -57,7 +58,8 @@ class AuthorizeActionTest extends ActionTestAbstract
         $details = ArrayObject::ensureArrayObject($payment->getDetails());
         $token->setDetails($details);
 
-        $authorize = new Authorize($token);
+        /** @var Authorize $authorize */
+        $authorize = new $this->requestClass($token);
         $authorize->setModel($details);
 
         $tokenFactory = $this->createMock(GenericTokenFactoryInterface::class);
@@ -68,7 +70,8 @@ class AuthorizeActionTest extends ActionTestAbstract
             ->willReturn($token)
         ;
 
-        $action = new AuthorizeAction();
+        /** @var AuthorizeAction $action */
+        $action = new $this->actionClass();
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
         $action->setGenericTokenFactory($tokenFactory);
@@ -76,7 +79,25 @@ class AuthorizeActionTest extends ActionTestAbstract
         try {
             $action->execute($authorize);
         } catch (HttpRedirect $redirect) {
-            $this->addToAssertionCount(1);
+            $this->assertStringStartsWith('https://payment.quickpay.net/payments/', $redirect->getUrl());
         }
+
+        // Authorize payment with test card
+        $details['card'] = $this->getTestCard()->toArray();
+        $details['acquirer'] = 'clearhaus';
+        $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
+
+        // Validate that we received the payment from the operation
+        $this->assertEquals($details['quickpayPayment']->getId(), $quickpayPayment->getId());
+
+        // Reload payment to get the status of the authorize operation
+        sleep(1);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['quickpayPaymentId' => $quickpayPayment->getId()]));
+
+        // Validate authorize operation
+        $latestOperation = $quickpayPayment->getLatestOperation();
+        $this->assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $latestOperation->getType());
+        $this->assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $latestOperation->getStatusCode());
+        $this->assertEquals($details['amount'], $latestOperation->getAmount());
     }
 }
