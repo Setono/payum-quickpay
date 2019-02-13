@@ -31,7 +31,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        if (!$model['quickpayPaymentId'] && !$model['quickpayPayment']) {
+        if (!$model->offsetExists('quickpayPaymentId') && !$model->offsetExists('quickpayPayment')) {
             $request->markNew();
 
             return;
@@ -72,7 +72,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             default:
-                $request->markUnknown(); // @codeCoverageIgnore
+                $request->markUnknown();
         }
     }
 

@@ -92,6 +92,9 @@ class Api
         $response = $this->doRequest('GET', 'payments?'.http_build_query($params->getArrayCopy()));
 
         $payments = json_decode((string) $response->getBody());
+        if (false === $payments) {
+            throw new HttpException('Invalid response');
+        }
 
         $return = [];
         foreach ($payments as $payment) {
@@ -211,7 +214,7 @@ class Api
 
         $encodedParams = json_encode($params);
         if (false === $encodedParams) {
-            throw new InvalidArgumentException('Could not encode $params'); // @codeCoverageIgnore
+            throw new InvalidArgumentException('Could not encode $params');
         }
 
         $request = $this->messageFactory->createRequest(
@@ -244,14 +247,14 @@ class Api
     /**
      * Generates a checksum based on response body.
      *
-     * @param string $requestBody
+     * @param string $data
      * @param string $privateKey
      *
      * @return string
      */
-    public static function checksum($requestBody, $privateKey): string
+    public static function checksum($data, $privateKey): string
     {
-        return hash_hmac('sha256', $requestBody, $privateKey);
+        return hash_hmac('sha256', $data, $privateKey);
     }
 
     /**
@@ -262,8 +265,8 @@ class Api
     {
         if ($response->hasHeader('QuickPay-Checksum-Sha256')) {
             $checksum = self::checksum((string) $response->getBody(), $privateKey);
-            $qp_checksum = $response->getHeaderLine('QuickPay-Checksum-Sha256');
-            if ($checksum !== $qp_checksum) {
+            $quickpayChecksum = $response->getHeaderLine('QuickPay-Checksum-Sha256');
+            if ($checksum !== $quickpayChecksum) {
                 throw new LogicException('Invalid checksum');
             }
         }

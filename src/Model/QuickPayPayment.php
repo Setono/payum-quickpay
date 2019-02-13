@@ -25,7 +25,7 @@ class QuickPayPayment extends QuickPayModel
     protected $currency;
 
     /**
-     * string.
+     * @var string
      */
     protected $order_id;
 
