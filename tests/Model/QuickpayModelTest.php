@@ -36,16 +36,19 @@ class QuickpayModelTest extends TestCase
      */
     public function quickpayPayment(): void
     {
-        $data = json_decode(json_encode([
+        $data = (object) [
             'id' => 100,
             'order_id' => 't100',
             'operations' => [],
             'currency' => 'DKK',
             'state' => QuickpayPayment::STATE_NEW,
-        ]));
+        ];
         $quickpayPayment = QuickpayPayment::createFromObject($data);
 
-        $this->assertQuickpayPayment($quickpayPayment);
+        $this->assertEquals($data->id, $quickpayPayment->getId());
+        $this->assertEquals($data->currency, $quickpayPayment->getCurrency());
+        $this->assertEquals($data->order_id, $quickpayPayment->getOrderId());
+        $this->assertEquals(QuickPayPayment::STATE_NEW, $quickpayPayment->getState());
     }
 
     /**
@@ -59,27 +62,13 @@ class QuickpayModelTest extends TestCase
 
         $this->assertCount(1, $quickpayPayments);
 
-        $this->assertQuickpayPayment($quickpayPayments[0]);
-    }
+        $quickpayPayment = $quickpayPayments[0];
 
-    /**
-     * @param QuickPayPayment $quickpayPayment
-     *
-     * @throws \Exception
-     */
-    private function assertQuickpayPayment(QuickPayPayment $quickpayPayment): void
-    {
         $this->assertGreaterThan(0, $quickpayPayment->getId());
         $this->assertGreaterThanOrEqual(0, $quickpayPayment->getAuthorizedAmount());
         $this->assertEquals(3, strlen($quickpayPayment->getCurrency()));
         $this->assertNotEmpty($quickpayPayment->getOrderId());
-        $this->assertContains($quickpayPayment->getState(), [
-            QuickPayPayment::STATE_INITIAL,
-            QuickPayPayment::STATE_NEW,
-            QuickPayPayment::STATE_PROCESSED,
-            QuickPayPayment::STATE_PENDING,
-            QuickPayPayment::STATE_REJECTED,
-        ]);
+        $this->assertEquals(QuickPayPayment::STATE_PROCESSED, $quickpayPayment->getState());
         if (null !== $quickpayPayment->getLatestOperation()) {
             $this->assertInstanceOf(QuickPayPaymentOperation::class, $quickpayPayment->getLatestOperation());
         }
@@ -100,9 +89,10 @@ class QuickpayModelTest extends TestCase
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getTestCard()->toArray(),
             'acquirer' => 'clearhaus',
-            'amount' => 1,
+            'amount' => $params['payment']->getTotalAmount(),
         ]));
 
+        sleep(1);
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
@@ -111,14 +101,9 @@ class QuickpayModelTest extends TestCase
 
         $this->assertInstanceOf(QuickPayPaymentOperation::class, $quickpayPaymentOperation);
         $this->assertGreaterThan(0, $quickpayPaymentOperation->getId());
-        $this->assertContains($quickpayPaymentOperation->getType(), [
-            QuickPayPaymentOperation::TYPE_AUTHORIZE,
-            QuickPayPaymentOperation::TYPE_CAPTURE,
-            QuickPayPaymentOperation::TYPE_REFUND,
-            QuickPayPaymentOperation::TYPE_CANCEL,
-        ]);
+        $this->assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPaymentOperation->getType());
         $this->assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $quickpayPaymentOperation->getStatusCode());
-        $this->assertGreaterThan(0, $quickpayPaymentOperation->getAmount());
+        $this->assertEquals($params['payment']->getTotalAmount(), $quickpayPaymentOperation->getAmount());
     }
 
     /**
