@@ -73,11 +73,31 @@ class Api
                     'currency' => $paymentModel->getCurrencyCode(),
                 ]);
             } else {
-                throw new LogicException("Payment with number {$paymentModel->getNumber()} does not exist");
+                throw new LogicException('Payment does not exist');
             }
         }
 
         return QuickPayPayment::createFromResponse($response);
+    }
+
+    /**
+     * @param ArrayObject $params
+     *
+     * @return QuickPayPayment[]
+     */
+    public function getPayments(ArrayObject $params): array
+    {
+        $params = ArrayObject::ensureArrayObject($params);
+
+        $response = $this->doRequest('GET', 'payments?' . http_build_query($params->getArrayCopy()));
+
+        $payments = json_decode((string) $response->getBody());
+
+        $return = [];
+        foreach ($payments as $payment) {
+            $return[] = QuickPayPayment::createFromObject($payment);
+        }
+        return $return;
     }
 
     /**
@@ -105,11 +125,18 @@ class Api
      * @param QuickPayPayment $payment
      * @param ArrayObject     $params
      *
-     * @throws LogicException
+     * @return QuickPayPayment
      */
-    public function authorizePayment(QuickPayPayment $payment, ArrayObject $params): void
+    public function authorizePayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
-        throw new LogicException('Not implemented, use payment link.');
+        $params = ArrayObject::ensureArrayObject($params);
+        $params->validateNotEmpty([
+            'card', 'amount'
+        ]);
+
+        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/authorize', $params->getArrayCopy());
+
+        return QuickPayPayment::createFromResponse($response);
     }
 
     /**
@@ -234,7 +261,7 @@ class Api
     {
         if ($response->hasHeader('QuickPay-Checksum-Sha256')) {
             $checksum = self::checksum((string) $response->getBody(), $privateKey);
-            $qp_checksum = $response->getHeader('QuickPay-Checksum-Sha256');
+            $qp_checksum = $response->getHeaderLine('QuickPay-Checksum-Sha256');
             if ($checksum !== $qp_checksum) {
                 throw new LogicException('Invalid checksum');
             }

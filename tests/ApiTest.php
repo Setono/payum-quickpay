@@ -29,7 +29,7 @@ class ApiTest extends TestCase
         try {
             Api::assertValidResponse($response, '12345');
         } catch (LogicException $le) {
-            $this->assertEquals('Invalid checksum.', $le->getMessage());
+            $this->assertEquals('Invalid checksum', $le->getMessage());
         }
     }
 
