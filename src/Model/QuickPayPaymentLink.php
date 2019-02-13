@@ -9,6 +9,11 @@ use Psr\Http\Message\ResponseInterface;
 class QuickPayPaymentLink extends QuickPayModel
 {
     /**
+     * @var string
+     */
+    protected $url;
+
+    /**
      * @param ResponseInterface $response
      *
      * @return QuickPayPaymentLink
@@ -25,6 +30,6 @@ class QuickPayPaymentLink extends QuickPayModel
      */
     public function getUrl(): string
     {
-        return $this->data->url;
+        return $this->url;
     }
 }

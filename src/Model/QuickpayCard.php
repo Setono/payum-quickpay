@@ -7,6 +7,21 @@ namespace Setono\Payum\QuickPay\Model;
 class QuickpayCard extends QuickPayModel
 {
     /**
+     * @var int
+     */
+    protected $number;
+
+    /**
+     * @var string
+     */
+    protected $expiration;
+
+    /**
+     * @var int
+     */
+    protected $cvd;
+
+    /**
      * @param array $data
      *
      * @return QuickpayCard
@@ -21,7 +36,7 @@ class QuickpayCard extends QuickPayModel
      */
     public function getNumber(): int
     {
-        return (int) $this->data->number;
+        return $this->number;
     }
 
     /**
@@ -29,7 +44,7 @@ class QuickpayCard extends QuickPayModel
      */
     public function getExpiration(): string
     {
-        return $this->data->expiration;
+        return $this->expiration;
     }
 
     /**
@@ -37,7 +52,7 @@ class QuickpayCard extends QuickPayModel
      */
     public function getCvd(): int
     {
-        return (int) $this->data->cvd;
+        return $this->cvd;
     }
 
     /**
@@ -57,6 +72,6 @@ class QuickpayCard extends QuickPayModel
      */
     public function setNumber(int $number): void
     {
-        $this->data->number = $number;
+        $this->number = $number;
     }
 }

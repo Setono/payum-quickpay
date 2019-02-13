@@ -16,6 +16,10 @@ abstract class QuickPayModel
      */
     protected function __construct($data)
     {
-        $this->data = $data;
+        foreach (get_object_vars($data) as $key => $value) {
+            if (property_exists($this, $key)) {
+                $this->{$key} = $value;
+            }
+        }
     }
 }
