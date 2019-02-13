@@ -73,11 +73,35 @@ class Api
                     'currency' => $paymentModel->getCurrencyCode(),
                 ]);
             } else {
-                throw new LogicException("Payment with number {$paymentModel->getNumber()} does not exist");
+                throw new LogicException('Payment does not exist');
             }
         }
 
         return QuickPayPayment::createFromResponse($response);
+    }
+
+    /**
+     * @param ArrayObject $params
+     *
+     * @return QuickPayPayment[]
+     */
+    public function getPayments(ArrayObject $params): array
+    {
+        $params = ArrayObject::ensureArrayObject($params);
+
+        $response = $this->doRequest('GET', 'payments?'.http_build_query($params->getArrayCopy()));
+
+        $payments = json_decode((string) $response->getBody());
+        if (null === $payments) {
+            throw new HttpException('Invalid response');
+        }
+
+        $return = [];
+        foreach ($payments as $payment) {
+            $return[] = QuickPayPayment::createFromObject($payment);
+        }
+
+        return $return;
     }
 
     /**
@@ -105,11 +129,18 @@ class Api
      * @param QuickPayPayment $payment
      * @param ArrayObject     $params
      *
-     * @throws LogicException
+     * @return QuickPayPayment
      */
-    public function authorizePayment(QuickPayPayment $payment, ArrayObject $params): void
+    public function authorizePayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
-        throw new \LogicException('Not implemented, use payment link.');
+        $params = ArrayObject::ensureArrayObject($params);
+        $params->validateNotEmpty([
+            'card', 'amount',
+        ]);
+
+        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/authorize', $params->getArrayCopy());
+
+        return QuickPayPayment::createFromResponse($response);
     }
 
     /**
@@ -183,7 +214,7 @@ class Api
 
         $encodedParams = json_encode($params);
         if (false === $encodedParams) {
-            throw new \InvalidArgumentException('Could not encode $params');
+            throw new InvalidArgumentException('Could not encode $params');
         }
 
         $request = $this->messageFactory->createRequest(
@@ -216,14 +247,14 @@ class Api
     /**
      * Generates a checksum based on response body.
      *
-     * @param string $requestBody
+     * @param string $data
      * @param string $privateKey
      *
      * @return string
      */
-    public static function checksum($requestBody, $privateKey): string
+    public static function checksum($data, $privateKey): string
     {
-        return hash_hmac('sha256', $requestBody, $privateKey);
+        return hash_hmac('sha256', $data, $privateKey);
     }
 
     /**
@@ -234,9 +265,9 @@ class Api
     {
         if ($response->hasHeader('QuickPay-Checksum-Sha256')) {
             $checksum = self::checksum((string) $response->getBody(), $privateKey);
-            $qp_checksum = $response->getHeader('QuickPay-Checksum-Sha256');
-            if ($checksum !== $qp_checksum) {
-                throw new \LogicException('Invalid checksum');
+            $quickpayChecksum = $response->getHeaderLine('QuickPay-Checksum-Sha256');
+            if ($checksum !== $quickpayChecksum) {
+                throw new LogicException('Invalid checksum');
             }
         }
     }

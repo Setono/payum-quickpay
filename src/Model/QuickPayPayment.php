@@ -15,6 +15,31 @@ class QuickPayPayment extends QuickPayModel
     public const STATE_PROCESSED = 'processed';
 
     /**
+     * @var int
+     */
+    protected $id;
+
+    /**
+     * @var string
+     */
+    protected $currency;
+
+    /**
+     * @var string
+     */
+    protected $order_id;
+
+    /**
+     * @var string
+     */
+    protected $state;
+
+    /**
+     * @var array
+     */
+    protected $operations;
+
+    /**
      * @param ResponseInterface $response
      *
      * @return QuickPayPayment
@@ -27,11 +52,21 @@ class QuickPayPayment extends QuickPayModel
     }
 
     /**
+     * @param object $data
+     *
+     * @return QuickPayPayment
+     */
+    public static function createFromObject($data): self
+    {
+        return new self($data);
+    }
+
+    /**
      * @return int
      */
     public function getId(): int
     {
-        return $this->data->id;
+        return $this->id;
     }
 
     /**
@@ -39,7 +74,7 @@ class QuickPayPayment extends QuickPayModel
      */
     public function getOrderId(): string
     {
-        return $this->data->order_id;
+        return $this->order_id;
     }
 
     /**
@@ -47,7 +82,7 @@ class QuickPayPayment extends QuickPayModel
      */
     public function getCurrency(): string
     {
-        return $this->data->currency;
+        return $this->currency;
     }
 
     /**
@@ -55,7 +90,7 @@ class QuickPayPayment extends QuickPayModel
      */
     public function getState(): string
     {
-        return $this->data->state;
+        return $this->state;
     }
 
     /**
@@ -80,8 +115,8 @@ class QuickPayPayment extends QuickPayModel
      */
     public function getOperations(): array
     {
-        if (count($this->data->operations) > 0) {
-            return QuickPayPaymentOperation::createFromArray($this->data->operations);
+        if (count($this->operations) > 0) {
+            return QuickPayPaymentOperation::createFromArray($this->operations);
         }
 
         return [];
@@ -92,8 +127,8 @@ class QuickPayPayment extends QuickPayModel
      */
     public function getLatestOperation(): ?QuickPayPaymentOperation
     {
-        if (count($this->data->operations) > 0) {
-            return QuickPayPaymentOperation::createFromObject(end($this->data->operations));
+        if (count($this->operations) > 0) {
+            return QuickPayPaymentOperation::createFromObject(end($this->operations));
         }
 
         return null;

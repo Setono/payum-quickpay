@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Action;
 
+use Payum\Core\ApiAwareInterface;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
 use Payum\Core\Action\ActionInterface;
@@ -16,7 +17,7 @@ use Payum\Core\Request\Notify;
 /**
  * Handles callback from QuickPay.
  */
-class NotifyAction implements ActionInterface, GatewayAwareInterface
+class NotifyAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
     use ApiAwareTrait;
     use GatewayAwareTrait;

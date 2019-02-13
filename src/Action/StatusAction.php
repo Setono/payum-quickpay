@@ -31,7 +31,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        if (!$model['quickpayPaymentId']) {
+        if (!$model->offsetExists('quickpayPaymentId') && !$model->offsetExists('quickpayPayment')) {
             $request->markNew();
 
             return;
@@ -63,6 +63,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
                 break;
             case QuickPayPayment::STATE_PROCESSED:
                 $latestOperation = $quickpayPayment->getLatestOperation();
+
                 if (null !== $latestOperation && QuickPayPaymentOperation::TYPE_CAPTURE === $latestOperation->getType() && $latestOperation->isApproved()) {
                     $request->markCaptured();
                 } else {

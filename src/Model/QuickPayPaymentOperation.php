@@ -8,8 +8,30 @@ class QuickPayPaymentOperation extends QuickPayModel
 {
     public const TYPE_AUTHORIZE = 'authorize';
     public const TYPE_CAPTURE = 'capture';
+    public const TYPE_REFUND = 'refund';
+    public const TYPE_CANCEL = 'cancel';
 
     public const STATUS_CODE_APPROVED = 20000;
+
+    /**
+     * @var int
+     */
+    protected $id;
+
+    /**
+     * @var string
+     */
+    protected $type;
+
+    /**
+     * @var int
+     */
+    protected $amount;
+
+    /**
+     * @var string
+     */
+    protected $qp_status_code;
 
     /**
      * @param \stdClass $operations
@@ -41,7 +63,7 @@ class QuickPayPaymentOperation extends QuickPayModel
      */
     public function getId(): int
     {
-        return $this->data->id;
+        return $this->id;
     }
 
     /**
@@ -49,7 +71,7 @@ class QuickPayPaymentOperation extends QuickPayModel
      */
     public function getType(): string
     {
-        return $this->data->type;
+        return $this->type;
     }
 
     /**
@@ -57,7 +79,7 @@ class QuickPayPaymentOperation extends QuickPayModel
      */
     public function getAmount(): int
     {
-        return $this->data->amount;
+        return $this->amount;
     }
 
     /**
@@ -65,7 +87,7 @@ class QuickPayPaymentOperation extends QuickPayModel
      */
     public function getStatusCode(): int
     {
-        return $this->data->qp_status_code;
+        return (int) $this->qp_status_code;
     }
 
     /**
