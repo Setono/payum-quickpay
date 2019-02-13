@@ -34,7 +34,7 @@ class QuickpayModelTest extends TestCase
      *
      * @throws \Exception
      */
-    public function quickpayPayment(): void
+    public function quickpayEmptyPayment(): void
     {
         $data = (object) [
             'id' => 100,
@@ -48,7 +48,9 @@ class QuickpayModelTest extends TestCase
         $this->assertEquals($data->id, $quickpayPayment->getId());
         $this->assertEquals($data->currency, $quickpayPayment->getCurrency());
         $this->assertEquals($data->order_id, $quickpayPayment->getOrderId());
+        $this->assertGreaterThanOrEqual(0, $quickpayPayment->getAuthorizedAmount());
         $this->assertEquals(QuickPayPayment::STATE_NEW, $quickpayPayment->getState());
+        $this->assertNull($quickpayPayment->getLatestOperation());
     }
 
     /**
@@ -56,7 +58,7 @@ class QuickpayModelTest extends TestCase
      *
      * @throws \Exception
      */
-    public function quickpayEmptyPayment(): void
+    public function quickpayPayment(): void
     {
         $quickpayPayments = $this->api->getPayments(new ArrayObject(['page_size' => 1, 'state' => QuickpayPayment::STATE_PROCESSED]));
 

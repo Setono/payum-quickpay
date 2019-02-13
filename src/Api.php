@@ -211,7 +211,7 @@ class Api
 
         $encodedParams = json_encode($params);
         if (false === $encodedParams) {
-            throw new InvalidArgumentException('Could not encode $params');
+            throw new InvalidArgumentException('Could not encode $params'); // @codeCoverageIgnore
         }
 
         $request = $this->messageFactory->createRequest(
