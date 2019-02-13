@@ -89,7 +89,7 @@ class Api
     {
         $params = ArrayObject::ensureArrayObject($params);
 
-        $response = $this->doRequest('GET', 'payments?' . http_build_query($params->getArrayCopy()));
+        $response = $this->doRequest('GET', 'payments?'.http_build_query($params->getArrayCopy()));
 
         $payments = json_decode((string) $response->getBody());
 
@@ -97,6 +97,7 @@ class Api
         foreach ($payments as $payment) {
             $return[] = QuickPayPayment::createFromObject($payment);
         }
+
         return $return;
     }
 
@@ -131,7 +132,7 @@ class Api
     {
         $params = ArrayObject::ensureArrayObject($params);
         $params->validateNotEmpty([
-            'card', 'amount'
+            'card', 'amount',
         ]);
 
         $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/authorize', $params->getArrayCopy());
