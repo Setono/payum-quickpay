@@ -92,7 +92,7 @@ class Api
         $response = $this->doRequest('GET', 'payments?'.http_build_query($params->getArrayCopy()));
 
         $payments = json_decode((string) $response->getBody());
-        if (false === $payments) {
+        if (null === $payments) {
             throw new HttpException('Invalid response');
         }
 
