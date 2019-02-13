@@ -27,7 +27,7 @@ class QuickPayPayment extends QuickPayModel
     }
 
     /**
-     * @param $data
+     * @param object $data
      *
      * @return QuickPayPayment
      */
