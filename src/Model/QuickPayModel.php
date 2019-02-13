@@ -7,14 +7,14 @@ namespace Setono\Payum\QuickPay\Model;
 abstract class QuickPayModel
 {
     /**
-     * @var \stdClass
+     * @var object
      */
     protected $data;
 
     /**
-     * @param \stdClass $data
+     * @param object $data
      */
-    protected function __construct(\stdClass $data)
+    protected function __construct($data)
     {
         $this->data = $data;
     }
