@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests;
 
+use DateTime;
+use Exception;
 use Payum\Core\GatewayInterface;
 use Payum\Core\Model\Payment;
+use ReflectionException;
+use ReflectionProperty;
+use RuntimeException;
 use Setono\Payum\QuickPay\Api;
 use Setono\Payum\QuickPay\Model\QuickpayCard;
 use Setono\Payum\QuickPay\QuickPayGatewayFactory;
 
-/**
- * @author jdk
- */
 trait ApiTestTrait
 {
     /** @var GatewayInterface */
@@ -24,7 +26,7 @@ trait ApiTestTrait
     /**
      * {@inheritdoc}
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function setUp(): void
     {
@@ -56,12 +58,12 @@ trait ApiTestTrait
     /**
      * @return mixed
      *
-     * @throws \ReflectionException
-     * @throws \Exception
+     * @throws ReflectionException
+     * @throws Exception
      */
     private function getApi(): Api
     {
-        $attribute = new \ReflectionProperty($this->gateway, 'apis');
+        $attribute = new ReflectionProperty($this->gateway, 'apis');
 
         $attribute->setAccessible(true);
         $value = $attribute->getValue($this->gateway);
@@ -73,13 +75,13 @@ trait ApiTestTrait
             }
         }
 
-        throw new \RuntimeException('No api found in gateway');
+        throw new RuntimeException('No api found in gateway');
     }
 
     /**
      * @return Payment
      *
-     * @throws \Exception
+     * @throws Exception
      */
     protected function createPayment(): Payment
     {
@@ -93,18 +95,22 @@ trait ApiTestTrait
 
     /**
      * @return QuickpayCard
+     *
+     * @throws Exception
      */
     protected function getTestCard(): QuickpayCard
     {
         return QuickpayCard::createFromArray([
             'number' => 1000000000000008,
-            'expiration' => (new \DateTime())->format('ym'),
+            'expiration' => (new DateTime())->format('ym'),
             'cvd' => 123,
         ]);
     }
 
     /**
      * @return QuickpayCard
+     *
+     * @throws Exception
      */
     protected function getAuthorizeRejectedTestCard(): QuickpayCard
     {
@@ -116,6 +122,8 @@ trait ApiTestTrait
 
     /**
      * @return QuickpayCard
+     *
+     * @throws Exception
      */
     protected function getCaptureRejectedTestCard(): QuickpayCard
     {

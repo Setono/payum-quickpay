@@ -21,43 +21,31 @@ class QuickpayCard extends QuickPayModel
      */
     protected $cvd;
 
-    /**
-     * @param array $data
-     *
-     * @return QuickpayCard
-     */
     public static function createFromArray(array $data): self
     {
         return new self((object) $data);
     }
 
-    /**
-     * @return int
-     */
     public function getNumber(): int
     {
         return $this->number;
     }
 
     /**
-     * @return string YYMM
+     * Returns the expiration formatted as YYMM.
+     *
+     * @return string
      */
     public function getExpiration(): string
     {
         return $this->expiration;
     }
 
-    /**
-     * @return int
-     */
     public function getCvd(): int
     {
         return $this->cvd;
     }
 
-    /**
-     * @return array
-     */
     public function toArray(): array
     {
         return [
@@ -67,9 +55,6 @@ class QuickpayCard extends QuickPayModel
         ];
     }
 
-    /**
-     * @param int $number
-     */
     public function setNumber(int $number): void
     {
         $this->number = $number;

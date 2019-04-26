@@ -39,14 +39,9 @@ class QuickPayPayment extends QuickPayModel
      */
     protected $operations;
 
-    /**
-     * @param ResponseInterface $response
-     *
-     * @return QuickPayPayment
-     */
     public static function createFromResponse(ResponseInterface $response): self
     {
-        $data = json_decode((string) $response->getBody());
+        $data = json_decode((string) $response->getBody(), false);
 
         return new self($data);
     }
@@ -61,25 +56,16 @@ class QuickPayPayment extends QuickPayModel
         return new self($data);
     }
 
-    /**
-     * @return int
-     */
     public function getId(): int
     {
         return $this->id;
     }
 
-    /**
-     * @return string
-     */
     public function getOrderId(): string
     {
         return $this->order_id;
     }
 
-    /**
-     * @return string
-     */
     public function getCurrency(): string
     {
         return $this->currency;
@@ -93,9 +79,6 @@ class QuickPayPayment extends QuickPayModel
         return $this->state;
     }
 
-    /**
-     * @return int
-     */
     public function getAuthorizedAmount(): int
     {
         /** @var QuickPayPaymentOperation[] $operations */
@@ -122,9 +105,6 @@ class QuickPayPayment extends QuickPayModel
         return [];
     }
 
-    /**
-     * @return QuickPayPaymentOperation|null
-     */
     public function getLatestOperation(): ?QuickPayPaymentOperation
     {
         if (count($this->operations) > 0) {

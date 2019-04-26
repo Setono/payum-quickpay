@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Action;
 
+use ArrayAccess;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
@@ -37,13 +38,8 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
         $this->api->capturePayment($quickpayPayment, $model);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function supports($request): bool
     {
-        return
-            $request instanceof Capture &&
-            $request->getModel() instanceof \ArrayAccess;
+        return $request instanceof Capture && $request->getModel() instanceof ArrayAccess;
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Model;
 
+use stdClass;
+
 class QuickPayPaymentOperation extends QuickPayModel
 {
     public const TYPE_AUTHORIZE = 'authorize';
@@ -33,21 +35,11 @@ class QuickPayPaymentOperation extends QuickPayModel
      */
     protected $qp_status_code;
 
-    /**
-     * @param \stdClass $operations
-     *
-     * @return QuickPayPaymentOperation
-     */
-    public static function createFromObject(\stdClass $operations): self
+    public static function createFromObject(stdClass $operations): self
     {
         return new self($operations);
     }
 
-    /**
-     * @param array $operations
-     *
-     * @return array
-     */
     public static function createFromArray(array $operations): array
     {
         $ret = [];
@@ -58,41 +50,26 @@ class QuickPayPaymentOperation extends QuickPayModel
         return $ret;
     }
 
-    /**
-     * @return int
-     */
     public function getId(): int
     {
         return $this->id;
     }
 
-    /**
-     * @return string
-     */
     public function getType(): string
     {
         return $this->type;
     }
 
-    /**
-     * @return int
-     */
     public function getAmount(): int
     {
         return $this->amount;
     }
 
-    /**
-     * @return int
-     */
     public function getStatusCode(): int
     {
         return (int) $this->qp_status_code;
     }
 
-    /**
-     * @return bool
-     */
     public function isApproved(): bool
     {
         return self::STATUS_CODE_APPROVED === $this->getStatusCode();

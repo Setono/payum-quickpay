@@ -17,9 +17,6 @@ use Payum\Core\GatewayFactory;
 
 class QuickPayGatewayFactory extends GatewayFactory
 {
-    /**
-     * {@inheritdoc}
-     */
     protected function populateConfig(ArrayObject $config): void
     {
         $config->defaults([
@@ -48,7 +45,7 @@ class QuickPayGatewayFactory extends GatewayFactory
             );
             $config->defaults($config['payum.default_options']);
 
-            $config['payum.api'] = function (ArrayObject $config) {
+            $config['payum.api'] = static function (ArrayObject $config) {
                 $config->validateNotEmpty($config['payum.required_options']);
 
                 return new Api((array) $config, $config['payum.http_client'], $config['httplug.message_factory']);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Action;
 
+use ArrayAccess;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
@@ -76,13 +77,8 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function supports($request): bool
     {
-        return
-            $request instanceof GetStatusInterface &&
-            $request->getModel() instanceof \ArrayAccess;
+        return $request instanceof GetStatusInterface && $request->getModel() instanceof ArrayAccess;
     }
 }

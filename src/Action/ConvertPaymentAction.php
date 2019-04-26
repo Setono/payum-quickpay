@@ -47,14 +47,8 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         $request->setResult((array) $details);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function supports($request): bool
     {
-        return
-            $request instanceof Convert &&
-            $request->getSource() instanceof PaymentInterface &&
-            'array' === $request->getTo();
+        return $request instanceof Convert && $request->getSource() instanceof PaymentInterface && 'array' === $request->getTo();
     }
 }

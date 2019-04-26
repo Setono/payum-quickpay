@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Action;
 
+use ArrayAccess;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
@@ -49,13 +50,8 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
         throw new HttpRedirect($paymentLink->getUrl());
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function supports($request): bool
     {
-        return
-            $request instanceof Authorize &&
-            $request->getModel() instanceof \ArrayAccess;
+        return $request instanceof Authorize && $request->getModel() instanceof ArrayAccess;
     }
 }

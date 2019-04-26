@@ -34,13 +34,6 @@ class Api
      */
     protected $options = [];
 
-    /**
-     * @param array               $options
-     * @param HttpClientInterface $client
-     * @param MessageFactory      $messageFactory
-     *
-     * @throws InvalidArgumentException if an option is invalid
-     */
     public function __construct(array $options, HttpClientInterface $client, MessageFactory $messageFactory)
     {
         $this->options = $options;
@@ -48,12 +41,6 @@ class Api
         $this->messageFactory = $messageFactory;
     }
 
-    /**
-     * @param ArrayObject $params
-     * @param bool        $create
-     *
-     * @return QuickPayPayment
-     */
     public function getPayment(ArrayObject $params, bool $create = true): QuickPayPayment
     {
         $params = ArrayObject::ensureArrayObject($params);
@@ -91,7 +78,7 @@ class Api
 
         $response = $this->doRequest('GET', 'payments?'.http_build_query($params->getArrayCopy()));
 
-        $payments = json_decode((string) $response->getBody());
+        $payments = json_decode((string) $response->getBody(), false);
         if (null === $payments) {
             throw new HttpException('Invalid response');
         }
@@ -104,12 +91,6 @@ class Api
         return $return;
     }
 
-    /**
-     * @param QuickPayPayment $payment
-     * @param ArrayObject     $params
-     *
-     * @return QuickPayPaymentLink
-     */
     public function createPaymentLink(QuickPayPayment $payment, ArrayObject $params): QuickPayPaymentLink
     {
         $params = ArrayObject::ensureArrayObject($params);
@@ -125,12 +106,6 @@ class Api
         return QuickPayPaymentLink::createFromResponse($response);
     }
 
-    /**
-     * @param QuickPayPayment $payment
-     * @param ArrayObject     $params
-     *
-     * @return QuickPayPayment
-     */
     public function authorizePayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
         $params = ArrayObject::ensureArrayObject($params);
@@ -143,12 +118,6 @@ class Api
         return QuickPayPayment::createFromResponse($response);
     }
 
-    /**
-     * @param QuickPayPayment $payment
-     * @param ArrayObject     $params
-     *
-     * @return QuickPayPayment
-     */
     public function capturePayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
         $params = ArrayObject::ensureArrayObject($params);
@@ -161,12 +130,6 @@ class Api
         return QuickPayPayment::createFromResponse($response);
     }
 
-    /**
-     * @param QuickPayPayment $payment
-     * @param ArrayObject     $params
-     *
-     * @return QuickPayPayment
-     */
     public function refundPayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
         $params = ArrayObject::ensureArrayObject($params);
@@ -179,12 +142,6 @@ class Api
         return QuickPayPayment::createFromResponse($response);
     }
 
-    /**
-     * @param QuickPayPayment $payment
-     * @param ArrayObject     $params
-     *
-     * @return QuickPayPayment
-     */
     public function cancelPayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
     {
         $params = ArrayObject::ensureArrayObject($params);
@@ -197,13 +154,6 @@ class Api
         return QuickPayPayment::createFromResponse($response);
     }
 
-    /**
-     * @param string $method
-     * @param string $path
-     * @param array  $params
-     *
-     * @return ResponseInterface
-     */
     protected function doRequest($method, string $path, array $params = []): ResponseInterface
     {
         $headers = [
@@ -236,9 +186,6 @@ class Api
         return $response;
     }
 
-    /**
-     * @return string
-     */
     protected function getApiEndpoint(): string
     {
         return 'https://api.quickpay.net';
@@ -257,10 +204,6 @@ class Api
         return hash_hmac('sha256', $data, $privateKey);
     }
 
-    /**
-     * @param ResponseInterface $response
-     * @param string            $privateKey
-     */
     public static function assertValidResponse(ResponseInterface $response, string $privateKey): void
     {
         if ($response->hasHeader('QuickPay-Checksum-Sha256')) {
@@ -272,12 +215,6 @@ class Api
         }
     }
 
-    /**
-     * @param string $option
-     * @param mixed  $default
-     *
-     * @return mixed|null
-     */
     public function getOption(string $option, $default = '')
     {
         return $this->options[$option] ?? $default;

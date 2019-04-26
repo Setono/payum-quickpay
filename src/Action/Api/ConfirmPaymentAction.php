@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Action\Api;
 
+use ArrayAccess;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
 use Payum\Core\Action\ActionInterface;
@@ -52,14 +53,8 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
         return 'OK';
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function supports($request)
     {
-        return
-            $request instanceof ConfirmPayment &&
-            $request->getModel() instanceof \ArrayAccess
-            ;
+        return $request instanceof ConfirmPayment && $request->getModel() instanceof ArrayAccess;
     }
 }

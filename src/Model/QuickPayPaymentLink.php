@@ -13,21 +13,13 @@ class QuickPayPaymentLink extends QuickPayModel
      */
     protected $url;
 
-    /**
-     * @param ResponseInterface $response
-     *
-     * @return QuickPayPaymentLink
-     */
     public static function createFromResponse(ResponseInterface $response): self
     {
-        $data = json_decode((string) $response->getBody());
+        $data = json_decode((string) $response->getBody(), false);
 
         return new self($data);
     }
 
-    /**
-     * @return string
-     */
     public function getUrl(): string
     {
         return $this->url;
