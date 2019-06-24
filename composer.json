@@ -28,8 +28,16 @@
         "psr-4": { "Setono\\Payum\\QuickPay\\Tests\\": "tests/" }
     },
     "scripts": {
+        "all": [
+            "@checks",
+            "@tests"
+        ],
         "analyse": "./vendor/bin/phpstan analyse -c phpstan.neon -l max src/",
         "check-style": "./vendor/bin/ecs check src/ tests/",
+        "checks": [
+            "@check-style",
+            "@analyse"
+        ],
         "fix-style": "./vendor/bin/ecs check --fix src/ tests/",
         "test": [
             "@phpunit"
