@@ -48,11 +48,6 @@ $model = new \ArrayObject([
 $quickpay->execute(new Capture($model));
 ```
 
-
-## Maintainers
-- [Jais Djurhuus-Kempel](https://github.com/JaisDK)
-- [Joachim Løvgaard](https://github.com/loevgaard)
-
 [ico-version]: https://img.shields.io/packagist/v/setono/payum-quickpay.svg?style=flat-square
 [ico-license]: https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square
 [ico-travis]: https://travis-ci.org/Setono/payum-quickpay.svg?branch=master
