@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay;
 
+use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\GatewayFactory;
 use Setono\Payum\QuickPay\Action\Api\ConfirmPaymentAction;
 use Setono\Payum\QuickPay\Action\AuthorizeAction;
 use Setono\Payum\QuickPay\Action\CancelAction;
@@ -12,8 +14,6 @@ use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
 use Setono\Payum\QuickPay\Action\NotifyAction;
 use Setono\Payum\QuickPay\Action\RefundAction;
 use Setono\Payum\QuickPay\Action\StatusAction;
-use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\GatewayFactory;
 
 class QuickPayGatewayFactory extends GatewayFactory
 {

@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Action\Api;
 
-use Setono\Payum\QuickPay\Api;
 use Payum\Core\Exception\UnsupportedApiException;
+use Setono\Payum\QuickPay\Api;
 
 trait ApiAwareTrait
 {
-    /**
-     * @var Api
-     */
+    /** @var Api */
     protected $api;
 
     /**

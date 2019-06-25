@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Action;
 
 use ArrayAccess;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
+use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\GetStatusInterface;
-use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Exception\RequestNotSupportedException;
+use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Payum\QuickPay\Model\QuickPayPayment;
+use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 
 class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {

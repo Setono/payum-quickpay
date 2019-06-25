@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
+use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Model\Token;
 use Payum\Core\Reply\HttpRedirect;
@@ -11,6 +12,8 @@ use Payum\Core\Request\Authorize;
 use Payum\Core\Request\Convert;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryInterface;
+use ReflectionClass;
+use ReflectionException;
 use Setono\Payum\QuickPay\Action\AuthorizeAction;
 use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
@@ -24,11 +27,11 @@ class AuthorizeActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function shouldImplementGenericTokenFactoryAwareInterface(): void
     {
-        $rc = new \ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass($this->actionClass);
 
         $this->assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
@@ -36,7 +39,7 @@ class AuthorizeActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldRedirectToPaymentLink(): void
     {

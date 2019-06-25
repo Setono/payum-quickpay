@@ -9,30 +9,25 @@ use stdClass;
 class QuickPayPaymentOperation extends QuickPayModel
 {
     public const TYPE_AUTHORIZE = 'authorize';
+
     public const TYPE_CAPTURE = 'capture';
+
     public const TYPE_REFUND = 'refund';
+
     public const TYPE_CANCEL = 'cancel';
 
     public const STATUS_CODE_APPROVED = 20000;
 
-    /**
-     * @var int
-     */
+    /** @var int */
     protected $id;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $type;
 
-    /**
-     * @var int
-     */
+    /** @var int */
     protected $amount;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $qp_status_code;
 
     public static function createFromObject(stdClass $operations): self

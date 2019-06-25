@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
+use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Model\Token;
-use Payum\Core\Request\Authorize;
-use Payum\Core\Request\Capture;
 use Payum\Core\Request\Convert;
 use Payum\Core\Request\Refund;
 use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
@@ -16,20 +15,16 @@ use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 
 class RefundActionTest extends ActionTestAbstract
 {
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $requestClass = Refund::class;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $actionClass = RefundAction::class;
 
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldRefundPayment(): void
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests;
 
+use Exception;
 use GuzzleHttp\Psr7\Response;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
@@ -17,7 +18,7 @@ class ApiTest extends TestCase
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldValidateChecksum(): void
     {
@@ -36,7 +37,7 @@ class ApiTest extends TestCase
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function getPaymentShouldFailOnInvalidPaymentInfo(): void
     {

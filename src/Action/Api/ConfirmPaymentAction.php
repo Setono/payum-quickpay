@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Action\Api;
 
 use ArrayAccess;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
-use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
@@ -14,6 +12,8 @@ use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
+use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
+use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
 
 class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, ApiAwareInterface
 {

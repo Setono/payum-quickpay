@@ -9,34 +9,28 @@ use Psr\Http\Message\ResponseInterface;
 class QuickPayPayment extends QuickPayModel
 {
     public const STATE_INITIAL = 'initial';
+
     public const STATE_PENDING = 'pending';
+
     public const STATE_NEW = 'new';
+
     public const STATE_REJECTED = 'rejected';
+
     public const STATE_PROCESSED = 'processed';
 
-    /**
-     * @var int
-     */
+    /** @var int */
     protected $id;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $currency;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $order_id;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $state;
 
-    /**
-     * @var array
-     */
+    /** @var array */
     protected $operations;
 
     public static function createFromResponse(ResponseInterface $response): self

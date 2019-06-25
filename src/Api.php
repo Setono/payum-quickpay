@@ -4,34 +4,28 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay;
 
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentLink;
+use Http\Message\MessageFactory;
+use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\Http\HttpException;
 use Payum\Core\Exception\InvalidArgumentException;
 use Payum\Core\Exception\LogicException;
-use Psr\Http\Message\ResponseInterface;
-use Http\Message\MessageFactory;
-use Payum\Core\Exception\Http\HttpException;
 use Payum\Core\HttpClientInterface;
-use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Model\Payment;
+use Psr\Http\Message\ResponseInterface;
+use Setono\Payum\QuickPay\Model\QuickPayPayment;
+use Setono\Payum\QuickPay\Model\QuickPayPaymentLink;
 
 class Api
 {
     public const VERSION = 'v10';
 
-    /**
-     * @var HttpClientInterface
-     */
+    /** @var HttpClientInterface */
     protected $client;
 
-    /**
-     * @var MessageFactory
-     */
+    /** @var MessageFactory */
     protected $messageFactory;
 
-    /**
-     * @var array
-     */
+    /** @var array */
     protected $options = [];
 
     public function __construct(array $options, HttpClientInterface $client, MessageFactory $messageFactory)
@@ -68,8 +62,6 @@ class Api
     }
 
     /**
-     * @param ArrayObject $params
-     *
      * @return QuickPayPayment[]
      */
     public function getPayments(ArrayObject $params): array
@@ -196,8 +188,6 @@ class Api
      *
      * @param string $data
      * @param string $privateKey
-     *
-     * @return string
      */
     public static function checksum($data, $privateKey): string
     {

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
+use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Model\Token;
-use Payum\Core\Request\Authorize;
 use Payum\Core\Request\Cancel;
 use Payum\Core\Request\Convert;
 use Setono\Payum\QuickPay\Action\CancelAction;
@@ -22,7 +22,7 @@ class CancelActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldCancelPayment(): void
     {

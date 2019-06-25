@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Action;
 
 use ArrayAccess;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
@@ -13,6 +12,7 @@ use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Cancel;
+use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 
 class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {

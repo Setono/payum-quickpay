@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
+use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
-use Setono\Payum\QuickPay\Action\StatusAction;
 use Payum\Core\Request\GetHumanStatus;
+use Setono\Payum\QuickPay\Action\StatusAction;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 
@@ -19,7 +20,7 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldMarkEmptyAsNew(): void
     {
@@ -33,7 +34,7 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldMarkInitialAsNew(): void
     {
@@ -56,7 +57,7 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldMarkNewAsAuthorized(): void
     {
@@ -85,7 +86,7 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldMarkNewAsFailed(): void
     {
@@ -118,7 +119,7 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldMarkPendingAsPending(): void
     {
@@ -148,7 +149,7 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldMarkRejectedAsFailed(): void
     {
@@ -184,7 +185,7 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldMarkProcessedAsCaptured(): void
     {
@@ -217,7 +218,7 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldMarkProcessedAsAuthorized(): void
     {

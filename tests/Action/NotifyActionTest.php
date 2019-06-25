@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
+use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\Request\Notify;
@@ -20,7 +21,7 @@ class NotifyActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldHandleNotify(): void
     {

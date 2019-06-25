@@ -6,9 +6,7 @@ namespace Setono\Payum\QuickPay\Model;
 
 abstract class QuickPayModel
 {
-    /**
-     * @var object
-     */
+    /** @var object */
     protected $data;
 
     /**

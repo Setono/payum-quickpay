@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Action;
 
 use ArrayAccess;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Authorize;
-use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
+use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 
 class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
 {

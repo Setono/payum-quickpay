@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Model;
 
+use DateTime;
+use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
@@ -17,11 +19,11 @@ class QuickpayModelTest extends TestCase
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function quickpayCard(): void
     {
-        $exp = (new \DateTime())->format('ym');
+        $exp = (new DateTime())->format('ym');
         $card = $this->getTestCard();
 
         $this->assertEquals(1000000000000008, $card->getNumber());
@@ -32,7 +34,7 @@ class QuickpayModelTest extends TestCase
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function quickpayEmptyPayment(): void
     {
@@ -56,7 +58,7 @@ class QuickpayModelTest extends TestCase
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function quickpayPayment(): void
     {
@@ -79,7 +81,7 @@ class QuickpayModelTest extends TestCase
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function quickpayPaymentOperation(): void
     {
@@ -111,7 +113,7 @@ class QuickpayModelTest extends TestCase
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function quickpayPaymentLink(): void
     {

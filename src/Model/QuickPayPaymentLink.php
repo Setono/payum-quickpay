@@ -8,9 +8,7 @@ use Psr\Http\Message\ResponseInterface;
 
 class QuickPayPaymentLink extends QuickPayModel
 {
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $url;
 
     public static function createFromResponse(ResponseInterface $response): self

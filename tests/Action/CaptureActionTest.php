@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
+use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\Http\HttpException;
 use Payum\Core\Model\Token;
-use Payum\Core\Request\Authorize;
 use Payum\Core\Request\Capture;
 use Payum\Core\Request\Convert;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
+use ReflectionClass;
+use ReflectionException;
 use Setono\Payum\QuickPay\Action\CaptureAction;
 use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
@@ -25,12 +27,12 @@ class CaptureActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \ReflectionException
-     * @throws \Exception
+     * @throws ReflectionException
+     * @throws Exception
      */
     public function shouldImplementGenericTokenFactoryAwareInterface(): void
     {
-        $rc = new \ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass($this->actionClass);
 
         $this->assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
@@ -38,7 +40,7 @@ class CaptureActionTest extends ActionTestAbstract
     /**
      * @test
      *
-     * @throws \Exception
+     * @throws Exception
      */
     public function shouldCapturePayment(): void
     {
@@ -73,7 +75,7 @@ class CaptureActionTest extends ActionTestAbstract
         try {
             $action->execute($capture);
         } catch (HttpException $e) {
-            $this->assertStringStartsWith('Validation error', json_decode($e->getMessage())->message);
+            $this->assertStringStartsWith('Validation error', json_decode($e->getMessage(), false)->message);
         }
 
         // Authorize payment with test card

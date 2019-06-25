@@ -6,19 +6,13 @@ namespace Setono\Payum\QuickPay\Model;
 
 class QuickpayCard extends QuickPayModel
 {
-    /**
-     * @var int
-     */
+    /** @var int */
     protected $number;
 
-    /**
-     * @var string
-     */
+    /** @var string */
     protected $expiration;
 
-    /**
-     * @var int
-     */
+    /** @var int */
     protected $cvd;
 
     public static function createFromArray(array $data): self
@@ -33,8 +27,6 @@ class QuickpayCard extends QuickPayModel
 
     /**
      * Returns the expiration formatted as YYMM.
-     *
-     * @return string
      */
     public function getExpiration(): string
     {

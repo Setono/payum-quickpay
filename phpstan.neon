@@ -1,6 +1,2 @@
 parameters:
     reportUnmatchedIgnoredErrors: true
-
-    excludes_analyse:
-        - './tests/'
-        - './vendor/'

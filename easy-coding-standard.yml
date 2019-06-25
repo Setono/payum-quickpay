@@ -1,5 +1,10 @@
 imports:
-    - { resource: 'vendor/symplify/easy-coding-standard/config/symfony.yml' }
+    - { resource: 'vendor/symplify/easy-coding-standard/config/set/symfony.yaml' }
+    - { resource: 'vendor/symplify/easy-coding-standard/config/set/symfony-risky.yaml' }
 
 services:
+    PhpCsFixer\Fixer\ClassNotation\ClassAttributesSeparationFixer: ~
+    PhpCsFixer\Fixer\Import\OrderedImportsFixer: ~
+    PhpCsFixer\Fixer\Phpdoc\NoSuperfluousPhpdocTagsFixer: ~
     PhpCsFixer\Fixer\Strict\DeclareStrictTypesFixer: ~
+    SlevomatCodingStandard\Sniffs\Commenting\RequireOneLinePropertyDocCommentSniff: ~

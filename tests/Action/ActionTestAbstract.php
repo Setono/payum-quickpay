@@ -8,6 +8,8 @@ use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\Tests\GenericActionTest;
+use ReflectionClass;
+use ReflectionException;
 use Setono\Payum\QuickPay\Tests\ApiTestTrait;
 
 abstract class ActionTestAbstract extends GenericActionTest
@@ -17,11 +19,11 @@ abstract class ActionTestAbstract extends GenericActionTest
     /**
      * @test
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function shouldImplementActionInterface(): void
     {
-        $rc = new \ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass($this->actionClass);
 
         $this->assertTrue($rc->implementsInterface(ActionInterface::class));
     }
@@ -29,11 +31,11 @@ abstract class ActionTestAbstract extends GenericActionTest
     /**
      * @test
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function shouldImplementApiAwareInterface(): void
     {
-        $rc = new \ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass($this->actionClass);
 
         $this->assertTrue($rc->implementsInterface(ApiAwareInterface::class));
     }
@@ -41,11 +43,11 @@ abstract class ActionTestAbstract extends GenericActionTest
     /**
      * @test
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function shouldImplementGatewayAwareInterface(): void
     {
-        $rc = new \ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass($this->actionClass);
 
         $this->assertTrue($rc->implementsInterface(GatewayAwareInterface::class));
     }

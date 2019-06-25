@@ -36,9 +36,6 @@ trait ApiTestTrait
         $this->api = $this->getApi();
     }
 
-    /**
-     * @return GatewayInterface
-     */
     protected function createGatewayMock(): GatewayInterface
     {
         $factory = new QuickPayGatewayFactory();
@@ -79,8 +76,6 @@ trait ApiTestTrait
     }
 
     /**
-     * @return Payment
-     *
      * @throws Exception
      */
     protected function createPayment(): Payment
@@ -94,8 +89,6 @@ trait ApiTestTrait
     }
 
     /**
-     * @return QuickpayCard
-     *
      * @throws Exception
      */
     protected function getTestCard(): QuickpayCard
@@ -108,8 +101,6 @@ trait ApiTestTrait
     }
 
     /**
-     * @return QuickpayCard
-     *
      * @throws Exception
      */
     protected function getAuthorizeRejectedTestCard(): QuickpayCard
@@ -121,8 +112,6 @@ trait ApiTestTrait
     }
 
     /**
-     * @return QuickpayCard
-     *
      * @throws Exception
      */
     protected function getCaptureRejectedTestCard(): QuickpayCard

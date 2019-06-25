@@ -7,19 +7,21 @@ namespace Setono\Payum\QuickPay\Tests;
 use Payum\Core\CoreGatewayFactory;
 use Payum\Core\Gateway;
 use Payum\Core\GatewayFactory;
-use Setono\Payum\QuickPay\QuickPayGatewayFactory;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
+use ReflectionException;
+use Setono\Payum\QuickPay\QuickPayGatewayFactory;
 
 class QuickPayGatewayFactoryTest extends TestCase
 {
     /**
      * @test
      *
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function shouldSubClassGatewayFactory(): void
     {
-        $rc = new \ReflectionClass(QuickPayGatewayFactory::class);
+        $rc = new ReflectionClass(QuickPayGatewayFactory::class);
         $this->assertTrue($rc->isSubclassOf(GatewayFactory::class));
     }
 
