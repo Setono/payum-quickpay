@@ -30,7 +30,7 @@
     "scripts": {
         "all": [
             "@checks",
-            "@tests"
+            "@test"
         ],
         "analyse": "./vendor/bin/phpstan analyse -c phpstan.neon -l max src/",
         "check-style": "./vendor/bin/ecs check src/ tests/",
