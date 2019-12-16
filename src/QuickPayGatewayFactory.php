@@ -41,9 +41,21 @@ class QuickPayGatewayFactory extends GatewayFactory
                 'payment_methods' => '',
                 'auto_capture' => 0,
                 'order_prefix' => '',
-                'syncronized' => false,
+
+                // @todo Use it?
+                'synchronized' => false,
+
+                'language' => 'en',
             );
             $config->defaults($config['payum.default_options']);
+            $config['payum.required_options'] = array(
+                'apikey',
+                'merchant',
+                'agreement',
+                'privatekey',
+                'payment_methods',
+                'language',
+            );
 
             $config['payum.api'] = static function (ArrayObject $config) {
                 $config->validateNotEmpty($config['payum.required_options']);

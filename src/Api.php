@@ -30,6 +30,17 @@ class Api
 
     public function __construct(array $options, HttpClientInterface $client, MessageFactory $messageFactory)
     {
+        $options = ArrayObject::ensureArrayObject($options);
+        $options->defaults($this->options);
+        $options->validateNotEmpty(array(
+            'apikey',
+            'merchant',
+            'agreement',
+            'privatekey',
+            'payment_methods',
+            'language',
+        ));
+
         $this->options = $options;
         $this->client = $client;
         $this->messageFactory = $messageFactory;
@@ -92,6 +103,7 @@ class Api
 
         $response = $this->doRequest('PUT', 'payments/'.$payment->getId().'/link', $params->getArrayCopy() + [
             'payment_methods' => $this->options['payment_methods'],
+            'language' => $this->options['language'],
             'auto_capture' => $this->options['auto_capture'],
         ]);
 
