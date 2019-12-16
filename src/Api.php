@@ -30,6 +30,16 @@ class Api
 
     public function __construct(array $options, HttpClientInterface $client, MessageFactory $messageFactory)
     {
+        $options = ArrayObject::ensureArrayObject($options);
+        $options->defaults($this->options);
+        $options->validateNotEmpty(array(
+            'apikey',
+            'merchant',
+            'agreement',
+            'privatekey',
+            'language',
+        ));
+
         $this->options = $options;
         $this->client = $client;
         $this->messageFactory = $messageFactory;

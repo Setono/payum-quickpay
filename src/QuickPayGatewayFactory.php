@@ -45,6 +45,13 @@ class QuickPayGatewayFactory extends GatewayFactory
                 'language' => 'en',
             );
             $config->defaults($config['payum.default_options']);
+            $config['payum.required_options'] = array(
+                'apikey',
+                'merchant',
+                'agreement',
+                'privatekey',
+                'language',
+            );
 
             $config['payum.api'] = static function (ArrayObject $config) {
                 $config->validateNotEmpty($config['payum.required_options']);
