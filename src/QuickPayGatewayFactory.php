@@ -42,6 +42,7 @@ class QuickPayGatewayFactory extends GatewayFactory
                 'auto_capture' => 0,
                 'order_prefix' => '',
                 'syncronized' => false,
+                'language' => 'en',
             );
             $config->defaults($config['payum.default_options']);
 

@@ -92,6 +92,7 @@ class Api
 
         $response = $this->doRequest('PUT', 'payments/'.$payment->getId().'/link', $params->getArrayCopy() + [
             'payment_methods' => $this->options['payment_methods'],
+            'language' => $this->options['language'],
             'auto_capture' => $this->options['auto_capture'],
         ]);
 
