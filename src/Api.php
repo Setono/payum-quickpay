@@ -25,7 +25,7 @@ class Api
     /** @var MessageFactory */
     protected $messageFactory;
 
-    /** @var array */
+    /** @var ArrayObject|array */
     protected $options = [];
 
     public function __construct(array $options, HttpClientInterface $client, MessageFactory $messageFactory)
