@@ -25,7 +25,7 @@ class Api
     /** @var MessageFactory */
     protected $messageFactory;
 
-    /** @var array */
+    /** @var ArrayObject|array */
     protected $options = [];
 
     public function __construct(array $options, HttpClientInterface $client, MessageFactory $messageFactory)
@@ -59,7 +59,15 @@ class Api
             /** @var Payment $paymentModel */
             $paymentModel = $params['payment'];
             if ($create) {
-                $response = $this->doRequest('POST', 'payments', [
+//                // You should specify this parameters in order to use Klarna
+//                ArrayObject::validatedKeysSet([
+//                    'shipping_address',
+//                    'invoice_address',
+//                    'shipping',
+//                    'basket',
+//                ]);
+
+                $response = $this->doRequest('POST', 'payments', $params->getArrayCopy() + [
                     'order_id' => $this->getOption('order_prefix').$paymentModel->getNumber(),
                     'currency' => $paymentModel->getCurrencyCode(),
                 ]);
