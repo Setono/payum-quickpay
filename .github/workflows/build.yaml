@@ -72,7 +72,7 @@ jobs:
                     coverage: "none"
                     extensions: "${{ env.PHP_EXTENSIONS }}"
                     php-version: "${{ matrix.php-version }}"
-                    tools: "composer-require-checker, composer-unused"
+                    tools: "composer:v1, composer-require-checker, composer-unused"
                     
             -   name: "Install composer dependencies"
                 uses: "ramsey/composer-install@v1"
