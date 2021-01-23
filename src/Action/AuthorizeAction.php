@@ -33,15 +33,15 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
         RequestNotSupportedException::assertSupports($this, $request);
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
-        $token = $request->getToken();
+
+        if (null !== $token = $request->getToken()) {
+            // Create callback url
+            $model['callback_url'] = $this->tokenFactory
+                ->createNotifyToken($token->getGatewayName(), $token->getDetails())
+                ->getTargetUrl();
+        }
 
         $quickpayPayment = $this->api->getPayment($model);
-
-        // Create callback url
-        $model['callback_url'] = $this->tokenFactory->createNotifyToken(
-            $token->getGatewayName(),
-            $token->getDetails()
-        )->getTargetUrl();
 
         // Create payment link
         $paymentLink = $this->api->createPaymentLink($quickpayPayment, $model);

@@ -22,7 +22,7 @@ class QuickPayGatewayFactoryTest extends TestCase
     public function shouldSubClassGatewayFactory(): void
     {
         $rc = new ReflectionClass(QuickPayGatewayFactory::class);
-        $this->assertTrue($rc->isSubclassOf(GatewayFactory::class));
+        self::assertTrue($rc->isSubclassOf(GatewayFactory::class));
     }
 
     /**
@@ -31,7 +31,7 @@ class QuickPayGatewayFactoryTest extends TestCase
     public function couldBeConstructedWithoutAnyArguments(): void
     {
         $factory = new QuickPayGatewayFactory();
-        $this->assertInstanceOf(QuickPayGatewayFactory::class, $factory);
+        self::assertInstanceOf(QuickPayGatewayFactory::class, $factory);
     }
 
     /**
@@ -40,7 +40,7 @@ class QuickPayGatewayFactoryTest extends TestCase
     public function shouldCreateCoreGatewayFactoryIfNotPassed(): void
     {
         $factory = new QuickPayGatewayFactory();
-        $this->assertAttributeInstanceOf(CoreGatewayFactory::class, 'coreGatewayFactory', $factory);
+        self::assertAttributeInstanceOf(CoreGatewayFactory::class, 'coreGatewayFactory', $factory);
     }
 
     /**
@@ -55,11 +55,11 @@ class QuickPayGatewayFactoryTest extends TestCase
             'merchant' => '1234',
             'agreement' => '1234',
         ]);
-        $this->assertInstanceOf(Gateway::class, $gateway);
-        $this->assertAttributeNotEmpty('apis', $gateway);
-        $this->assertAttributeNotEmpty('actions', $gateway);
+        self::assertInstanceOf(Gateway::class, $gateway);
+        self::assertAttributeNotEmpty('apis', $gateway);
+        self::assertAttributeNotEmpty('actions', $gateway);
         $extensions = $this->readAttribute($gateway, 'extensions');
-        $this->assertAttributeNotEmpty('extensions', $extensions);
+        self::assertAttributeNotEmpty('extensions', $extensions);
     }
 
     /**
@@ -69,8 +69,8 @@ class QuickPayGatewayFactoryTest extends TestCase
     {
         $factory = new QuickPayGatewayFactory();
         $config = $factory->createConfig();
-        $this->assertInternalType('array', $config);
-        $this->assertNotEmpty($config);
+        self::assertInternalType('array', $config);
+        self::assertNotEmpty($config);
     }
 
     /**
@@ -80,10 +80,10 @@ class QuickPayGatewayFactoryTest extends TestCase
     {
         $factory = new QuickPayGatewayFactory();
         $config = $factory->createConfig();
-        $this->assertInternalType('array', $config);
-        $this->assertArrayHasKey('payum.factory_name', $config);
-        $this->assertEquals('quickpay', $config['payum.factory_name']);
-        $this->assertArrayHasKey('payum.factory_title', $config);
-        $this->assertEquals('QuickPay', $config['payum.factory_title']);
+        self::assertInternalType('array', $config);
+        self::assertArrayHasKey('payum.factory_name', $config);
+        self::assertEquals('quickpay', $config['payum.factory_name']);
+        self::assertArrayHasKey('payum.factory_title', $config);
+        self::assertEquals('QuickPay', $config['payum.factory_title']);
     }
 }

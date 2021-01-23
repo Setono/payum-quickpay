@@ -30,7 +30,7 @@ class ApiTest extends TestCase
         try {
             Api::assertValidResponse($response, '12345');
         } catch (LogicException $le) {
-            $this->assertEquals('Invalid checksum', $le->getMessage());
+            self::assertEquals('Invalid checksum', $le->getMessage());
         }
     }
 
@@ -44,7 +44,7 @@ class ApiTest extends TestCase
         try {
             $this->api->getPayment(new ArrayObject(), false);
         } catch (LogicException $le) {
-            $this->assertEquals('Payment does not exist', $le->getMessage());
+            self::assertEquals('Payment does not exist', $le->getMessage());
         }
     }
 }

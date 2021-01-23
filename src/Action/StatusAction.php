@@ -39,6 +39,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         }
 
         $quickpayPayment = $this->api->getPayment($model);
+        $latestOperation = $quickpayPayment->getLatestOperation();
 
         switch ($quickpayPayment->getState()) {
             case QuickPayPayment::STATE_INITIAL:
@@ -46,8 +47,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             case QuickPayPayment::STATE_NEW:
-                $latestOperation = $quickpayPayment->getLatestOperation();
-                if (null !== $latestOperation && QuickPayPaymentOperation::TYPE_AUTHORIZE === $latestOperation->getType() && $latestOperation->isApproved()) {
+                if ($this->isOperationApproved($latestOperation, QuickPayPaymentOperation::TYPE_AUTHORIZE)) {
                     $request->markAuthorized();
                 } else {
                     $request->markFailed();
@@ -63,11 +63,11 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             case QuickPayPayment::STATE_PROCESSED:
-                $latestOperation = $quickpayPayment->getLatestOperation();
-
-                if (null !== $latestOperation && QuickPayPaymentOperation::TYPE_CAPTURE === $latestOperation->getType() && $latestOperation->isApproved()) {
+                if ($this->isOperationApproved($latestOperation, QuickPayPaymentOperation::TYPE_CAPTURE)) {
                     $request->markCaptured();
-                } else {
+                } elseif ($this->isOperationApproved($latestOperation, QuickPayPaymentOperation::TYPE_REFUND)) {
+                    $request->markRefunded();
+                } elseif ($this->isOperationApproved($latestOperation, QuickPayPaymentOperation::TYPE_CANCEL)) {
                     $request->markCanceled();
                 }
 
@@ -75,10 +75,21 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
             default:
                 $request->markUnknown();
         }
+
+        // can be canceled at any time
     }
 
     public function supports($request): bool
     {
         return $request instanceof GetStatusInterface && $request->getModel() instanceof ArrayAccess;
+    }
+
+    private function isOperationApproved(?QuickPayPaymentOperation $operation, string $state): bool
+    {
+        if (null === $operation) {
+            return false;
+        }
+
+        return $operation->getType() === $state && $operation->isApproved();
     }
 }

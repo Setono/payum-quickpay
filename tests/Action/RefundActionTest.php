@@ -50,11 +50,11 @@ class RefundActionTest extends ActionTestAbstract
         $details['card'] = $this->getTestCard()->toArray();
         $details['acquirer'] = 'clearhaus';
         $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
 
         // Capture payment
         $quickpayPayment = $this->api->capturePayment($details['quickpayPayment'], $details);
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
 
         /** @var Refund $refund */
         $refund = new $this->requestClass($token);
@@ -68,6 +68,6 @@ class RefundActionTest extends ActionTestAbstract
         $action->execute($refund);
 
         $quickpayPayment = $this->api->getPayment(new ArrayObject(['quickpayPaymentId' => $details['quickpayPayment']->getId()]));
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_REFUND, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_REFUND, $quickpayPayment->getLatestOperation()->getType());
     }
 }

@@ -48,7 +48,7 @@ class CancelActionTest extends ActionTestAbstract
         $details['card'] = $this->getTestCard()->toArray();
         $details['acquirer'] = 'clearhaus';
         $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
 
         /** @var Cancel $cancel */
         $cancel = new $this->requestClass($token);
@@ -62,6 +62,6 @@ class CancelActionTest extends ActionTestAbstract
         $action->execute($cancel);
 
         $quickpayPayment = $this->api->getPayment(new ArrayObject(['quickpayPaymentId' => $details['quickpayPayment']->getId()]));
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_CANCEL, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_CANCEL, $quickpayPayment->getLatestOperation()->getType());
     }
 }
