@@ -53,7 +53,7 @@ class QuickPayGatewayFactory extends GatewayFactory
                 'language',
             ];
 
-            $config['payum.api'] = static function (ArrayObject $config) {
+            $config['payum.api'] = static function (ArrayObject $config): Api {
                 $config->validateNotEmpty($config['payum.required_options']);
 
                 return new Api((array) $config, $config['payum.http_client'], $config['httplug.message_factory']);

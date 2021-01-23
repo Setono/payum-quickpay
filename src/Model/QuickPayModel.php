@@ -6,13 +6,7 @@ namespace Setono\Payum\QuickPay\Model;
 
 abstract class QuickPayModel
 {
-    /** @var object */
-    protected $data;
-
-    /**
-     * @param object $data
-     */
-    protected function __construct($data)
+    protected function __construct(object $data)
     {
         foreach (get_object_vars($data) as $key => $value) {
             if (property_exists($this, $key)) {

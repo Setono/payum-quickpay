@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Model;
 
 use Psr\Http\Message\ResponseInterface;
+use function Safe\json_decode;
 
 class QuickPayPayment extends QuickPayModel
 {
@@ -18,20 +19,15 @@ class QuickPayPayment extends QuickPayModel
 
     public const STATE_PROCESSED = 'processed';
 
-    /** @var int */
-    protected $id;
+    protected int $id;
 
-    /** @var string */
-    protected $currency;
+    protected string $currency;
 
-    /** @var string */
-    protected $order_id;
+    protected string $order_id;
 
-    /** @var string */
-    protected $state;
+    protected string $state;
 
-    /** @var array */
-    protected $operations;
+    protected array $operations;
 
     public static function createFromResponse(ResponseInterface $response): self
     {
@@ -40,12 +36,7 @@ class QuickPayPayment extends QuickPayModel
         return new self($data);
     }
 
-    /**
-     * @param object $data
-     *
-     * @return QuickPayPayment
-     */
-    public static function createFromObject($data): self
+    public static function createFromObject(object $data): self
     {
         return new self($data);
     }
@@ -75,7 +66,6 @@ class QuickPayPayment extends QuickPayModel
 
     public function getAuthorizedAmount(): int
     {
-        /** @var QuickPayPaymentOperation[] $operations */
         $operations = array_reverse($this->getOperations());
 
         foreach ($operations as $operation) {

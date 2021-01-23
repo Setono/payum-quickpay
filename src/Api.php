@@ -7,11 +7,12 @@ namespace Setono\Payum\QuickPay;
 use Http\Message\MessageFactory;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\Http\HttpException;
-use Payum\Core\Exception\InvalidArgumentException;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\HttpClientInterface;
 use Payum\Core\Model\Payment;
 use Psr\Http\Message\ResponseInterface;
+use function Safe\json_decode;
+use function Safe\json_encode;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentLink;
 
@@ -19,11 +20,9 @@ class Api
 {
     public const VERSION = 'v10';
 
-    /** @var HttpClientInterface */
-    protected $client;
+    protected HttpClientInterface $client;
 
-    /** @var MessageFactory */
-    protected $messageFactory;
+    protected MessageFactory $messageFactory;
 
     /** @var ArrayObject|array */
     protected $options = [];
@@ -179,9 +178,6 @@ class Api
         ];
 
         $encodedParams = json_encode($params);
-        if (false === $encodedParams) {
-            throw new InvalidArgumentException('Could not encode $params');
-        }
 
         $request = $this->messageFactory->createRequest(
             $method,
@@ -209,11 +205,8 @@ class Api
 
     /**
      * Generates a checksum based on request/response body.
-     *
-     * @param string $data
-     * @param string $privateKey
      */
-    public static function checksum($data, $privateKey): string
+    public static function checksum(string $data, string $privateKey): string
     {
         return hash_hmac('sha256', $data, $privateKey);
     }

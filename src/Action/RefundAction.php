@@ -20,9 +20,7 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     use ApiAwareTrait;
 
     /**
-     * {@inheritdoc}
-     *
-     * @param Refund $request
+     * @param mixed|Refund $request
      */
     public function execute($request): void
     {

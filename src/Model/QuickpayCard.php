@@ -6,14 +6,11 @@ namespace Setono\Payum\QuickPay\Model;
 
 class QuickpayCard extends QuickPayModel
 {
-    /** @var int */
-    protected $number;
+    protected int $number;
 
-    /** @var string */
-    protected $expiration;
+    protected string $expiration;
 
-    /** @var int */
-    protected $cvd;
+    protected int $cvd;
 
     public static function createFromArray(array $data): self
     {

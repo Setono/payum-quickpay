@@ -18,17 +18,13 @@ class QuickPayPaymentOperation extends QuickPayModel
 
     public const STATUS_CODE_APPROVED = 20000;
 
-    /** @var int */
-    protected $id;
+    protected int $id;
 
-    /** @var string */
-    protected $type;
+    protected string $type;
 
-    /** @var int */
-    protected $amount;
+    protected int $amount;
 
-    /** @var string */
-    protected $qp_status_code;
+    protected string $qp_status_code;
 
     public static function createFromObject(stdClass $operations): self
     {

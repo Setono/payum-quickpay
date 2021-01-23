@@ -12,6 +12,7 @@ use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
+use function Safe\sprintf;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
 
@@ -21,9 +22,7 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
     use ApiAwareTrait;
 
     /**
-     * {@inheritdoc}
-     *
-     * @param ConfirmPayment $request
+     * @param mixed|ConfirmPayment $request
      */
     public function execute($request): void
     {

@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Model;
 
 use Psr\Http\Message\ResponseInterface;
+use function Safe\json_decode;
 
 class QuickPayPaymentLink extends QuickPayModel
 {
-    /** @var string */
-    protected $url;
+    protected string $url;
 
     public static function createFromResponse(ResponseInterface $response): self
     {
