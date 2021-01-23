@@ -24,7 +24,7 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
      *
      * @param Refund $request
      */
-    public function execute($request)
+    public function execute($request): void
     {
         RequestNotSupportedException::assertSupports($this, $request);
 

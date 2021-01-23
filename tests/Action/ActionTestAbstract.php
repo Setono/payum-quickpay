@@ -25,7 +25,7 @@ abstract class ActionTestAbstract extends GenericActionTest
     {
         $rc = new ReflectionClass($this->actionClass);
 
-        $this->assertTrue($rc->implementsInterface(ActionInterface::class));
+        self::assertTrue($rc->implementsInterface(ActionInterface::class));
     }
 
     /**
@@ -37,7 +37,7 @@ abstract class ActionTestAbstract extends GenericActionTest
     {
         $rc = new ReflectionClass($this->actionClass);
 
-        $this->assertTrue($rc->implementsInterface(ApiAwareInterface::class));
+        self::assertTrue($rc->implementsInterface(ApiAwareInterface::class));
     }
 
     /**
@@ -49,6 +49,6 @@ abstract class ActionTestAbstract extends GenericActionTest
     {
         $rc = new ReflectionClass($this->actionClass);
 
-        $this->assertTrue($rc->implementsInterface(GatewayAwareInterface::class));
+        self::assertTrue($rc->implementsInterface(GatewayAwareInterface::class));
     }
 }

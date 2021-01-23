@@ -28,7 +28,7 @@ class StatusActionTest extends ActionTestAbstract
 
         $action = new StatusAction();
         $action->execute($statusRequest);
-        $this->assertTrue($statusRequest->isNew(), 'Request should be marked as new');
+        self::assertTrue($statusRequest->isNew(), 'Request should be marked as new');
     }
 
     /**
@@ -51,7 +51,7 @@ class StatusActionTest extends ActionTestAbstract
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
-        $this->assertTrue($statusRequest->isNew(), 'Request should be marked as new');
+        self::assertTrue($statusRequest->isNew(), 'Request should be marked as new');
     }
 
     /**
@@ -80,7 +80,7 @@ class StatusActionTest extends ActionTestAbstract
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
-        $this->assertTrue($statusRequest->isAuthorized(), 'Request should be marked as authorized');
+        self::assertTrue($statusRequest->isAuthorized(), 'Request should be marked as authorized');
     }
 
     /**
@@ -113,7 +113,7 @@ class StatusActionTest extends ActionTestAbstract
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
-        $this->assertTrue($statusRequest->isFailed(), 'Request should be marked as failed');
+        self::assertTrue($statusRequest->isFailed(), 'Request should be marked as failed');
     }
 
     /**
@@ -133,7 +133,7 @@ class StatusActionTest extends ActionTestAbstract
             'acquirer' => 'clearhaus',
             'amount' => 1,
         ]));
-        $this->assertEquals(QuickPayPayment::STATE_PENDING, $quickpayPayment->getState());
+        self::assertEquals(QuickPayPayment::STATE_PENDING, $quickpayPayment->getState());
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
@@ -143,7 +143,7 @@ class StatusActionTest extends ActionTestAbstract
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
-        $this->assertTrue($statusRequest->isPending(), 'Request should be marked as pending');
+        self::assertEquals($statusRequest::STATUS_PENDING, $statusRequest->getValue());
     }
 
     /**
@@ -168,8 +168,8 @@ class StatusActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
-        $this->assertEquals(QuickpayPayment::STATE_REJECTED, $quickpayPayment->getState());
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickpayPayment::STATE_REJECTED, $quickpayPayment->getState());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
@@ -179,7 +179,7 @@ class StatusActionTest extends ActionTestAbstract
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
-        $this->assertTrue($statusRequest->isFailed(), 'Request should be marked as failed');
+        self::assertTrue($statusRequest->isFailed(), 'Request should be marked as failed');
     }
 
     /**
@@ -212,7 +212,7 @@ class StatusActionTest extends ActionTestAbstract
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
-        $this->assertTrue($statusRequest->isCaptured(), 'Request should be marked as captured');
+        self::assertTrue($statusRequest->isCaptured(), 'Request should be marked as captured');
     }
 
     /**
@@ -242,8 +242,8 @@ class StatusActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
-        $this->assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_CANCEL, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_CANCEL, $quickpayPayment->getLatestOperation()->getType());
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
@@ -253,6 +253,72 @@ class StatusActionTest extends ActionTestAbstract
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
-        $this->assertTrue($statusRequest->isCanceled(), 'Request should be marked as canceled');
+        self::assertTrue($statusRequest->isCanceled(), 'Request should be marked as canceled');
+    }
+
+    /**
+     * @test
+     */
+    public function shouldMarkRefunded(): void
+    {
+        $params = new ArrayObject([
+            'payment' => $this->createPayment(),
+        ]);
+        $quickpayPayment = $this->api->getPayment($params);
+
+        $this->api->authorizePayment($quickpayPayment, new ArrayObject([
+            'card' => $this->getTestCard()->toArray(),
+            'acquirer' => 'clearhaus',
+            'amount' => $params['payment']->getTotalAmount(),
+        ]));
+
+        $this->api->capturePayment($quickpayPayment, new ArrayObject([
+            'amount' => $params['payment']->getTotalAmount(),
+        ]));
+
+        $this->api->refundPayment($quickpayPayment, new ArrayObject([
+            'amount' => $params['payment']->getTotalAmount(),
+        ]));
+
+        $statusRequest = new GetHumanStatus([]);
+        $statusRequest->setModel(new ArrayObject([
+            'quickpayPaymentId' => $quickpayPayment->getId(),
+        ]));
+
+        $action = new StatusAction();
+        $action->setApi($this->api);
+        $action->execute($statusRequest);
+        self::assertEquals($statusRequest::STATUS_REFUNDED, $statusRequest->getValue());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldMarkCanceled(): void
+    {
+        $params = new ArrayObject([
+            'payment' => $this->createPayment(),
+        ]);
+        $quickpayPayment = $this->api->getPayment($params);
+
+        $this->api->authorizePayment($quickpayPayment, new ArrayObject([
+            'card' => $this->getTestCard()->toArray(),
+            'acquirer' => 'clearhaus',
+            'amount' => $params['payment']->getTotalAmount(),
+        ]));
+
+        $this->api->cancelPayment($quickpayPayment, new ArrayObject([
+            'amount' => $params['payment']->getTotalAmount(),
+        ]));
+
+        $statusRequest = new GetHumanStatus([]);
+        $statusRequest->setModel(new ArrayObject([
+            'quickpayPaymentId' => $quickpayPayment->getId(),
+        ]));
+
+        $action = new StatusAction();
+        $action->setApi($this->api);
+        $action->execute($statusRequest);
+        self::assertEquals($statusRequest::STATUS_CANCELED, $statusRequest->getValue());
     }
 }

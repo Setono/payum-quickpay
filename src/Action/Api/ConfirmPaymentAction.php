@@ -25,7 +25,7 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
      *
      * @param ConfirmPayment $request
      */
-    public function execute($request)
+    public function execute($request): void
     {
         RequestNotSupportedException::assertSupports($this, $request);
 
@@ -49,8 +49,6 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
                 throw new LogicException(sprintf('Authorized amount does not match. Authorized %s expected %s', $quickpayPayment->getAuthorizedAmount(), $model['amount']));
             }
         }
-
-        return 'OK';
     }
 
     public function supports($request)

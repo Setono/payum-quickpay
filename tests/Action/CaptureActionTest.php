@@ -34,7 +34,7 @@ class CaptureActionTest extends ActionTestAbstract
     {
         $rc = new ReflectionClass($this->actionClass);
 
-        $this->assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
+        self::assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
 
     /**
@@ -75,7 +75,7 @@ class CaptureActionTest extends ActionTestAbstract
         try {
             $action->execute($capture);
         } catch (HttpException $e) {
-            $this->assertStringStartsWith('Validation error', json_decode($e->getMessage(), false)->message);
+            self::assertStringStartsWith('Validation error', json_decode($e->getMessage(), false)->message);
         }
 
         // Authorize payment with test card
@@ -83,7 +83,7 @@ class CaptureActionTest extends ActionTestAbstract
         $details['acquirer'] = 'clearhaus';
         $this->api->authorizePayment($details['quickpayPayment'], $details);
         $quickpayPayment = $this->api->getPayment($details);
-        $this->assertEquals(QuickpayPayment::STATE_INITIAL, $quickpayPayment->getState());
+        self::assertEquals(QuickpayPayment::STATE_INITIAL, $quickpayPayment->getState());
 
         // Capture again
         $action->execute($capture);
@@ -92,8 +92,8 @@ class CaptureActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
-        $this->assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
-        $this->assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $quickpayPayment->getLatestOperation()->getStatusCode());
+        self::assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $quickpayPayment->getLatestOperation()->getStatusCode());
     }
 }

@@ -48,7 +48,7 @@ class NotifyActionTest extends ActionTestAbstract
         try {
             $action->execute($notify);
         } catch (LogicException $le) {
-            $this->assertEquals('The payment has not been created', $le->getMessage());
+            self::assertEquals('The payment has not been created', $le->getMessage());
         }
 
         // Use incorrect amount to trigger error
@@ -60,7 +60,7 @@ class NotifyActionTest extends ActionTestAbstract
         try {
             $action->execute($notify);
         } catch (LogicException $le) {
-            $this->assertStringStartsWith('Authorized amount does not match', $le->getMessage());
+            self::assertStringStartsWith('Authorized amount does not match', $le->getMessage());
         }
 
         $notify->setModel(new ArrayObject([
@@ -74,8 +74,8 @@ class NotifyActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
-        $this->assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
-        $this->assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $quickpayPayment->getLatestOperation()->getStatusCode());
+        self::assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
+        self::assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $quickpayPayment->getLatestOperation()->getStatusCode());
     }
 }

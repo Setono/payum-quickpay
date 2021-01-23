@@ -33,7 +33,7 @@ class AuthorizeActionTest extends ActionTestAbstract
     {
         $rc = new ReflectionClass($this->actionClass);
 
-        $this->assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
+        self::assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
 
     /**
@@ -82,7 +82,7 @@ class AuthorizeActionTest extends ActionTestAbstract
         try {
             $action->execute($authorize);
         } catch (HttpRedirect $redirect) {
-            $this->assertStringStartsWith('https://payment.quickpay.net/payments/', $redirect->getUrl());
+            self::assertStringStartsWith('https://payment.quickpay.net/payments/', $redirect->getUrl());
         }
 
         // Authorize payment with test card
@@ -91,7 +91,7 @@ class AuthorizeActionTest extends ActionTestAbstract
         $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
 
         // Validate that we received the payment from the operation
-        $this->assertEquals($details['quickpayPayment']->getId(), $quickpayPayment->getId());
+        self::assertEquals($details['quickpayPayment']->getId(), $quickpayPayment->getId());
 
         // Reload payment to get the status of the authorize operation
         sleep(1);
@@ -99,8 +99,8 @@ class AuthorizeActionTest extends ActionTestAbstract
 
         // Validate authorize operation
         $latestOperation = $quickpayPayment->getLatestOperation();
-        $this->assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $latestOperation->getType());
-        $this->assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $latestOperation->getStatusCode());
-        $this->assertEquals($details['amount'], $latestOperation->getAmount());
+        self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $latestOperation->getType());
+        self::assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $latestOperation->getStatusCode());
+        self::assertEquals($details['amount'], $latestOperation->getAmount());
     }
 }

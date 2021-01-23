@@ -165,7 +165,12 @@ class Api
         return QuickPayPayment::createFromResponse($response);
     }
 
-    protected function doRequest($method, string $path, array $params = []): ResponseInterface
+    public function validateChecksum(string $content, string $checksum): bool
+    {
+        return $checksum === self::checksum($content, (string) $this->getOption('privatekey'));
+    }
+
+    protected function doRequest(string $method, string $path, array $params = []): ResponseInterface
     {
         $headers = [
             'Authorization' => 'Basic '.base64_encode(':'.$this->getOption('apikey')),
@@ -203,7 +208,7 @@ class Api
     }
 
     /**
-     * Generates a checksum based on response body.
+     * Generates a checksum based on request/response body.
      *
      * @param string $data
      * @param string $privateKey
@@ -224,6 +229,11 @@ class Api
         }
     }
 
+    /**
+     * @param string|mixed $default
+     *
+     * @return string|mixed
+     */
     public function getOption(string $option, $default = '')
     {
         return $this->options[$option] ?? $default;
