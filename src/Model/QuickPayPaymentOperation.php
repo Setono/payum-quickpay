@@ -22,9 +22,9 @@ class QuickPayPaymentOperation extends QuickPayModel
 
     protected string $type;
 
-    protected int $amount;
+    protected ?int $amount = null;
 
-    protected string $qp_status_code;
+    protected ?string $qp_status_code = null;
 
     public static function createFromObject(stdClass $operations): self
     {
@@ -53,7 +53,7 @@ class QuickPayPaymentOperation extends QuickPayModel
 
     public function getAmount(): int
     {
-        return $this->amount;
+        return (int) $this->amount;
     }
 
     public function getStatusCode(): int
