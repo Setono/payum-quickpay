@@ -92,7 +92,7 @@ class QuickPayPayment extends QuickPayModel
      */
     public function getOperations(): array
     {
-        if (count($this->operations) > 0) {
+        if (\count($this->operations) > 0) {
             return QuickPayPaymentOperation::createFromArray($this->operations);
         }
 
@@ -101,7 +101,7 @@ class QuickPayPayment extends QuickPayModel
 
     public function getLatestOperation(): ?QuickPayPaymentOperation
     {
-        if (count($this->operations) > 0) {
+        if (\count($this->operations) > 0) {
             return QuickPayPaymentOperation::createFromObject(end($this->operations));
         }
 

@@ -32,13 +32,13 @@ class Api
     {
         $options = ArrayObject::ensureArrayObject($options);
         $options->defaults($this->options);
-        $options->validateNotEmpty(array(
+        $options->validateNotEmpty([
             'apikey',
             'merchant',
             'agreement',
             'privatekey',
             'language',
-        ));
+        ]);
 
         $this->options = $options;
         $this->client = $client;
@@ -53,7 +53,7 @@ class Api
             return $params['quickpayPayment'];
         }
 
-        if (is_int($params['quickpayPaymentId'])) {
+        if (\is_int($params['quickpayPaymentId'])) {
             $response = $this->doRequest('GET', 'payments/'.$params['quickpayPaymentId']);
         } else {
             /** @var Payment $paymentModel */

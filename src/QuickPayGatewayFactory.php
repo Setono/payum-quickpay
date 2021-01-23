@@ -33,7 +33,7 @@ class QuickPayGatewayFactory extends GatewayFactory
         ]);
 
         if (!$config->offsetExists('payum.api')) {
-            $config['payum.default_options'] = array(
+            $config['payum.default_options'] = [
                 'apikey' => '',
                 'merchant' => '',
                 'agreement' => '',
@@ -43,15 +43,15 @@ class QuickPayGatewayFactory extends GatewayFactory
                 'order_prefix' => '',
                 'syncronized' => false,
                 'language' => 'en',
-            );
+            ];
             $config->defaults($config['payum.default_options']);
-            $config['payum.required_options'] = array(
+            $config['payum.required_options'] = [
                 'apikey',
                 'merchant',
                 'agreement',
                 'privatekey',
                 'language',
-            );
+            ];
 
             $config['payum.api'] = static function (ArrayObject $config) {
                 $config->validateNotEmpty($config['payum.required_options']);
