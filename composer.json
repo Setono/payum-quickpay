@@ -45,7 +45,7 @@
             "@checks",
             "@test"
         ],
-        "analyse": "phpstan analyse -c phpstan.neon -l max src/",
+        "analyse": "phpstan analyse",
         "check-style": "ecs check src/ tests/",
         "checks": [
             "@check-style",
