@@ -11,8 +11,11 @@
     "license": "MIT",
     "require": {
         "php": "^7.4",
+        "ext-hash": "*",
         "ext-json": "*",
         "payum/core": "^1.6",
+        "php-http/message-factory": "^1.0",
+        "psr/http-message": "^1.0",
         "thecodingmachine/safe": "^1.3"
     },
     "require-dev": {
