@@ -73,8 +73,6 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
             default:
                 $request->markUnknown();
         }
-
-        // can be canceled at any time
     }
 
     public function supports($request): bool
