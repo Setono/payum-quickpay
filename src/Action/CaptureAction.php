@@ -23,9 +23,7 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
     use GenericTokenFactoryAwareTrait;
 
     /**
-     * {@inheritdoc}
-     *
-     * @param Capture $request
+     * @param mixed|Capture $request
      */
     public function execute($request): void
     {

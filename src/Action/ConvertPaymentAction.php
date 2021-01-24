@@ -21,9 +21,7 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
     use ApiAwareTrait;
 
     /**
-     * {@inheritdoc}
-     *
-     * @param Convert $request
+     * @param mixed|Convert $request
      */
     public function execute($request): void
     {

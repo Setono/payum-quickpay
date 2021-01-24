@@ -22,9 +22,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     use ApiAwareTrait;
 
     /**
-     * {@inheritdoc}
-     *
-     * @param GetStatusInterface $request
+     * @param mixed|GetStatusInterface $request
      */
     public function execute($request): void
     {

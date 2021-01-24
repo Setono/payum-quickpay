@@ -24,9 +24,7 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
     use GenericTokenFactoryAwareTrait;
 
     /**
-     * {@inheritdoc}
-     *
-     * @param Authorize $request
+     * @param mixed|Authorize $request
      */
     public function execute($request): void
     {

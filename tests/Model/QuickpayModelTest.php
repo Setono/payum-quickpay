@@ -70,7 +70,7 @@ class QuickpayModelTest extends TestCase
 
         self::assertGreaterThan(0, $quickpayPayment->getId());
         self::assertGreaterThanOrEqual(0, $quickpayPayment->getAuthorizedAmount());
-        self::assertEquals(3, strlen($quickpayPayment->getCurrency()));
+        self::assertEquals(3, \strlen($quickpayPayment->getCurrency()));
         self::assertNotEmpty($quickpayPayment->getOrderId());
         self::assertEquals(QuickPayPayment::STATE_PROCESSED, $quickpayPayment->getState());
         if (null !== $quickpayPayment->getLatestOperation()) {

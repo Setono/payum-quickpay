@@ -20,9 +20,7 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     use ApiAwareTrait;
 
     /**
-     * {@inheritdoc}
-     *
-     * @param Cancel $request
+     * @param mixed|Cancel $request
      */
     public function execute($request): void
     {
