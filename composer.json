@@ -10,7 +10,7 @@
     "homepage": "https://setono.com",
     "license": "MIT",
     "require": {
-        "php": "^7.4",
+        "php": ">=7.4",
         "ext-hash": "*",
         "ext-json": "*",
         "payum/core": "^1.6",
