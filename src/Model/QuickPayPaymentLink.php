@@ -18,7 +18,12 @@ class QuickPayPaymentLink extends QuickPayModel
         try {
             $data = json_decode($body, false, 512, \JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
-            throw new JsonException(sprintf('Could not json_decode input. Error was: %s. Input was: %s', $e->getMessage(), $body), $e->getCode(), $e);
+            throw new JsonException(sprintf(
+                'Could not json_decode input. Error was: %s. Called in: %s. Input was: %s',
+                $e->getMessage(),
+                __METHOD__,
+                $body === '' ? 'Empty' : $body
+            ), $e->getCode(), $e);
         }
 
         return new self($data);

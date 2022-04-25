@@ -84,13 +84,20 @@ class Api
     {
         $params = ArrayObject::ensureArrayObject($params);
 
-        $response = $this->doRequest('GET', 'payments?' . http_build_query($params->getArrayCopy()));
+        $url = 'payments?' . http_build_query($params->getArrayCopy());
+
+        $response = $this->doRequest('GET', $url);
         $body = (string) $response->getBody();
 
         try {
             $payments = json_decode($body, false, 512, \JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
-            throw new JsonException(sprintf('Could not json_decode input. Error was: %s. Input was: %s', $e->getMessage(), $body), $e->getCode(), $e);
+            throw new JsonException(sprintf(
+                'Could not json_decode input. Error was: %s. Request was: %s. Input was: %s',
+                $e->getMessage(),
+                $url,
+                $body === '' ? 'Empty' : $body
+            ), $e->getCode(), $e);
         }
         if (null === $payments) {
             throw new HttpException('Invalid response');
