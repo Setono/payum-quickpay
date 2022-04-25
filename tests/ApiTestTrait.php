@@ -24,7 +24,7 @@ trait ApiTestTrait
     protected $api;
 
     /**
-     * {@inheritdoc}
+     * @inheritdoc
      *
      * @throws ReflectionException
      */

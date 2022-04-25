@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Model;
 
+use JsonException;
 use Psr\Http\Message\ResponseInterface;
-use function Safe\json_decode;
 
 class QuickPayPaymentLink extends QuickPayModel
 {
@@ -13,7 +13,11 @@ class QuickPayPaymentLink extends QuickPayModel
 
     public static function createFromResponse(ResponseInterface $response): self
     {
-        $data = json_decode((string) $response->getBody(), false);
+        try {
+            $data = json_decode((string) $response->getBody(), false, 512, \JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new JsonException(sprintf('[%s] %s', __METHOD__, $e->getMessage()), $e->getCode(), $e);
+        }
 
         return new self($data);
     }

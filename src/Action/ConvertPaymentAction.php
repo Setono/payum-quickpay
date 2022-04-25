@@ -18,6 +18,7 @@ use Setono\Payum\QuickPay\Model\QuickPayPayment;
 class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
     use GatewayAwareTrait;
+
     use ApiAwareTrait;
 
     /**

@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<files psalm-version="4.22.0@fc2c6ab4d5fa5d644d8617089f012f3bb84b8703">
+  <file src="src/Action/Api/ApiAwareTrait.php">
+    <MissingConstructor occurrences="8">
+      <code>$api</code>
+      <code>$api</code>
+      <code>$api</code>
+      <code>$api</code>
+      <code>$api</code>
+      <code>$api</code>
+      <code>$api</code>
+      <code>$api</code>
+    </MissingConstructor>
+    <MissingParamType occurrences="1">
+      <code>$api</code>
+    </MissingParamType>
+  </file>
+  <file src="src/Action/Api/ConfirmPaymentAction.php">
+    <MixedArgument occurrences="1">
+      <code>$model['amount']</code>
+    </MixedArgument>
+    <MixedMethodCall occurrences="1">
+      <code>getModel</code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Action/AuthorizeAction.php">
+    <MixedArgument occurrences="2">
+      <code>$token-&gt;getDetails()</code>
+      <code>$token-&gt;getGatewayName()</code>
+    </MixedArgument>
+    <MixedAssignment occurrences="1">
+      <code>$token</code>
+    </MixedAssignment>
+    <MixedMethodCall occurrences="4">
+      <code>getDetails</code>
+      <code>getGatewayName</code>
+      <code>getModel</code>
+      <code>getToken</code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Action/CancelAction.php">
+    <MixedMethodCall occurrences="1">
+      <code>getModel</code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Action/CaptureAction.php">
+    <MixedMethodCall occurrences="1">
+      <code>getModel</code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Action/ConvertPaymentAction.php">
+    <MixedAssignment occurrences="4">
+      <code>$details['cancel_url']</code>
+      <code>$details['continue_url']</code>
+      <code>$details['quickpayPaymentId']</code>
+      <code>$token</code>
+    </MixedAssignment>
+    <MixedMethodCall occurrences="5">
+      <code>getAfterUrl</code>
+      <code>getId</code>
+      <code>getSource</code>
+      <code>getToken</code>
+      <code>setResult</code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Action/NotifyAction.php">
+    <MixedMethodCall occurrences="1">
+      <code>getModel</code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Action/RefundAction.php">
+    <MixedMethodCall occurrences="1">
+      <code>getModel</code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Action/StatusAction.php">
+    <MixedMethodCall occurrences="11">
+      <code>getModel</code>
+      <code>markAuthorized</code>
+      <code>markCanceled</code>
+      <code>markCaptured</code>
+      <code>markFailed</code>
+      <code>markFailed</code>
+      <code>markNew</code>
+      <code>markNew</code>
+      <code>markPending</code>
+      <code>markRefunded</code>
+      <code>markUnknown</code>
+    </MixedMethodCall>
+  </file>
+  <file src="src/Api.php">
+    <MixedArgument occurrences="1">
+      <code>$payment</code>
+    </MixedArgument>
+    <MixedAssignment occurrences="2">
+      <code>$payment</code>
+      <code>$payments</code>
+    </MixedAssignment>
+    <MixedOperand occurrences="2">
+      <code>$this-&gt;getOption('apikey')</code>
+      <code>$this-&gt;getOption('order_prefix')</code>
+    </MixedOperand>
+  </file>
+  <file src="src/Model/QuickPayModel.php">
+    <MixedAssignment occurrences="1">
+      <code>$value</code>
+    </MixedAssignment>
+  </file>
+  <file src="src/Model/QuickPayPayment.php">
+    <MixedArgument occurrences="2">
+      <code>$data</code>
+      <code>end($this-&gt;operations)</code>
+    </MixedArgument>
+    <MixedAssignment occurrences="1">
+      <code>$data</code>
+    </MixedAssignment>
+    <MixedReturnTypeCoercion occurrences="2">
+      <code>QuickPayPaymentOperation::createFromArray($this-&gt;operations)</code>
+      <code>QuickPayPaymentOperation[]</code>
+    </MixedReturnTypeCoercion>
+    <PropertyNotSetInConstructor occurrences="5">
+      <code>$currency</code>
+      <code>$id</code>
+      <code>$operations</code>
+      <code>$order_id</code>
+      <code>$state</code>
+    </PropertyNotSetInConstructor>
+  </file>
+  <file src="src/Model/QuickPayPaymentLink.php">
+    <MixedArgument occurrences="1">
+      <code>$data</code>
+    </MixedArgument>
+    <MixedAssignment occurrences="1">
+      <code>$data</code>
+    </MixedAssignment>
+    <PropertyNotSetInConstructor occurrences="1">
+      <code>$url</code>
+    </PropertyNotSetInConstructor>
+  </file>
+  <file src="src/Model/QuickPayPaymentOperation.php">
+    <MixedArgument occurrences="1">
+      <code>$operation</code>
+    </MixedArgument>
+    <MixedAssignment occurrences="1">
+      <code>$operation</code>
+    </MixedAssignment>
+    <PropertyNotSetInConstructor occurrences="2">
+      <code>$id</code>
+      <code>$type</code>
+    </PropertyNotSetInConstructor>
+  </file>
+  <file src="src/Model/QuickpayCard.php">
+    <PropertyNotSetInConstructor occurrences="3">
+      <code>$cvd</code>
+      <code>$expiration</code>
+      <code>$number</code>
+    </PropertyNotSetInConstructor>
+  </file>
+  <file src="src/QuickPayGatewayFactory.php">
+    <MixedArgument occurrences="4">
+      <code>$config['httplug.message_factory']</code>
+      <code>$config['payum.default_options']</code>
+      <code>$config['payum.http_client']</code>
+      <code>$config['payum.required_options']</code>
+    </MixedArgument>
+  </file>
+  <file src="src/Request/Api/ConfirmPayment.php">
+    <PropertyNotSetInConstructor occurrences="1">
+      <code>ConfirmPayment</code>
+    </PropertyNotSetInConstructor>
+  </file>
+</files>

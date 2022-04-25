@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-if (!$loader = @include __DIR__.'/../vendor/autoload.php') {
+if (!$loader = @include __DIR__ . '/../vendor/autoload.php') {
     echo <<<EOM
 You must set up the project dependencies by running the following commands:
     curl -s http://getcomposer.org/installer | php
@@ -14,6 +14,6 @@ EOM;
 use Payum\Core\GatewayInterface;
 
 $rc = new ReflectionClass(GatewayInterface::class);
-$coreDir = dirname($rc->getFileName()).'/tests';
+$coreDir = dirname($rc->getFileName()) . '/tests';
 $loader->add('Payum\Core\Tests', $coreDir);
 $loader->add('Setono\Payum\QuickPay\Tests', $coreDir);

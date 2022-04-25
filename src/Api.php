@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay;
 
 use Http\Message\MessageFactory;
+use JsonException;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\Http\HttpException;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\HttpClientInterface;
 use Payum\Core\Model\Payment;
 use Psr\Http\Message\ResponseInterface;
-use function Safe\json_decode;
-use function Safe\json_encode;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentLink;
 
@@ -53,7 +52,7 @@ class Api
         }
 
         if (\is_int($params['quickpayPaymentId'])) {
-            $response = $this->doRequest('GET', 'payments/'.$params['quickpayPaymentId']);
+            $response = $this->doRequest('GET', 'payments/' . $params['quickpayPaymentId']);
         } else {
             /** @var Payment $paymentModel */
             $paymentModel = $params['payment'];
@@ -67,7 +66,7 @@ class Api
 //                ]);
 
                 $response = $this->doRequest('POST', 'payments', $params->getArrayCopy() + [
-                    'order_id' => $this->getOption('order_prefix').$paymentModel->getNumber(),
+                    'order_id' => $this->getOption('order_prefix') . $paymentModel->getNumber(),
                     'currency' => $paymentModel->getCurrencyCode(),
                 ]);
             } else {
@@ -85,9 +84,13 @@ class Api
     {
         $params = ArrayObject::ensureArrayObject($params);
 
-        $response = $this->doRequest('GET', 'payments?'.http_build_query($params->getArrayCopy()));
+        $response = $this->doRequest('GET', 'payments?' . http_build_query($params->getArrayCopy()));
 
-        $payments = json_decode((string) $response->getBody(), false);
+        try {
+            $payments = json_decode((string) $response->getBody(), false, 512, \JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            throw new JsonException(sprintf('[%s] %s', __METHOD__, $e->getMessage()), $e->getCode(), $e);
+        }
         if (null === $payments) {
             throw new HttpException('Invalid response');
         }
@@ -107,7 +110,7 @@ class Api
             'continue_url', 'cancel_url', 'callback_url', 'amount',
         ]);
 
-        $response = $this->doRequest('PUT', 'payments/'.$payment->getId().'/link', $params->getArrayCopy() + [
+        $response = $this->doRequest('PUT', 'payments/' . $payment->getId() . '/link', $params->getArrayCopy() + [
             'payment_methods' => $this->options['payment_methods'],
             'language' => $this->options['language'],
             'auto_capture' => $this->options['auto_capture'],
@@ -123,7 +126,7 @@ class Api
             'card', 'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/authorize', $params->getArrayCopy());
+        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/authorize', $params->getArrayCopy());
 
         return QuickPayPayment::createFromResponse($response);
     }
@@ -135,7 +138,7 @@ class Api
             'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/capture', $params->getArrayCopy());
+        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/capture', $params->getArrayCopy());
 
         return QuickPayPayment::createFromResponse($response);
     }
@@ -147,7 +150,7 @@ class Api
             'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/refund', $params->getArrayCopy());
+        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/refund', $params->getArrayCopy());
 
         return QuickPayPayment::createFromResponse($response);
     }
@@ -159,7 +162,7 @@ class Api
             'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/'.$payment->getId().'/cancel', $params->getArrayCopy());
+        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/cancel', $params->getArrayCopy());
 
         return QuickPayPayment::createFromResponse($response);
     }
@@ -172,7 +175,7 @@ class Api
     protected function doRequest(string $method, string $path, array $params = []): ResponseInterface
     {
         $headers = [
-            'Authorization' => 'Basic '.base64_encode(':'.$this->getOption('apikey')),
+            'Authorization' => 'Basic ' . base64_encode(':' . $this->getOption('apikey')),
             'Accept-Version' => self::VERSION,
             'Content-Type' => 'application/json',
         ];
@@ -181,7 +184,7 @@ class Api
 
         $request = $this->messageFactory->createRequest(
             $method,
-            $this->getApiEndpoint().'/'.ltrim($path, '/'),
+            $this->getApiEndpoint() . '/' . ltrim($path, '/'),
             $headers,
             $encodedParams
         );

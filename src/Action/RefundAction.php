@@ -17,6 +17,7 @@ use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
     use GatewayAwareTrait;
+
     use ApiAwareTrait;
 
     /**

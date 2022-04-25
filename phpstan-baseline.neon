@@ -1,7 +1,0 @@
-parameters:
-	ignoreErrors:
-		-
-			message: "#^Variable property access on \\$this\\(Setono\\\\Payum\\\\QuickPay\\\\Model\\\\QuickPayModel\\)\\.$#"
-			count: 1
-			path: src/Model/QuickPayModel.php
-
