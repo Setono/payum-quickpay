@@ -29,7 +29,7 @@ class QuickPayPayment extends QuickPayModel
 
     protected array $operations;
 
-    public static function createFromResponse(ResponseInterface $response): self
+    public static function createFromResponse(ResponseInterface $response, string $url = null): self
     {
         $body = (string) $response->getBody();
 
@@ -37,9 +37,10 @@ class QuickPayPayment extends QuickPayModel
             $data = json_decode($body, false, 512, \JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
             throw new JsonException(sprintf(
-                'Could not json_decode input. Error was: %s. Called in: %s. Input was: %s',
+                'Could not json_decode input. Error was: %s. Called in: %s. Request: %s. Input was: %s',
                 $e->getMessage(),
                 __METHOD__,
+                $url ?? 'Not available',
                 $body === '' ? 'Empty' : $body
             ), $e->getCode(), $e);
         }

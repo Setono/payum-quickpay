@@ -52,7 +52,8 @@ class Api
         }
 
         if (\is_int($params['quickpayPaymentId'])) {
-            $response = $this->doRequest('GET', 'payments/' . $params['quickpayPaymentId']);
+            $url = 'payments/' . $params['quickpayPaymentId'];
+            $response = $this->doRequest('GET', $url);
         } else {
             /** @var Payment $paymentModel */
             $paymentModel = $params['payment'];
@@ -65,7 +66,8 @@ class Api
 //                    'basket',
 //                ]);
 
-                $response = $this->doRequest('POST', 'payments', $params->getArrayCopy() + [
+                $url = 'payments';
+                $response = $this->doRequest('POST', $url, $params->getArrayCopy() + [
                     'order_id' => $this->getOption('order_prefix') . $paymentModel->getNumber(),
                     'currency' => $paymentModel->getCurrencyCode(),
                 ]);
@@ -74,7 +76,7 @@ class Api
             }
         }
 
-        return QuickPayPayment::createFromResponse($response);
+        return QuickPayPayment::createFromResponse($response, $url);
     }
 
     /**
@@ -134,9 +136,10 @@ class Api
             'card', 'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/authorize', $params->getArrayCopy());
+        $url = 'payments/' . $payment->getId() . '/authorize';
+        $response = $this->doRequest('POST', $url, $params->getArrayCopy());
 
-        return QuickPayPayment::createFromResponse($response);
+        return QuickPayPayment::createFromResponse($response, $url);
     }
 
     public function capturePayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
@@ -146,9 +149,10 @@ class Api
             'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/capture', $params->getArrayCopy());
+        $url = 'payments/' . $payment->getId() . '/capture';
+        $response = $this->doRequest('POST', $url, $params->getArrayCopy());
 
-        return QuickPayPayment::createFromResponse($response);
+        return QuickPayPayment::createFromResponse($response, $url);
     }
 
     public function refundPayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
@@ -158,9 +162,10 @@ class Api
             'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/refund', $params->getArrayCopy());
+        $url = 'payments/' . $payment->getId() . '/refund';
+        $response = $this->doRequest('POST', $url, $params->getArrayCopy());
 
-        return QuickPayPayment::createFromResponse($response);
+        return QuickPayPayment::createFromResponse($response, $url);
     }
 
     public function cancelPayment(QuickPayPayment $payment, ArrayObject $params): QuickPayPayment
@@ -170,9 +175,10 @@ class Api
             'amount',
         ]);
 
-        $response = $this->doRequest('POST', 'payments/' . $payment->getId() . '/cancel', $params->getArrayCopy());
+        $url = 'payments/' . $payment->getId() . '/cancel';
+        $response = $this->doRequest('POST', $url, $params->getArrayCopy());
 
-        return QuickPayPayment::createFromResponse($response);
+        return QuickPayPayment::createFromResponse($response, $url);
     }
 
     public function validateChecksum(string $content, string $checksum): bool
