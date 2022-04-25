@@ -31,10 +31,12 @@ class QuickPayPayment extends QuickPayModel
 
     public static function createFromResponse(ResponseInterface $response): self
     {
+        $body = (string) $response->getBody();
+
         try {
-            $data = json_decode((string) $response->getBody(), false, 512, \JSON_THROW_ON_ERROR);
+            $data = json_decode($body, false, 512, \JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
-            throw new JsonException(sprintf('[%s] %s', __METHOD__, $e->getMessage()), $e->getCode(), $e);
+            throw new JsonException(sprintf('Could not json_decode input. Error was: %s. Input was: %s', $e->getMessage(), $body), $e->getCode(), $e);
         }
 
         return new self($data);
