@@ -43,6 +43,7 @@ class QuickpayModelTest extends TestCase
             'order_id' => 't100',
             'operations' => [],
             'currency' => 'DKK',
+            'fee' => null,
             'state' => QuickpayPayment::STATE_NEW,
         ];
         $quickpayPayment = QuickpayPayment::createFromObject($data);
@@ -52,6 +53,7 @@ class QuickpayModelTest extends TestCase
         self::assertEquals($data->order_id, $quickpayPayment->getOrderId());
         self::assertGreaterThanOrEqual(0, $quickpayPayment->getAuthorizedAmount());
         self::assertEquals(QuickPayPayment::STATE_NEW, $quickpayPayment->getState());
+        self::assertEquals($data->fee, $quickpayPayment->getFee());
         self::assertNull($quickpayPayment->getLatestOperation());
     }
 

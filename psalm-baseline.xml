@@ -118,12 +118,13 @@
       <code>QuickPayPaymentOperation::createFromArray($this-&gt;operations)</code>
       <code>QuickPayPaymentOperation[]</code>
     </MixedReturnTypeCoercion>
-    <PropertyNotSetInConstructor occurrences="5">
+    <PropertyNotSetInConstructor occurrences="6">
       <code>$currency</code>
       <code>$id</code>
       <code>$operations</code>
       <code>$order_id</code>
       <code>$state</code>
+      <code>$fee</code>
     </PropertyNotSetInConstructor>
   </file>
   <file src="src/Model/QuickPayPaymentLink.php">

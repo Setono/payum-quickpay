@@ -29,6 +29,8 @@ class QuickPayPayment extends QuickPayModel
 
     protected array $operations;
 
+    protected ?int $fee;
+
     public static function createFromResponse(ResponseInterface $response, string $url = null): self
     {
         $body = (string) $response->getBody();
@@ -74,6 +76,11 @@ class QuickPayPayment extends QuickPayModel
     public function getState(): string
     {
         return $this->state;
+    }
+
+    public function getFee(): ?int
+    {
+        return $this->fee;
     }
 
     public function getAuthorizedAmount(): int
