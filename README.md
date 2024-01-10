@@ -50,7 +50,7 @@ $quickpay->execute(new Capture($model));
 [ico-version]: https://img.shields.io/packagist/v/setono/payum-quickpay.svg?style=flat-square
 [ico-license]: https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square
 [ico-github-actions]: https://github.com/Setono/payum-quickpay/workflows/build/badge.svg
-[ico-code-coverage]: https://codecov.io/gh/Setono/payum-quickpay/branch/master/graph/badge.svg
+[ico-code-coverage]: https://codecov.io/gh/Setono/payum-quickpay/branch/1.x/graph/badge.svg
 
 [link-packagist]: https://packagist.org/packages/setono/payum-quickpay
 [link-github-actions]: https://github.com/Setono/payum-quickpay/actions
