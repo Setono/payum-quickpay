@@ -194,7 +194,7 @@ class Api
             'Content-Type' => 'application/json',
         ];
 
-        $encodedParams = json_encode($params);
+        $encodedParams = json_encode($params, \JSON_THROW_ON_ERROR);
 
         $request = $this->messageFactory->createRequest(
             $method,
@@ -207,7 +207,7 @@ class Api
         $statusCode = $response->getStatusCode();
 
         if ($statusCode < 200 || $statusCode > 299) {
-            throw new HttpException((string) $response->getBody(), $response->getStatusCode());
+            throw HttpException::factory($request, $response);
         }
 
         self::assertValidResponse($response, (string) $this->getOption('privatekey'));
