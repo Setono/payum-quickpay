@@ -37,7 +37,7 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         } catch (HttpException $e) {
             try {
                 $data = json_decode((string) $e->getResponse()->getBody(), true, 512, \JSON_THROW_ON_ERROR);
-                if (!isset($data['message']) || !is_string($data['message'])) {
+                if (!is_array($data) || !isset($data['message']) || !is_string($data['message'])) {
                     throw $e;
                 }
 
