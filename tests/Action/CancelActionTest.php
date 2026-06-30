@@ -10,6 +10,7 @@ use Payum\Core\Request\Cancel;
 use Payum\Core\Request\Convert;
 use Setono\Payum\QuickPay\Action\CancelAction;
 use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
+use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 
 class CancelActionTest extends ActionTestAbstract
@@ -32,6 +33,8 @@ class CancelActionTest extends ActionTestAbstract
 
         $convert = new Convert($payment, 'array', $token);
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+
         $convertPaymentAction = new ConvertPaymentAction();
         $convertPaymentAction->setGateway($this->gateway);
         $convertPaymentAction->setApi($this->api);
@@ -41,9 +44,14 @@ class CancelActionTest extends ActionTestAbstract
         $details = ArrayObject::ensureArrayObject($payment->getDetails());
         $token->setDetails($details);
 
-        // Authorize payment with test card
+        // Authorize payment with test card.
         $details['card'] = $this->getTestCard()->toArray();
         $details['acquirer'] = 'clearhaus';
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_NEW,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE)],
+        ]);
         $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
         self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
 
@@ -56,8 +64,20 @@ class CancelActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
+        // The cancel operation itself.
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CANCEL)],
+        ]);
         $action->execute($cancel);
 
+        // Reload to assert the cancel operation.
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CANCEL)],
+        ]);
         $quickpayPayment = $this->api->getPayment(new ArrayObject(['quickpayPaymentId' => $details['quickpayPayment']->getId()]));
         self::assertEquals(QuickPayPaymentOperation::TYPE_CANCEL, $quickpayPayment->getLatestOperation()->getType());
     }

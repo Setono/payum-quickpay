@@ -5,92 +5,115 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Tests;
 
 use DateTime;
-use Exception;
+use GuzzleHttp\Psr7\Response;
+use Http\Message\MessageFactory\GuzzleMessageFactory;
+use Payum\Core\Gateway;
 use Payum\Core\GatewayInterface;
 use Payum\Core\Model\Payment;
-use ReflectionException;
-use ReflectionProperty;
-use RuntimeException;
+use Setono\Payum\QuickPay\Action\Api\ConfirmPaymentAction;
 use Setono\Payum\QuickPay\Api;
 use Setono\Payum\QuickPay\Model\QuickpayCard;
-use Setono\Payum\QuickPay\QuickPayGatewayFactory;
+use Setono\Payum\QuickPay\Model\QuickPayPayment;
+use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 
+/**
+ * Shared setup for tests that exercise the {@see Api} and the actions. The Api is built around a
+ * {@see StubHttpClient}, so no test touches the live QuickPay API: each test queues the responses
+ * the QuickPay API would return for the requests it triggers.
+ */
 trait ApiTestTrait
 {
-    /** @var GatewayInterface */
-    protected $gateway;
+    protected StubHttpClient $httpClient;
 
-    /** @var Api */
-    protected $api;
+    protected Api $api;
 
-    /**
-     * @inheritdoc
-     *
-     * @throws ReflectionException
-     */
+    protected GatewayInterface $gateway;
+
     public function setUp(): void
     {
         parent::setUp();
 
-        $this->gateway = $this->createGatewayMock();
-        $this->api = $this->getApi();
+        $this->httpClient = new StubHttpClient();
+        $this->api = new Api($this->apiOptions(), $this->httpClient, new GuzzleMessageFactory());
+
+        // A real gateway is only needed so actions that dispatch sub-requests (NotifyAction ->
+        // ConfirmPayment) stay offline; it shares the same stubbed Api.
+        $gateway = new Gateway();
+        $gateway->addApi($this->api);
+        $gateway->addAction(new ConfirmPaymentAction());
+        $this->gateway = $gateway;
     }
 
-    protected function createGatewayMock(): GatewayInterface
+    /**
+     * @return array<string, mixed>
+     */
+    protected function apiOptions(): array
     {
-        $factory = new QuickPayGatewayFactory();
-        $gateway = $factory->create([
-            'apikey' => '3fc7aa8a994d871d920c1c4b4de20129274ecdc7f023257e0b2b1f773771fda8',
-            'privatekey' => '31f1ec081caad82046e3bd763d81df4629e498cbc286fe66f0286bb74d7e9d0e',
+        return [
+            'apikey' => 'test-apikey',
+            'privatekey' => 'test-privatekey',
             'merchant' => '75015',
             'agreement' => '266017',
             'order_prefix' => 'ut',
             'payment_methods' => 'visa',
             'auto_capture' => '1',
-        ]);
-
-        return $gateway;
+            'language' => 'en',
+        ];
     }
 
-    /**
-     * @return mixed
-     *
-     * @throws ReflectionException
-     * @throws Exception
-     */
-    private function getApi(): Api
+    protected function queueResponse(string $body, int $status = 200): void
     {
-        $attribute = new ReflectionProperty($this->gateway, 'apis');
-
-        $attribute->setAccessible(true);
-        $value = $attribute->getValue($this->gateway);
-        $attribute->setAccessible(false);
-
-        foreach ($value as $api) {
-            if ($api instanceof Api) {
-                return $api;
-            }
-        }
-
-        throw new RuntimeException('No api found in gateway');
+        $this->httpClient->addResponse(new Response($status, [], $body));
     }
 
     /**
-     * @throws Exception
+     * Queues a QuickPay payment JSON response built from sensible defaults plus the given overrides.
+     *
+     * @param array<string, mixed> $overrides
      */
+    protected function queuePayment(array $overrides = []): void
+    {
+        $this->queueResponse($this->paymentJson($overrides));
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    protected function paymentJson(array $overrides = []): string
+    {
+        return (string) json_encode(array_replace([
+            'id' => 1001,
+            'order_id' => 'ut0001',
+            'currency' => 'DKK',
+            'fee' => null,
+            'state' => QuickPayPayment::STATE_INITIAL,
+            'operations' => [],
+        ], $overrides), \JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function operation(string $type, int $statusCode = QuickPayPaymentOperation::STATUS_CODE_APPROVED, int $amount = 100): array
+    {
+        return [
+            'id' => 1,
+            'type' => $type,
+            'amount' => $amount,
+            'qp_status_code' => (string) $statusCode,
+        ];
+    }
+
     protected function createPayment(): Payment
     {
         $payment = new Payment();
-        $payment->setNumber(substr(uniqid('', true), 0, 18));
-        $payment->setTotalAmount(random_int(1, 100) * 100);
+        $payment->setNumber('000000000001');
+        $payment->setTotalAmount(100);
         $payment->setCurrencyCode('DKK');
 
         return $payment;
     }
 
-    /**
-     * @throws Exception
-     */
     protected function getTestCard(): QuickpayCard
     {
         return QuickpayCard::createFromArray([
@@ -100,9 +123,6 @@ trait ApiTestTrait
         ]);
     }
 
-    /**
-     * @throws Exception
-     */
     protected function getAuthorizeRejectedTestCard(): QuickpayCard
     {
         $card = $this->getTestCard();
@@ -111,9 +131,6 @@ trait ApiTestTrait
         return $card;
     }
 
-    /**
-     * @throws Exception
-     */
     protected function getCaptureRejectedTestCard(): QuickpayCard
     {
         $card = $this->getTestCard();

@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
-use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Model\Token;
 use Payum\Core\Request\Convert;
 use Payum\Core\Request\Refund;
 use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
 use Setono\Payum\QuickPay\Action\RefundAction;
+use Setono\Payum\QuickPay\Model\QuickPayPayment;
 use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 
 class RefundActionTest extends ActionTestAbstract
@@ -23,8 +23,6 @@ class RefundActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldRefundPayment(): void
     {
@@ -37,6 +35,8 @@ class RefundActionTest extends ActionTestAbstract
 
         $convert = new Convert($payment, 'array', $token);
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+
         $convertPaymentAction = new ConvertPaymentAction();
         $convertPaymentAction->setGateway($this->gateway);
         $convertPaymentAction->setApi($this->api);
@@ -46,13 +46,23 @@ class RefundActionTest extends ActionTestAbstract
         $details = ArrayObject::ensureArrayObject($payment->getDetails());
         $token->setDetails($details);
 
-        // Authorize payment with test card
+        // Authorize payment with test card.
         $details['card'] = $this->getTestCard()->toArray();
         $details['acquirer'] = 'clearhaus';
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_NEW,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE)],
+        ]);
         $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
         self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
 
-        // Capture payment
+        // Capture payment.
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CAPTURE)],
+        ]);
         $quickpayPayment = $this->api->capturePayment($details['quickpayPayment'], $details);
         self::assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
 
@@ -65,8 +75,20 @@ class RefundActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
+        // The refund operation itself.
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_REFUND)],
+        ]);
         $action->execute($refund);
 
+        // Reload to assert the refund operation.
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_REFUND)],
+        ]);
         $quickpayPayment = $this->api->getPayment(new ArrayObject(['quickpayPaymentId' => $details['quickpayPayment']->getId()]));
         self::assertEquals(QuickPayPaymentOperation::TYPE_REFUND, $quickpayPayment->getLatestOperation()->getType());
     }
