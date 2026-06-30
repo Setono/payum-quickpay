@@ -22,7 +22,7 @@ class QuickPayPaymentLink extends QuickPayModel
                 'Could not json_decode input. Error was: %s. Called in: %s. Input was: %s',
                 $e->getMessage(),
                 __METHOD__,
-                $body === '' ? 'Empty' : $body
+                $body === '' ? 'Empty' : $body,
             ), $e->getCode(), $e);
         }
 

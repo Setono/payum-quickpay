@@ -27,11 +27,12 @@ class QuickPayPayment extends QuickPayModel
 
     protected string $state;
 
+    /** @var list<\stdClass> */
     protected array $operations;
 
     protected ?int $fee;
 
-    public static function createFromResponse(ResponseInterface $response, string $url = null): self
+    public static function createFromResponse(ResponseInterface $response, ?string $url = null): self
     {
         $body = (string) $response->getBody();
 
@@ -43,7 +44,7 @@ class QuickPayPayment extends QuickPayModel
                 $e->getMessage(),
                 __METHOD__,
                 $url ?? 'Not available',
-                $body === '' ? 'Empty' : $body
+                $body === '' ? 'Empty' : $body,
             ), $e->getCode(), $e);
         }
 

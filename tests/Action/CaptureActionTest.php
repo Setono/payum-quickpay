@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
-use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\Http\HttpException;
 use Payum\Core\Model\Token;
@@ -28,7 +27,6 @@ class CaptureActionTest extends ActionTestAbstract
      * @test
      *
      * @throws ReflectionException
-     * @throws Exception
      */
     public function shouldImplementGenericTokenFactoryAwareInterface(): void
     {
@@ -39,8 +37,6 @@ class CaptureActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldCapturePayment(): void
     {
@@ -52,6 +48,9 @@ class CaptureActionTest extends ActionTestAbstract
         $token->setGatewayName('quickpay');
 
         $convert = new Convert($payment, 'array', $token);
+
+        // ConvertPaymentAction creates the QuickPay payment.
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
 
         $convertPaymentAction = new ConvertPaymentAction();
         $convertPaymentAction->setGateway($this->gateway);
@@ -71,28 +70,46 @@ class CaptureActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
-        // Try capture from incorrect state
+        // Capturing before the payment is authorized fails with a validation error.
+        $this->queueResponse('{"message":"Validation error in capture"}', 400);
+
         try {
             $action->execute($capture);
         } catch (HttpException $e) {
-            self::assertStringStartsWith('Validation error', json_decode($e->getMessage(), false)->message);
+            $body = json_decode((string) $e->getResponse()->getBody(), false, 512, \JSON_THROW_ON_ERROR);
+            self::assertStringStartsWith('Validation error', $body->message);
         }
 
-        // Authorize payment with test card
+        // Authorize the payment with the test card.
         $details['card'] = $this->getTestCard()->toArray();
         $details['acquirer'] = 'clearhaus';
+        $this->queuePayment([
+            'state' => QuickPayPayment::STATE_NEW,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE)],
+        ]);
         $this->api->authorizePayment($details['quickpayPayment'], $details);
-        $quickpayPayment = $this->api->getPayment($details);
-        self::assertEquals(QuickpayPayment::STATE_INITIAL, $quickpayPayment->getState());
 
-        // Capture again
+        $quickpayPayment = $this->api->getPayment($details);
+        self::assertEquals(QuickPayPayment::STATE_INITIAL, $quickpayPayment->getState());
+
+        // Capture again, this time it succeeds.
+        $this->queuePayment([
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CAPTURE)],
+        ]);
         $action->execute($capture);
 
+        // Reload the payment to assert the captured state.
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CAPTURE)],
+        ]);
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
-        self::assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());
+        self::assertEquals(QuickPayPayment::STATE_PROCESSED, $quickpayPayment->getState());
         self::assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
         self::assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $quickpayPayment->getLatestOperation()->getStatusCode());
     }

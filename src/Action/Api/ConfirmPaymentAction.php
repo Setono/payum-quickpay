@@ -18,7 +18,6 @@ use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
 class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, ApiAwareInterface
 {
     use GatewayAwareTrait;
-
     use ApiAwareTrait;
 
     /**

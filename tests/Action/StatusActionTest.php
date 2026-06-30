@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests\Action;
 
-use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Request\GetHumanStatus;
 use Setono\Payum\QuickPay\Action\StatusAction;
@@ -19,8 +18,6 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldMarkEmptyAsNew(): void
     {
@@ -33,21 +30,18 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldMarkInitialAsNew(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
         $statusRequest = new GetHumanStatus([]);
         $statusRequest->setModel(new ArrayObject([
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
@@ -56,16 +50,13 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldMarkNewAsAuthorized(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_NEW]);
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getTestCard()->toArray(),
             'acquirer' => 'clearhaus',
@@ -77,6 +68,11 @@ class StatusActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_NEW,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE)],
+        ]);
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
@@ -85,24 +81,22 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldMarkNewAsFailed(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_NEW]);
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getCaptureRejectedTestCard()->toArray(),
             'acquirer' => 'clearhaus',
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_NEW]);
         $this->api->capturePayment($quickpayPayment, new ArrayObject([
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
         $statusRequest = new GetHumanStatus([]);
@@ -110,6 +104,12 @@ class StatusActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
+        // A new payment whose authorize operation was not approved -> failed.
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_NEW,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE, 40000)],
+        ]);
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
@@ -118,16 +118,13 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldMarkPendingAsPending(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_PENDING]);
         $quickpayPayment = $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getTestCard()->toArray(),
             'acquirer' => 'clearhaus',
@@ -148,27 +145,29 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldMarkRejectedAsFailed(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_REJECTED]);
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getAuthorizeRejectedTestCard()->toArray(),
             'acquirer' => 'clearhaus',
             'amount' => 1,
         ]));
 
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_REJECTED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE, 40000)],
+        ]);
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
-        self::assertEquals(QuickpayPayment::STATE_REJECTED, $quickpayPayment->getState());
+        self::assertEquals(QuickPayPayment::STATE_REJECTED, $quickpayPayment->getState());
         self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
 
         $statusRequest = new GetHumanStatus([]);
@@ -184,24 +183,22 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function shouldMarkProcessedAsCaptured(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_NEW]);
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getTestCard()->toArray(),
             'acquirer' => 'clearhaus',
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_PROCESSED]);
         $this->api->capturePayment($quickpayPayment, new ArrayObject([
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
         $statusRequest = new GetHumanStatus([]);
@@ -209,6 +206,11 @@ class StatusActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CAPTURE)],
+        ]);
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
@@ -217,32 +219,34 @@ class StatusActionTest extends ActionTestAbstract
 
     /**
      * @test
-     *
-     * @throws Exception
      */
-    public function shouldMarkProcessedAsAuthorized(): void
+    public function shouldMarkProcessedAsCanceled(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_NEW]);
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getTestCard()->toArray(),
             'acquirer' => 'clearhaus',
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
-        sleep(1);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_PROCESSED]);
         $this->api->cancelPayment($quickpayPayment, new ArrayObject([
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CANCEL)],
+        ]);
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
-        self::assertEquals(QuickpayPayment::STATE_PROCESSED, $quickpayPayment->getState());
+        self::assertEquals(QuickPayPayment::STATE_PROCESSED, $quickpayPayment->getState());
         self::assertEquals(QuickPayPaymentOperation::TYPE_CANCEL, $quickpayPayment->getLatestOperation()->getType());
 
         $statusRequest = new GetHumanStatus([]);
@@ -261,23 +265,24 @@ class StatusActionTest extends ActionTestAbstract
      */
     public function shouldMarkRefunded(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_NEW]);
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getTestCard()->toArray(),
             'acquirer' => 'clearhaus',
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_PROCESSED]);
         $this->api->capturePayment($quickpayPayment, new ArrayObject([
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_PROCESSED]);
         $this->api->refundPayment($quickpayPayment, new ArrayObject([
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
         $statusRequest = new GetHumanStatus([]);
@@ -285,6 +290,11 @@ class StatusActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_REFUND)],
+        ]);
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);
@@ -296,19 +306,19 @@ class StatusActionTest extends ActionTestAbstract
      */
     public function shouldMarkCanceled(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_NEW]);
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getTestCard()->toArray(),
             'acquirer' => 'clearhaus',
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_PROCESSED]);
         $this->api->cancelPayment($quickpayPayment, new ArrayObject([
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
         $statusRequest = new GetHumanStatus([]);
@@ -316,6 +326,11 @@ class StatusActionTest extends ActionTestAbstract
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
 
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CANCEL)],
+        ]);
         $action = new StatusAction();
         $action->setApi($this->api);
         $action->execute($statusRequest);

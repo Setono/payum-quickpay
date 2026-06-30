@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Tests\Model;
 
 use DateTime;
-use Exception;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\QuickPay\Model\QuickPayPayment;
@@ -18,8 +17,6 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function quickpayCard(): void
     {
@@ -33,8 +30,6 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function quickpayEmptyPayment(): void
     {
@@ -59,11 +54,13 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function quickpayPayment(): void
     {
+        $this->queueResponse('[' . $this->paymentJson([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_PROCESSED,
+        ]) . ']');
         $quickpayPayments = $this->api->getPayments(new ArrayObject(['page_size' => 1, 'state' => QuickpayPayment::STATE_PROCESSED]));
 
         self::assertCount(1, $quickpayPayments);
@@ -82,23 +79,24 @@ class QuickpayModelTest extends TestCase
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function quickpayPaymentOperation(): void
     {
-        $params = new ArrayObject([
-            'payment' => $this->createPayment(),
-        ]);
-        $quickpayPayment = $this->api->getPayment($params);
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
+        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_NEW]);
         $this->api->authorizePayment($quickpayPayment, new ArrayObject([
             'card' => $this->getTestCard()->toArray(),
             'acquirer' => 'clearhaus',
-            'amount' => $params['payment']->getTotalAmount(),
+            'amount' => 100,
         ]));
 
-        sleep(1);
+        $this->queuePayment([
+            'id' => 1001,
+            'state' => QuickPayPayment::STATE_NEW,
+            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE, QuickPayPaymentOperation::STATUS_CODE_APPROVED, 100)],
+        ]);
         $quickpayPayment = $this->api->getPayment(new ArrayObject([
             'quickpayPaymentId' => $quickpayPayment->getId(),
         ]));
@@ -109,18 +107,18 @@ class QuickpayModelTest extends TestCase
         self::assertGreaterThan(0, $quickpayPaymentOperation->getId());
         self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPaymentOperation->getType());
         self::assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $quickpayPaymentOperation->getStatusCode());
-        self::assertEquals($params['payment']->getTotalAmount(), $quickpayPaymentOperation->getAmount());
+        self::assertEquals(100, $quickpayPaymentOperation->getAmount());
     }
 
     /**
      * @test
-     *
-     * @throws Exception
      */
     public function quickpayPaymentLink(): void
     {
+        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
         $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $this->createPayment()]));
 
+        $this->queueResponse('{"url":"https://payment.quickpay.net/payments/1001/payment-window"}');
         $quickpayPaymentLink = $this->api->createPaymentLink($quickpayPayment, new ArrayObject(['continue_url' => '-', 'cancel_url' => '-', 'callback_url' => '-', 'amount' => 100]));
 
         self::assertNotEmpty($quickpayPaymentLink->getUrl());
