@@ -8,6 +8,7 @@ use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
@@ -16,6 +17,7 @@ use Payum\Core\Request\Authorize;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Quickpay\Request\Payment\CreateLinkRequest;
 
 class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
 {
@@ -33,19 +35,32 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
         if (null !== $token = $request->getToken()) {
-            // Create callback url
+            // Build the server-to-server callback (notify) url.
             $model['callback_url'] = $this->tokenFactory
                 ->createNotifyToken($token->getGatewayName(), $token->getDetails())
                 ->getTargetUrl();
         }
 
-        $quickpayPayment = $this->api->getPayment($model);
+        $model->validateNotEmpty(['continue_url', 'cancel_url', 'callback_url', 'amount']);
 
-        // Create payment link
-        $paymentLink = $this->api->createPaymentLink($quickpayPayment, $model);
+        $link = $this->api->payments()->createLink((int) $model['quickpayPaymentId'], new CreateLinkRequest(
+            amount: (int) $model['amount'],
+            agreementId: $this->api->getAgreementId(),
+            language: $this->api->getLanguage(),
+            continueUrl: (string) $model['continue_url'],
+            cancelUrl: (string) $model['cancel_url'],
+            callbackUrl: (string) $model['callback_url'],
+            paymentMethods: $this->api->getPaymentMethods(),
+            autoCapture: $this->api->isAutoCapture(),
+            brandingId: $this->api->getBrandingId(),
+        ));
 
-        // Redirect to payment
-        throw new HttpRedirect($paymentLink->getUrl());
+        if (null === $link->url) {
+            throw new LogicException('QuickPay did not return a payment link url');
+        }
+
+        // Redirect the customer to the QuickPay payment window.
+        throw new HttpRedirect($link->url);
     }
 
     public function supports($request): bool

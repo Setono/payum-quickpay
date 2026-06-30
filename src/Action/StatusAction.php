@@ -13,8 +13,9 @@ use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\GetStatusInterface;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
+use Setono\Payum\QuickPay\Operations;
+use Setono\Quickpay\Enum\OperationType;
+use Setono\Quickpay\Enum\PaymentState;
 
 class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -30,43 +31,47 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        if (!$model->offsetExists('quickpayPaymentId') && !$model->offsetExists('quickpayPayment')) {
+        if (!$model->offsetExists('quickpayPaymentId')) {
             $request->markNew();
 
             return;
         }
 
-        $quickpayPayment = $this->api->getPayment($model);
-        $latestOperation = $quickpayPayment->getLatestOperation();
+        $payment = $this->api->payments()->getById((int) $model['quickpayPaymentId']);
+        $operations = $payment->operations;
 
-        switch ($quickpayPayment->getState()) {
-            case QuickPayPayment::STATE_INITIAL:
+        switch ($payment->state()) {
+            case PaymentState::Initial:
                 $request->markNew();
 
                 break;
-            case QuickPayPayment::STATE_NEW:
-                if ($this->isOperationApproved($latestOperation, QuickPayPaymentOperation::TYPE_AUTHORIZE)) {
+            case PaymentState::New:
+                if (Operations::isLatestApproved($operations, OperationType::Authorize)) {
                     $request->markAuthorized();
                 } else {
                     $request->markFailed();
                 }
 
                 break;
-            case QuickPayPayment::STATE_PENDING:
+            case PaymentState::Pending:
                 $request->markPending();
 
                 break;
-            case QuickPayPayment::STATE_REJECTED:
+            case PaymentState::Rejected:
+            case PaymentState::Invalid:
                 $request->markFailed();
 
                 break;
-            case QuickPayPayment::STATE_PROCESSED:
-                if ($this->isOperationApproved($latestOperation, QuickPayPaymentOperation::TYPE_CAPTURE)) {
+            case PaymentState::Processed:
+                $latestOperation = Operations::latest($operations);
+                if (Operations::isApprovedOfType($latestOperation, OperationType::Capture)) {
                     $request->markCaptured();
-                } elseif ($this->isOperationApproved($latestOperation, QuickPayPaymentOperation::TYPE_REFUND)) {
+                } elseif (Operations::isApprovedOfType($latestOperation, OperationType::Refund)) {
                     $request->markRefunded();
-                } elseif ($this->isOperationApproved($latestOperation, QuickPayPaymentOperation::TYPE_CANCEL)) {
+                } elseif (Operations::isApprovedOfType($latestOperation, OperationType::Cancel)) {
                     $request->markCanceled();
+                } else {
+                    $request->markUnknown();
                 }
 
                 break;
@@ -78,14 +83,5 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     public function supports($request): bool
     {
         return $request instanceof GetStatusInterface && $request->getModel() instanceof ArrayAccess;
-    }
-
-    private function isOperationApproved(?QuickPayPaymentOperation $operation, string $state): bool
-    {
-        if (null === $operation) {
-            return false;
-        }
-
-        return $operation->getType() === $state && $operation->isApproved();
     }
 }

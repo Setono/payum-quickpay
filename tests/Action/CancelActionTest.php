@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Model\Token;
 use Payum\Core\Request\Cancel;
-use Payum\Core\Request\Convert;
 use Setono\Payum\QuickPay\Action\CancelAction;
-use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
+use Setono\Quickpay\Enum\OperationType;
+use Setono\Quickpay\Enum\PaymentState;
+use Setono\Quickpay\Exception\ValidationException;
 
 class CancelActionTest extends ActionTestAbstract
 {
@@ -24,61 +22,69 @@ class CancelActionTest extends ActionTestAbstract
      */
     public function shouldCancelPayment(): void
     {
-        $payment = $this->createPayment();
-
-        $token = new Token();
-        $token->setTargetUrl('theCallbackUrl');
-        $token->setAfterUrl('theContinueUrl');
-        $token->setGatewayName('quickpay');
-
-        $convert = new Convert($payment, 'array', $token);
-
-        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
-
-        $convertPaymentAction = new ConvertPaymentAction();
-        $convertPaymentAction->setGateway($this->gateway);
-        $convertPaymentAction->setApi($this->api);
-        $convertPaymentAction->execute($convert);
-
-        $payment->setDetails($convert->getResult());
-        $details = ArrayObject::ensureArrayObject($payment->getDetails());
-        $token->setDetails($details);
-
-        // Authorize payment with test card.
-        $details['card'] = $this->getTestCard()->toArray();
-        $details['acquirer'] = 'clearhaus';
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_NEW,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE)],
-        ]);
-        $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
-        self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
 
         /** @var Cancel $cancel */
-        $cancel = new $this->requestClass($token);
-        $cancel->setModel($details);
+        $cancel = new $this->requestClass($details);
 
-        /** @var CancelAction $action */
-        $action = new $this->actionClass();
+        $action = new CancelAction();
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
-        // The cancel operation itself.
         $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_PROCESSED,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CANCEL)],
+            'state' => PaymentState::Processed->value,
+            'operations' => [$this->operation(OperationType::Cancel)],
         ]);
+
         $action->execute($cancel);
 
-        // Reload to assert the cancel operation.
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_PROCESSED,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CANCEL)],
-        ]);
-        $quickpayPayment = $this->api->getPayment(new ArrayObject(['quickpayPaymentId' => $details['quickpayPayment']->getId()]));
-        self::assertEquals(QuickPayPaymentOperation::TYPE_CANCEL, $quickpayPayment->getLatestOperation()->getType());
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'POST', '#/payments/1001/cancel$#');
+        // Cancel takes no body.
+        self::assertSame('', (string) $requests[0]->getBody());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldSwallowWrongStateError(): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
+
+        /** @var Cancel $cancel */
+        $cancel = new $this->requestClass($details);
+
+        $action = new CancelAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        // QuickPay reports an already finalized payment as a wrong-state error; the action treats it
+        // as a no-op so cancelling is idempotent.
+        $this->queueResponse('{"message":"Transaction in wrong state for this operation"}', 400);
+
+        $action->execute($cancel);
+
+        self::assertCount(1, $this->getRequests());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldRethrowOtherErrors(): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
+
+        /** @var Cancel $cancel */
+        $cancel = new $this->requestClass($details);
+
+        $action = new CancelAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queueResponse('{"message":"Some other error"}', 400);
+
+        $this->expectException(ValidationException::class);
+        $action->execute($cancel);
     }
 }

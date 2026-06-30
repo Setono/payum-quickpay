@@ -4,61 +4,64 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests;
 
-use DateTime;
 use GuzzleHttp\Psr7\Response;
-use Http\Message\MessageFactory\GuzzleMessageFactory;
+use Http\Mock\Client as MockHttpClient;
 use Payum\Core\Gateway;
 use Payum\Core\GatewayInterface;
 use Payum\Core\Model\Payment;
+use Psr\Http\Message\RequestInterface;
 use Setono\Payum\QuickPay\Action\Api\ConfirmPaymentAction;
 use Setono\Payum\QuickPay\Api;
-use Setono\Payum\QuickPay\Model\QuickpayCard;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
+use Setono\Payum\QuickPay\Operations;
+use Setono\Quickpay\Client\Client;
+use Setono\Quickpay\Enum\OperationType;
+use Setono\Quickpay\Enum\PaymentState;
 
 /**
- * Shared setup for tests that exercise the {@see Api} and the actions. The Api is built around a
- * {@see StubHttpClient}, so no test touches the live QuickPay API: each test queues the responses
- * the QuickPay API would return for the requests it triggers.
+ * Shared setup for tests exercising the actions and the {@see Api}. The SDK client is built around a
+ * PSR-18 {@see MockHttpClient}, so no test touches the live QuickPay API: each test queues the
+ * responses the API would return, in the order the code under test performs the requests, and may
+ * assert on the recorded requests via {@see self::getRequests()}.
  */
 trait ApiTestTrait
 {
-    protected StubHttpClient $httpClient;
+    protected MockHttpClient $httpClient;
 
     protected Api $api;
 
     protected GatewayInterface $gateway;
 
+    protected StubGetHttpRequestAction $httpRequestAction;
+
     public function setUp(): void
     {
         parent::setUp();
 
-        $this->httpClient = new StubHttpClient();
-        $this->api = new Api($this->apiOptions(), $this->httpClient, new GuzzleMessageFactory());
+        $this->httpClient = new MockHttpClient();
 
-        // A real gateway is only needed so actions that dispatch sub-requests (NotifyAction ->
-        // ConfirmPayment) stay offline; it shares the same stubbed Api.
+        $this->api = new Api(
+            client: new Client('test-apikey', $this->httpClient),
+            privateKey: 'test-privatekey',
+            orderPrefix: 'ut',
+            paymentMethods: 'visa',
+            language: 'en',
+            autoCapture: true,
+            synchronized: false,
+            agreementId: 266017,
+        );
+
+        // A real gateway is needed so actions that dispatch sub-requests stay offline:
+        // NotifyAction -> GetHttpRequest (StubGetHttpRequestAction) and -> ConfirmPayment.
+        $confirmPaymentAction = new ConfirmPaymentAction();
+        $confirmPaymentAction->setApi($this->api);
+
+        $this->httpRequestAction = new StubGetHttpRequestAction();
+
         $gateway = new Gateway();
         $gateway->addApi($this->api);
-        $gateway->addAction(new ConfirmPaymentAction());
+        $gateway->addAction($confirmPaymentAction);
+        $gateway->addAction($this->httpRequestAction);
         $this->gateway = $gateway;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function apiOptions(): array
-    {
-        return [
-            'apikey' => 'test-apikey',
-            'privatekey' => 'test-privatekey',
-            'merchant' => '75015',
-            'agreement' => '266017',
-            'order_prefix' => 'ut',
-            'payment_methods' => 'visa',
-            'auto_capture' => '1',
-            'language' => 'en',
-        ];
     }
 
     protected function queueResponse(string $body, int $status = 200): void
@@ -85,8 +88,11 @@ trait ApiTestTrait
             'id' => 1001,
             'order_id' => 'ut0001',
             'currency' => 'DKK',
+            'merchant_id' => 75015,
+            'accepted' => true,
+            'test_mode' => true,
+            'state' => PaymentState::Initial->value,
             'fee' => null,
-            'state' => QuickPayPayment::STATE_INITIAL,
             'operations' => [],
         ], $overrides), \JSON_THROW_ON_ERROR);
     }
@@ -94,13 +100,14 @@ trait ApiTestTrait
     /**
      * @return array<string, mixed>
      */
-    protected function operation(string $type, int $statusCode = QuickPayPaymentOperation::STATUS_CODE_APPROVED, int $amount = 100): array
+    protected function operation(OperationType $type, string $statusCode = Operations::APPROVED_STATUS_CODE, int $amount = 100): array
     {
         return [
             'id' => 1,
-            'type' => $type,
+            'type' => $type->value,
             'amount' => $amount,
-            'qp_status_code' => (string) $statusCode,
+            'pending' => false,
+            'qp_status_code' => $statusCode,
         ];
     }
 
@@ -114,28 +121,39 @@ trait ApiTestTrait
         return $payment;
     }
 
-    protected function getTestCard(): QuickpayCard
+    /**
+     * @return list<RequestInterface>
+     */
+    protected function getRequests(): array
     {
-        return QuickpayCard::createFromArray([
-            'number' => 1000000000000008,
-            'expiration' => (new DateTime())->format('ym'),
-            'cvd' => 123,
-        ]);
+        return $this->httpClient->getRequests();
     }
 
-    protected function getAuthorizeRejectedTestCard(): QuickpayCard
+    /**
+     * Asserts the method, path and the auth/version headers the SDK client sets on every request.
+     */
+    protected function assertRequest(RequestInterface $request, string $method, string $pathPattern): void
     {
-        $card = $this->getTestCard();
-        $card->setNumber($card->getNumber() + 8);
-
-        return $card;
+        self::assertSame($method, $request->getMethod());
+        self::assertMatchesRegularExpression($pathPattern, $request->getUri()->getPath());
+        self::assertSame('Basic ' . base64_encode(':test-apikey'), $request->getHeaderLine('Authorization'));
+        self::assertSame('v10', $request->getHeaderLine('Accept-Version'));
+        self::assertSame('application/json', $request->getHeaderLine('Accept'));
     }
 
-    protected function getCaptureRejectedTestCard(): QuickpayCard
+    /**
+     * @return array<string, mixed>
+     */
+    protected function decodeBody(RequestInterface $request): array
     {
-        $card = $this->getTestCard();
-        $card->setNumber($card->getNumber() + 24);
+        $body = (string) $request->getBody();
+        if ('' === $body) {
+            return [];
+        }
 
-        return $card;
+        /** @var array<string, mixed> $decoded */
+        $decoded = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
+
+        return $decoded;
     }
 }

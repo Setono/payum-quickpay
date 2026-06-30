@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Setono\Payum\QuickPay\Tests;
 
+use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\CoreGatewayFactory;
+use Payum\Core\Exception\LogicException;
 use Payum\Core\Extension\ExtensionCollection;
 use Payum\Core\Gateway;
 use Payum\Core\GatewayFactory;
@@ -12,7 +14,10 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionProperty;
+use Setono\Payum\QuickPay\Api;
 use Setono\Payum\QuickPay\QuickPayGatewayFactory;
+use Setono\Quickpay\Client\Client;
+use stdClass;
 
 class QuickPayGatewayFactoryTest extends TestCase
 {
@@ -54,8 +59,6 @@ class QuickPayGatewayFactoryTest extends TestCase
         $gateway = $factory->create([
             'apikey' => '1234',
             'privatekey' => '1234',
-            'merchant' => '1234',
-            'agreement' => '1234',
         ]);
         self::assertInstanceOf(Gateway::class, $gateway);
         self::assertNotEmpty(self::readProperty($gateway, 'apis'));
@@ -64,6 +67,48 @@ class QuickPayGatewayFactoryTest extends TestCase
         $extensions = self::readProperty($gateway, 'extensions');
         self::assertInstanceOf(ExtensionCollection::class, $extensions);
         self::assertNotEmpty(self::readProperty($extensions, 'extensions'));
+    }
+
+    /**
+     * @test
+     */
+    public function shouldBuildApiWithInjectedClient(): void
+    {
+        $client = new Client('injected-key');
+
+        $factory = new QuickPayGatewayFactory();
+        $config = $factory->createConfig([
+            'apikey' => '1234',
+            'privatekey' => 'private',
+            'quickpay.client' => $client,
+            'order_prefix' => 'sylius-',
+        ]);
+
+        self::assertArrayHasKey('payum.api', $config);
+        self::assertIsCallable($config['payum.api']);
+
+        $api = $config['payum.api'](ArrayObject::ensureArrayObject($config));
+
+        self::assertInstanceOf(Api::class, $api);
+        self::assertSame($client, $api->getClient());
+        self::assertSame('sylius-', $api->getOrderPrefix());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldThrowWhenInjectedClientIsInvalid(): void
+    {
+        $factory = new QuickPayGatewayFactory();
+        $config = $factory->createConfig([
+            'apikey' => '1234',
+            'privatekey' => 'private',
+            'quickpay.client' => new stdClass(),
+        ]);
+
+        $this->expectException(LogicException::class);
+
+        $config['payum.api'](ArrayObject::ensureArrayObject($config));
     }
 
     /**

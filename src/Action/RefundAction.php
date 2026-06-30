@@ -13,6 +13,7 @@ use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Refund;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Quickpay\Request\Payment\RefundRequest;
 
 class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -28,9 +29,11 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        $quickpayPayment = $this->api->getPayment($model);
-
-        $this->api->refundPayment($quickpayPayment, $model);
+        $this->api->payments()->refund(
+            (int) $model['quickpayPaymentId'],
+            new RefundRequest(amount: (int) $model['amount']),
+            synchronized: $this->api->isSynchronized(),
+        );
     }
 
     public function supports($request): bool

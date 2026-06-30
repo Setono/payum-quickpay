@@ -15,6 +15,7 @@ use Payum\Core\Request\Capture;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Quickpay\Request\Payment\CaptureRequest;
 
 class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
 {
@@ -31,9 +32,11 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        $quickpayPayment = $this->api->getPayment($model);
-
-        $this->api->capturePayment($quickpayPayment, $model);
+        $this->api->payments()->capture(
+            (int) $model['quickpayPaymentId'],
+            new CaptureRequest(amount: (int) $model['amount']),
+            synchronized: $this->api->isSynchronized(),
+        );
     }
 
     public function supports($request): bool

@@ -13,7 +13,7 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Model\PaymentInterface;
 use Payum\Core\Request\Convert;
 use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
+use Setono\Quickpay\Request\Payment\CreatePaymentRequest;
 
 class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -30,17 +30,25 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         /** @var PaymentInterface $paymentModel */
         $paymentModel = $request->getSource();
 
-        $token = $request->getToken();
-
         $details = ArrayObject::ensureArrayObject($paymentModel->getDetails());
         $details['amount'] = $paymentModel->getTotalAmount();
-        $details['payment'] = $paymentModel;
+        $details['currency'] = $paymentModel->getCurrencyCode();
 
-        if (!isset($details['quickpayPayment']) || !$details['quickpayPayment'] instanceof QuickPayPayment) {
-            $details['quickpayPayment'] = $this->api->getPayment($details);
-            $details['quickpayPaymentId'] = $details['quickpayPayment']->getId();
+        // Only scalars are stored in the details so they survive serialization by the consumer.
+        // `quickpayPaymentId` is the single source of truth; the payment is re-fetched when needed.
+        if (!isset($details['quickpayPaymentId'])) {
+            $payment = $this->api->payments()->create(new CreatePaymentRequest(
+                orderId: $this->api->getOrderPrefix() . $paymentModel->getNumber(),
+                currency: $paymentModel->getCurrencyCode(),
+            ));
+
+            $details['quickpayPaymentId'] = $payment->id;
+            $details['order_id'] = $payment->orderId;
         }
-        $details['continue_url'] = $details['cancel_url'] = $token->getAfterUrl();
+
+        if (null !== $token = $request->getToken()) {
+            $details['continue_url'] = $details['cancel_url'] = $token->getAfterUrl();
+        }
 
         $request->setResult((array) $details);
     }
