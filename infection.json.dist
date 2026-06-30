@@ -7,5 +7,7 @@
     },
     "logs": {
         "text": "php://stderr"
-    }
+    },
+    "minMsi": 65,
+    "minCoveredMsi": 70
 }
