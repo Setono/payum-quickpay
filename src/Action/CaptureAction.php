@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action;
+namespace Setono\Payum\Quickpay\Action;
 
 use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
@@ -14,7 +14,7 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Capture;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Quickpay\Request\Payment\CaptureRequest;
 
 class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface

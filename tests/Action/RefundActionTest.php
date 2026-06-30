@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Request\Refund;
-use Setono\Payum\QuickPay\Action\RefundAction;
+use Setono\Payum\Quickpay\Action\RefundAction;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 

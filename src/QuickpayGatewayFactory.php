@@ -2,29 +2,29 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay;
+namespace Setono\Payum\Quickpay;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\GatewayFactory;
-use Setono\Payum\QuickPay\Action\Api\ConfirmPaymentAction;
-use Setono\Payum\QuickPay\Action\AuthorizeAction;
-use Setono\Payum\QuickPay\Action\CancelAction;
-use Setono\Payum\QuickPay\Action\CaptureAction;
-use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
-use Setono\Payum\QuickPay\Action\NotifyAction;
-use Setono\Payum\QuickPay\Action\RefundAction;
-use Setono\Payum\QuickPay\Action\StatusAction;
+use Setono\Payum\Quickpay\Action\Api\ConfirmPaymentAction;
+use Setono\Payum\Quickpay\Action\AuthorizeAction;
+use Setono\Payum\Quickpay\Action\CancelAction;
+use Setono\Payum\Quickpay\Action\CaptureAction;
+use Setono\Payum\Quickpay\Action\ConvertPaymentAction;
+use Setono\Payum\Quickpay\Action\NotifyAction;
+use Setono\Payum\Quickpay\Action\RefundAction;
+use Setono\Payum\Quickpay\Action\StatusAction;
 use Setono\Quickpay\Client\Client;
 use Setono\Quickpay\Client\ClientInterface;
 
-class QuickPayGatewayFactory extends GatewayFactory
+class QuickpayGatewayFactory extends GatewayFactory
 {
     protected function populateConfig(ArrayObject $config): void
     {
         $config->defaults([
             'payum.factory_name' => 'quickpay',
-            'payum.factory_title' => 'QuickPay',
+            'payum.factory_title' => 'Quickpay',
             'payum.action.capture' => new CaptureAction(),
             'payum.action.authorize' => new AuthorizeAction(),
             'payum.action.refund' => new RefundAction(),
@@ -46,7 +46,7 @@ class QuickPayGatewayFactory extends GatewayFactory
                 'synchronized' => false,
                 // optional: maps to CreateLinkRequest::agreementId
                 'agreement' => '',
-                // optional: maps to the QuickPay branding id on the payment link
+                // optional: maps to the Quickpay branding id on the payment link
                 'branding_id' => '',
             ];
             $config->defaults($config['payum.default_options']);

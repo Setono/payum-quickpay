@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Model\Token;
@@ -12,7 +12,7 @@ use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryInterface;
 use ReflectionClass;
 use ReflectionException;
-use Setono\Payum\QuickPay\Action\AuthorizeAction;
+use Setono\Payum\Quickpay\Action\AuthorizeAction;
 
 class AuthorizeActionTest extends ActionTestAbstract
 {

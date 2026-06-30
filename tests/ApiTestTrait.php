@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests;
+namespace Setono\Payum\Quickpay\Tests;
 
 use GuzzleHttp\Psr7\Response;
 use Http\Mock\Client as MockHttpClient;
@@ -10,16 +10,16 @@ use Payum\Core\Gateway;
 use Payum\Core\GatewayInterface;
 use Payum\Core\Model\Payment;
 use Psr\Http\Message\RequestInterface;
-use Setono\Payum\QuickPay\Action\Api\ConfirmPaymentAction;
-use Setono\Payum\QuickPay\Api;
-use Setono\Payum\QuickPay\Operations;
+use Setono\Payum\Quickpay\Action\Api\ConfirmPaymentAction;
+use Setono\Payum\Quickpay\Api;
+use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Client\Client;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 
 /**
  * Shared setup for tests exercising the actions and the {@see Api}. The SDK client is built around a
- * PSR-18 {@see MockHttpClient}, so no test touches the live QuickPay API: each test queues the
+ * PSR-18 {@see MockHttpClient}, so no test touches the live Quickpay API: each test queues the
  * responses the API would return, in the order the code under test performs the requests, and may
  * assert on the recorded requests via {@see self::getRequests()}.
  */
@@ -70,7 +70,7 @@ trait ApiTestTrait
     }
 
     /**
-     * Queues a QuickPay payment JSON response built from sensible defaults plus the given overrides.
+     * Queues a Quickpay payment JSON response built from sensible defaults plus the given overrides.
      *
      * @param array<string, mixed> $overrides
      */

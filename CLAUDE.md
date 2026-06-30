@@ -5,9 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Overview
 
 `setono/payum-quickpay` is a [Payum](https://github.com/Payum/Payum) gateway that integrates the
-[QuickPay](https://quickpay.net) payment provider (a Danish PSP). It is a library — there is no
+[Quickpay](https://quickpay.net) payment provider (a Danish PSP). It is a library — there is no
 runnable application — consumed by projects that wire it into Payum (commonly Sylius shops). The
-package targets **PHP >= 8.1** and the QuickPay API **v10**.
+package targets **PHP >= 8.1** and the Quickpay API **v10**.
 
 ## Commands
 
@@ -41,7 +41,7 @@ on both `lowest` and `highest` Composer resolutions, everything else on `highest
 ## Architecture
 
 This package follows Payum's request/action gateway pattern. A consumer creates a gateway via
-`QuickPayGatewayFactory`, then `execute()`s Payum request objects against it. Each request is routed
+`QuickpayGatewayFactory`, then `execute()`s Payum request objects against it. Each request is routed
 to a matching Action.
 
 ### The SDK
@@ -55,7 +55,7 @@ currently pinned at `^1.0@alpha`.
 
 ### Wiring
 
-`QuickPayGatewayFactory::populateConfig()` is the composition root. It registers every action under a
+`QuickpayGatewayFactory::populateConfig()` is the composition root. It registers every action under a
 `payum.action.*` key and defines `payum.api` — a factory closure that builds the `Api` value object.
 Required options are just `apikey` and `privatekey`; other options (`payment_methods`, `auto_capture`,
 `order_prefix`, `language`, `synchronized`, `agreement` → link `agreementId`, `branding_id`) are
@@ -73,18 +73,18 @@ the `quickpayPaymentId` (int) it carries is the single source of truth — actio
 
 Request → Action flow (amounts are integer minor units everywhere — no conversion):
 - **Convert** → `ConvertPaymentAction` — turns a Payum `PaymentInterface` into the details array; creates
-  the QuickPay payment (via `CreatePaymentRequest`) if absent and stores **only scalars** —
+  the Quickpay payment (via `CreatePaymentRequest`) if absent and stores **only scalars** —
   `quickpayPaymentId`, `amount`, `currency`, `order_id` — plus `continue_url`/`cancel_url` from the
   token's after-URL. It never persists DTO/model objects.
 - **Authorize** → `AuthorizeAction` — builds a notify (callback) token into `callback_url`, creates a
-  payment link (`createLink` + `CreateLinkRequest`), and **throws `HttpRedirect`** to QuickPay's hosted
+  payment link (`createLink` + `CreateLinkRequest`), and **throws `HttpRedirect`** to Quickpay's hosted
   payment window.
 - **Capture / Refund / Cancel** → call `Api::payments()->capture/refund/cancel(...)`. Operations are
   asynchronous by default (final state arrives via the callback); `Api::isSynchronized()` (the
   `synchronized` option, default off) is the single toggle that flips them to synchronous. `CancelAction`
   catches the typed `QuickpayException` and swallows the "Transaction in wrong state for this operation"
   case (so cancel is idempotent), rethrowing anything else.
-- **Notify** → `NotifyAction` — entry point for QuickPay's server-to-server callback. It fetches the raw
+- **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. It fetches the raw
   body + `QuickPay-Checksum-Sha256` header (via Payum's `GetHttpRequest`), **verifies the HMAC signature**
   with the SDK `CallbackValidator`, and rejects an invalid/unsigned callback with a 400 `HttpResponse`
   before delegating to the internal `ConfirmPayment` request.
@@ -113,11 +113,11 @@ on those models now lives in the stateless `Operations` helper over a `list<Oper
 ## Testing
 
 Tests mirror `src/` under `tests/` and are **fully offline and deterministic** — no network, no shared
-QuickPay account. The HTTP seam is a PSR-18 `Http\Mock\Client` (`php-http/mock-client`) injected into the
+Quickpay account. The HTTP seam is a PSR-18 `Http\Mock\Client` (`php-http/mock-client`) injected into the
 SDK `Client`; `tests/ApiTestTrait` builds the `Api` around it with fake credentials and provides
 `queueResponse()` / `queuePayment()` (FIFO response queue), `operation()`, fixture builders, and
 request-shape assertion helpers (`assertRequest()` checks method, path, Basic auth and `Accept-Version`).
-Tests assert both the resulting Payum marks/replies **and** that the correct QuickPay requests were sent
+Tests assert both the resulting Payum marks/replies **and** that the correct Quickpay requests were sent
 (`getRequests()`).
 
 Most action tests extend `ActionTestAbstract` → `GenericActionTestCase`, a **local copy** of Payum's

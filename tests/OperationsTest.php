@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests;
+namespace Setono\Payum\Quickpay\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Setono\Payum\QuickPay\Operations;
+use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Response\Payment\Operation;
 

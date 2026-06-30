@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action\Api;
+namespace Setono\Payum\Quickpay\Action\Api;
 
 use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
@@ -12,8 +12,8 @@ use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
-use Setono\Payum\QuickPay\Operations;
-use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
+use Setono\Payum\Quickpay\Operations;
+use Setono\Payum\Quickpay\Request\Api\ConfirmPayment;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Request\Payment\CaptureRequest;
 

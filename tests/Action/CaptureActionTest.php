@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Request\Capture;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use ReflectionClass;
 use ReflectionException;
-use Setono\Payum\QuickPay\Action\CaptureAction;
+use Setono\Payum\Quickpay\Action\CaptureAction;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 use Setono\Quickpay\Exception\ValidationException;

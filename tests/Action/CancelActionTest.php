@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Request\Cancel;
-use Setono\Payum\QuickPay\Action\CancelAction;
+use Setono\Payum\Quickpay\Action\CancelAction;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 use Setono\Quickpay\Exception\ValidationException;
@@ -59,7 +59,7 @@ class CancelActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
-        // QuickPay reports an already finalized payment as a wrong-state error; the action treats it
+        // Quickpay reports an already finalized payment as a wrong-state error; the action treats it
         // as a no-op so cancelling is idempotent.
         $this->queueResponse('{"message":"Transaction in wrong state for this operation"}', 400);
 

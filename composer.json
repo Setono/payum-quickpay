@@ -1,6 +1,6 @@
 {
     "name": "setono/payum-quickpay",
-    "description": "QuickPay gateway for Payum",
+    "description": "Quickpay gateway for Payum",
     "license": "MIT",
     "type": "library",
     "keywords": [
@@ -39,12 +39,12 @@
     },
     "autoload": {
         "psr-4": {
-            "Setono\\Payum\\QuickPay\\": "src/"
+            "Setono\\Payum\\Quickpay\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Setono\\Payum\\QuickPay\\Tests\\": "tests/"
+            "Setono\\Payum\\Quickpay\\Tests\\": "tests/"
         }
     },
     "config": {

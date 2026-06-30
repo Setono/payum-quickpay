@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
@@ -11,8 +11,8 @@ use Payum\Core\Model\Payment;
 use Payum\Core\Model\Token;
 use Payum\Core\Request\Convert;
 use PHPUnit\Framework\TestCase;
-use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
-use Setono\Payum\QuickPay\Tests\ApiTestTrait;
+use Setono\Payum\Quickpay\Action\ConvertPaymentAction;
+use Setono\Payum\Quickpay\Tests\ApiTestTrait;
 use stdClass;
 
 /**

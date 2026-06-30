@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests;
+namespace Setono\Payum\Quickpay\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Setono\Payum\QuickPay\Api;
+use Setono\Payum\Quickpay\Api;
 use Setono\Quickpay\Client\Endpoint\PaymentsEndpoint;
 
 class ApiTest extends TestCase

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action;
+namespace Setono\Payum\Quickpay\Action;
 
 use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
@@ -14,12 +14,12 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Reply\HttpResponse;
 use Payum\Core\Request\GetHttpRequest;
 use Payum\Core\Request\Notify;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
-use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
+use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Request\Api\ConfirmPayment;
 use Setono\Quickpay\Callback\CallbackValidator;
 
 /**
- * Handles the server-to-server callback (webhook) from QuickPay.
+ * Handles the server-to-server callback (webhook) from Quickpay.
  *
  * The raw request body is verified against the `QuickPay-Checksum-Sha256` HMAC signature (computed
  * with the account private key) before the callback is acted upon, so forged or tampered callbacks
@@ -57,7 +57,7 @@ class NotifyAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     }
 
     /**
-     * Reads the QuickPay checksum header off the (Symfony-bridge populated) `headers` property of the
+     * Reads the Quickpay checksum header off the (Symfony-bridge populated) `headers` property of the
      * http request. The lookup is case-insensitive because Payum's bridges normalize header casing
      * inconsistently, and the value may be a list (PSR/Symfony) or a plain string.
      */

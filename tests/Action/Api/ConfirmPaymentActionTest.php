@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action\Api;
+namespace Setono\Payum\Quickpay\Tests\Action\Api;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
 use PHPUnit\Framework\TestCase;
-use Setono\Payum\QuickPay\Action\Api\ConfirmPaymentAction;
-use Setono\Payum\QuickPay\Api;
-use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
-use Setono\Payum\QuickPay\Tests\ApiTestTrait;
+use Setono\Payum\Quickpay\Action\Api\ConfirmPaymentAction;
+use Setono\Payum\Quickpay\Api;
+use Setono\Payum\Quickpay\Request\Api\ConfirmPayment;
+use Setono\Payum\Quickpay\Tests\ApiTestTrait;
 use Setono\Quickpay\Client\Client;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action;
+namespace Setono\Payum\Quickpay\Action;
 
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
@@ -12,7 +12,7 @@ use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Model\PaymentInterface;
 use Payum\Core\Request\Convert;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Quickpay\Request\Payment\CreatePaymentRequest;
 
 class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface

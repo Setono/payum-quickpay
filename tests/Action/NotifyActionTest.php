@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Reply\HttpResponse;
 use Payum\Core\Request\Notify;
-use Setono\Payum\QuickPay\Action\NotifyAction;
+use Setono\Payum\Quickpay\Action\NotifyAction;
 use Setono\Quickpay\Callback\CallbackValidator;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;

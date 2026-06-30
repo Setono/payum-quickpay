@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay;
+namespace Setono\Payum\Quickpay;
 
 use Setono\Quickpay\Callback\CallbackValidator;
 use Setono\Quickpay\Client\ClientInterface;
 use Setono\Quickpay\Client\Endpoint\PaymentsEndpoint;
 
 /**
- * Immutable value object injected as Payum's `payum.api`. It wraps the configured QuickPay SDK
+ * Immutable value object injected as Payum's `payum.api`. It wraps the configured Quickpay SDK
  * client together with the gateway behavior options the actions need.
  *
  * It performs no HTTP itself — the SDK client does (Basic auth, the mandatory `Accept-Version: v10`

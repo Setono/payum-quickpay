@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay;
+namespace Setono\Payum\Quickpay;
 
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Response\Payment\Operation;
@@ -10,14 +10,14 @@ use Setono\Quickpay\Response\Payment\Operation;
 /**
  * Stateless helpers over a payment's list of {@see Operation}s.
  *
- * This replaces the behavior that used to live on the deleted `QuickPayPayment` /
- * `QuickPayPaymentOperation` models — the SDK response DTOs are readonly data holders without
+ * This replaces the behavior that used to live on the deleted `QuickpayPayment` /
+ * `QuickpayPaymentOperation` models — the SDK response DTOs are readonly data holders without
  * behavior of their own.
  */
 final class Operations
 {
     /**
-     * QuickPay's status code for an approved operation.
+     * Quickpay's status code for an approved operation.
      */
     public const APPROVED_STATUS_CODE = '20000';
 

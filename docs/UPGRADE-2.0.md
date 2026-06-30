@@ -1,6 +1,6 @@
 # Upgrading from 1.x to 2.0
 
-Version 2.0 replaces the library's hand-rolled QuickPay API client with the
+Version 2.0 replaces the library's hand-rolled Quickpay API client with the
 [`setono/quickpay-php-sdk`](https://github.com/Setono/quickpay-php-sdk) package, hardens callback
 handling, and modernizes the test suite. This is a major release with breaking changes.
 
@@ -14,7 +14,7 @@ handling, and modernizes the test suite. This is a major release with breaking c
 
 ## Gateway options
 
-- **`merchant` was removed.** QuickPay API v10 authenticates with the API key alone; the option was
+- **`merchant` was removed.** Quickpay API v10 authenticates with the API key alone; the option was
   never used. Remove it from your gateway configuration (passing it is harmless — it is ignored).
 - **Only `apikey` and `privatekey` are now required.** `language` is defaulted to `en`.
 - **`agreement` is now optional** and maps to the payment-window `agreement_id`.
@@ -28,7 +28,7 @@ The details array stored on a payment (the `ArrayObject` model) now contains **o
 
 - `1.x` stored a hydrated `quickpayPayment` **object** alongside `quickpayPaymentId`.
 - `2.0` stores only `quickpayPaymentId` (int) — the source of truth — plus `amount`, `currency`,
-  `order_id`, `continue_url`, `cancel_url`, `callback_url`. The payment is re-fetched from QuickPay when
+  `order_id`, `continue_url`, `cancel_url`, `callback_url`. The payment is re-fetched from Quickpay when
   needed.
 
 If your code reads `$details['quickpayPayment']`, switch to fetching the payment via the SDK using
@@ -49,11 +49,11 @@ response. Ensure:
 
 These were internal implementation details; they are gone in 2.0:
 
-- `Setono\Payum\QuickPay\Model\*` (`QuickPayPayment`, `QuickPayPaymentOperation`, `QuickPayPaymentLink`,
-  `QuickPayModel`, `QuickpayCard`) — replaced by the SDK's `Setono\Quickpay\Response\Payment\*` DTOs and
+- `Setono\Payum\Quickpay\Model\*` (`QuickpayPayment`, `QuickpayPaymentOperation`, `QuickpayPaymentLink`,
+  `QuickpayModel`, `QuickpayCard`) — replaced by the SDK's `Setono\Quickpay\Response\Payment\*` DTOs and
   the `Setono\Quickpay\Enum\{PaymentState,OperationType}` enums. State logic now lives in the
-  `Setono\Payum\QuickPay\Operations` helper.
-- `Setono\Payum\QuickPay\Api` is no longer an HTTP client. It is now an immutable value object wrapping
+  `Setono\Payum\Quickpay\Operations` helper.
+- `Setono\Payum\Quickpay\Api` is no longer an HTTP client. It is now an immutable value object wrapping
   the SDK `Setono\Quickpay\Client\ClientInterface` and the gateway options (`payments()`, `getClient()`,
   `isAutoCapture()`, `createCallbackValidator()`, …). Its old `getPayment()` / `capturePayment()` /
   `checksum()` / `assertValidResponse()` methods were removed.

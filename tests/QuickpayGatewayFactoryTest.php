@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests;
+namespace Setono\Payum\Quickpay\Tests;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\CoreGatewayFactory;
@@ -14,12 +14,12 @@ use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionProperty;
-use Setono\Payum\QuickPay\Api;
-use Setono\Payum\QuickPay\QuickPayGatewayFactory;
+use Setono\Payum\Quickpay\Api;
+use Setono\Payum\Quickpay\QuickpayGatewayFactory;
 use Setono\Quickpay\Client\Client;
 use stdClass;
 
-class QuickPayGatewayFactoryTest extends TestCase
+class QuickpayGatewayFactoryTest extends TestCase
 {
     /**
      * @test
@@ -28,7 +28,7 @@ class QuickPayGatewayFactoryTest extends TestCase
      */
     public function shouldSubClassGatewayFactory(): void
     {
-        $rc = new ReflectionClass(QuickPayGatewayFactory::class);
+        $rc = new ReflectionClass(QuickpayGatewayFactory::class);
         self::assertTrue($rc->isSubclassOf(GatewayFactory::class));
     }
 
@@ -37,8 +37,8 @@ class QuickPayGatewayFactoryTest extends TestCase
      */
     public function couldBeConstructedWithoutAnyArguments(): void
     {
-        $factory = new QuickPayGatewayFactory();
-        self::assertInstanceOf(QuickPayGatewayFactory::class, $factory);
+        $factory = new QuickpayGatewayFactory();
+        self::assertInstanceOf(QuickpayGatewayFactory::class, $factory);
     }
 
     /**
@@ -46,7 +46,7 @@ class QuickPayGatewayFactoryTest extends TestCase
      */
     public function shouldCreateCoreGatewayFactoryIfNotPassed(): void
     {
-        $factory = new QuickPayGatewayFactory();
+        $factory = new QuickpayGatewayFactory();
         self::assertInstanceOf(CoreGatewayFactory::class, self::readProperty($factory, 'coreGatewayFactory'));
     }
 
@@ -55,7 +55,7 @@ class QuickPayGatewayFactoryTest extends TestCase
      */
     public function shouldAllowCreateGateway(): void
     {
-        $factory = new QuickPayGatewayFactory();
+        $factory = new QuickpayGatewayFactory();
         $gateway = $factory->create([
             'apikey' => '1234',
             'privatekey' => '1234',
@@ -76,7 +76,7 @@ class QuickPayGatewayFactoryTest extends TestCase
     {
         $client = new Client('injected-key');
 
-        $factory = new QuickPayGatewayFactory();
+        $factory = new QuickpayGatewayFactory();
         $config = $factory->createConfig([
             'apikey' => '1234',
             'privatekey' => 'private',
@@ -99,7 +99,7 @@ class QuickPayGatewayFactoryTest extends TestCase
      */
     public function shouldThrowWhenInjectedClientIsInvalid(): void
     {
-        $factory = new QuickPayGatewayFactory();
+        $factory = new QuickpayGatewayFactory();
         $config = $factory->createConfig([
             'apikey' => '1234',
             'privatekey' => 'private',
@@ -116,7 +116,7 @@ class QuickPayGatewayFactoryTest extends TestCase
      */
     public function shouldAllowCreateGatewayConfig(): void
     {
-        $factory = new QuickPayGatewayFactory();
+        $factory = new QuickpayGatewayFactory();
         $config = $factory->createConfig();
         self::assertIsArray($config);
         self::assertNotEmpty($config);
@@ -127,13 +127,13 @@ class QuickPayGatewayFactoryTest extends TestCase
      */
     public function shouldConfigContainFactoryNameAndTitle(): void
     {
-        $factory = new QuickPayGatewayFactory();
+        $factory = new QuickpayGatewayFactory();
         $config = $factory->createConfig();
         self::assertIsArray($config);
         self::assertArrayHasKey('payum.factory_name', $config);
         self::assertEquals('quickpay', $config['payum.factory_name']);
         self::assertArrayHasKey('payum.factory_title', $config);
-        self::assertEquals('QuickPay', $config['payum.factory_title']);
+        self::assertEquals('Quickpay', $config['payum.factory_title']);
     }
 
     /**

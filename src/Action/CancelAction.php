@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action;
+namespace Setono\Payum\Quickpay\Action;
 
 use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
@@ -12,7 +12,7 @@ use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Cancel;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Quickpay\Exception\QuickpayException;
 use Setono\Quickpay\Exception\ResponseAwareException;
 
@@ -33,7 +33,7 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         try {
             $this->api->payments()->cancel((int) $model['quickpayPaymentId'], synchronized: $this->api->isSynchronized());
         } catch (QuickpayException $e) {
-            // QuickPay rejects cancelling a payment that is already captured/cancelled with a
+            // Quickpay rejects cancelling a payment that is already captured/cancelled with a
             // "Transaction in wrong state for this operation" error. Treat that as a no-op so a
             // cancel is idempotent; rethrow anything else.
             if ($e instanceof ResponseAwareException &&

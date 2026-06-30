@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action;
+namespace Setono\Payum\Quickpay\Action;
 
 use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
@@ -16,7 +16,7 @@ use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Authorize;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Quickpay\Request\Payment\CreateLinkRequest;
 
 class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
@@ -56,10 +56,10 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
         ));
 
         if (null === $link->url) {
-            throw new LogicException('QuickPay did not return a payment link url');
+            throw new LogicException('Quickpay did not return a payment link url');
         }
 
-        // Redirect the customer to the QuickPay payment window.
+        // Redirect the customer to the Quickpay payment window.
         throw new HttpRedirect($link->url);
     }
 

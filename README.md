@@ -1,11 +1,11 @@
-# Payum QuickPay Gateway
+# Payum Quickpay Gateway
 
 [![Latest Version on Packagist][ico-version]][link-packagist]
 [![Software License][ico-license]](LICENSE)
 [![Build Status][ico-github-actions]][link-github-actions]
 [![Code Coverage][ico-code-coverage]][link-code-coverage]
 
-This component enables the use of QuickPay with Payum. Under the hood it uses the
+This component enables the use of Quickpay with Payum. Under the hood it uses the
 [`setono/quickpay-php-sdk`](https://github.com/Setono/quickpay-php-sdk) client.
 
 > **Upgrading from 1.x?** See [`docs/UPGRADE-2.0.md`](docs/UPGRADE-2.0.md).
@@ -30,16 +30,16 @@ composer require kriswallsmith/buzz nyholm/psr7
 
 ## Configuration
 
-The gateway requires your QuickPay **API key** (Settings → API user) and **private key** (Settings →
+The gateway requires your Quickpay **API key** (Settings → API user) and **private key** (Settings →
 Integration — used to verify callback signatures). Other options are optional:
 
 | Option            | Default | Description                                                          |
 |-------------------|---------|----------------------------------------------------------------------|
-| `apikey`          | —       | **Required.** QuickPay API key.                                      |
+| `apikey`          | —       | **Required.** Quickpay API key.                                      |
 | `privatekey`      | —       | **Required.** Private key; used to verify the callback HMAC.         |
 | `auto_capture`    | `0`     | Capture automatically once an approved authorize is confirmed.       |
 | `payment_methods` | `''`    | Restrict the payment-window methods (e.g. `creditcard`).             |
-| `order_prefix`    | `''`    | Prepended to the Payum payment number to form the QuickPay order id. |
+| `order_prefix`    | `''`    | Prepended to the Payum payment number to form the Quickpay order id. |
 | `language`        | `en`    | Payment-window language.                                             |
 | `synchronized`    | `false` | Run capture/refund/cancel synchronously instead of via callbacks.    |
 | `agreement`       | `''`    | Optional payment-window agreement id.                                |
@@ -55,7 +55,7 @@ $defaultConfig = [];
 
 $payum = (new PayumBuilder)
     ->addGatewayFactory('quickpay', function(array $config, GatewayFactoryInterface $coreGatewayFactory) {
-        return new \Setono\Payum\QuickPay\QuickPayGatewayFactory($config, $coreGatewayFactory);
+        return new \Setono\Payum\Quickpay\QuickpayGatewayFactory($config, $coreGatewayFactory);
     })
     ->addGateway('quickpay', [
         'factory' => 'quickpay'
