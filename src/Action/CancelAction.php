@@ -18,7 +18,6 @@ use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
     use GatewayAwareTrait;
-
     use ApiAwareTrait;
 
     /**

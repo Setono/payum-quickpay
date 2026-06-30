@@ -23,9 +23,12 @@ class Api
 
     protected MessageFactory $messageFactory;
 
-    /** @var ArrayObject|array */
+    /** @var ArrayObject|array<string, mixed> */
     protected $options = [];
 
+    /**
+     * @param array<string, mixed> $options
+     */
     public function __construct(array $options, HttpClientInterface $client, MessageFactory $messageFactory)
     {
         $options = ArrayObject::ensureArrayObject($options);
@@ -98,7 +101,7 @@ class Api
                 'Could not json_decode input. Error was: %s. Request was: %s. Input was: %s',
                 $e->getMessage(),
                 $url,
-                $body === '' ? 'Empty' : $body
+                $body === '' ? 'Empty' : $body,
             ), $e->getCode(), $e);
         }
         if (null === $payments) {
@@ -186,6 +189,9 @@ class Api
         return $checksum === self::checksum($content, (string) $this->getOption('privatekey'));
     }
 
+    /**
+     * @param array<string, mixed> $params
+     */
     protected function doRequest(string $method, string $path, array $params = []): ResponseInterface
     {
         $headers = [
@@ -200,7 +206,7 @@ class Api
             $method,
             $this->getApiEndpoint() . '/' . ltrim($path, '/'),
             $headers,
-            $encodedParams
+            $encodedParams,
         );
 
         $response = $this->client->send($request);

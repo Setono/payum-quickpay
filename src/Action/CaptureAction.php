@@ -19,9 +19,7 @@ use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
 {
     use GatewayAwareTrait;
-
     use ApiAwareTrait;
-
     use GenericTokenFactoryAwareTrait;
 
     /**

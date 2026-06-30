@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Setono\Payum\QuickPay\Tests;
 
 use Payum\Core\CoreGatewayFactory;
+use Payum\Core\Extension\ExtensionCollection;
 use Payum\Core\Gateway;
 use Payum\Core\GatewayFactory;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
+use ReflectionProperty;
 use Setono\Payum\QuickPay\QuickPayGatewayFactory;
 
 class QuickPayGatewayFactoryTest extends TestCase
@@ -40,7 +42,7 @@ class QuickPayGatewayFactoryTest extends TestCase
     public function shouldCreateCoreGatewayFactoryIfNotPassed(): void
     {
         $factory = new QuickPayGatewayFactory();
-        self::assertAttributeInstanceOf(CoreGatewayFactory::class, 'coreGatewayFactory', $factory);
+        self::assertInstanceOf(CoreGatewayFactory::class, self::readProperty($factory, 'coreGatewayFactory'));
     }
 
     /**
@@ -56,10 +58,12 @@ class QuickPayGatewayFactoryTest extends TestCase
             'agreement' => '1234',
         ]);
         self::assertInstanceOf(Gateway::class, $gateway);
-        self::assertAttributeNotEmpty('apis', $gateway);
-        self::assertAttributeNotEmpty('actions', $gateway);
-        $extensions = $this->readAttribute($gateway, 'extensions');
-        self::assertAttributeNotEmpty('extensions', $extensions);
+        self::assertNotEmpty(self::readProperty($gateway, 'apis'));
+        self::assertNotEmpty(self::readProperty($gateway, 'actions'));
+
+        $extensions = self::readProperty($gateway, 'extensions');
+        self::assertInstanceOf(ExtensionCollection::class, $extensions);
+        self::assertNotEmpty(self::readProperty($extensions, 'extensions'));
     }
 
     /**
@@ -69,7 +73,7 @@ class QuickPayGatewayFactoryTest extends TestCase
     {
         $factory = new QuickPayGatewayFactory();
         $config = $factory->createConfig();
-        self::assertInternalType('array', $config);
+        self::assertIsArray($config);
         self::assertNotEmpty($config);
     }
 
@@ -80,10 +84,19 @@ class QuickPayGatewayFactoryTest extends TestCase
     {
         $factory = new QuickPayGatewayFactory();
         $config = $factory->createConfig();
-        self::assertInternalType('array', $config);
+        self::assertIsArray($config);
         self::assertArrayHasKey('payum.factory_name', $config);
         self::assertEquals('quickpay', $config['payum.factory_name']);
         self::assertArrayHasKey('payum.factory_title', $config);
         self::assertEquals('QuickPay', $config['payum.factory_title']);
+    }
+
+    /**
+     * Reads a non-public property off an object, replacing the assertAttribute and readAttribute
+     * helpers that were removed in PHPUnit 9.
+     */
+    private static function readProperty(object $object, string $property): mixed
+    {
+        return (new ReflectionProperty($object, $property))->getValue($object);
     }
 }

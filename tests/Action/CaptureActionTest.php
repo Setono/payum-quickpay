@@ -75,7 +75,8 @@ class CaptureActionTest extends ActionTestAbstract
         try {
             $action->execute($capture);
         } catch (HttpException $e) {
-            self::assertStringStartsWith('Validation error', json_decode($e->getMessage(), false)->message);
+            $body = json_decode((string) $e->getResponse()->getBody(), false, 512, \JSON_THROW_ON_ERROR);
+            self::assertStringStartsWith('Validation error', $body->message);
         }
 
         // Authorize payment with test card

@@ -27,6 +27,7 @@ class QuickPayPayment extends QuickPayModel
 
     protected string $state;
 
+    /** @var list<\stdClass> */
     protected array $operations;
 
     protected ?int $fee;
@@ -43,7 +44,7 @@ class QuickPayPayment extends QuickPayModel
                 $e->getMessage(),
                 __METHOD__,
                 $url ?? 'Not available',
-                $body === '' ? 'Empty' : $body
+                $body === '' ? 'Empty' : $body,
             ), $e->getCode(), $e);
         }
 

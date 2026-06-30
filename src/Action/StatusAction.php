@@ -19,7 +19,6 @@ use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
 class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
     use GatewayAwareTrait;
-
     use ApiAwareTrait;
 
     /**

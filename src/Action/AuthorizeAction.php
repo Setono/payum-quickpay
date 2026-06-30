@@ -20,9 +20,7 @@ use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
 class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
 {
     use GatewayAwareTrait;
-
     use ApiAwareTrait;
-
     use GenericTokenFactoryAwareTrait;
 
     /**

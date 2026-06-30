@@ -31,6 +31,11 @@ class QuickPayPaymentOperation extends QuickPayModel
         return new self($operations);
     }
 
+    /**
+     * @param array<array-key, stdClass> $operations
+     *
+     * @return list<self>
+     */
     public static function createFromArray(array $operations): array
     {
         $ret = [];

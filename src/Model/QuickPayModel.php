@@ -10,7 +10,7 @@ abstract class QuickPayModel
     {
         foreach (get_object_vars($data) as $key => $value) {
             if (property_exists($this, $key)) {
-                $this->{$key} = $value;
+                (new \ReflectionProperty($this, $key))->setValue($this, $value);
             }
         }
     }

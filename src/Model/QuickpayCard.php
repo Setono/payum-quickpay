@@ -12,6 +12,9 @@ class QuickpayCard extends QuickPayModel
 
     protected int $cvd;
 
+    /**
+     * @param array<string, mixed> $data
+     */
     public static function createFromArray(array $data): self
     {
         return new self((object) $data);
@@ -35,6 +38,9 @@ class QuickpayCard extends QuickPayModel
         return $this->cvd;
     }
 
+    /**
+     * @return array{number: int, expiration: string, cvd: int}
+     */
     public function toArray(): array
     {
         return [
