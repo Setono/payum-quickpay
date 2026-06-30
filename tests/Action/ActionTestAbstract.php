@@ -7,12 +7,12 @@ namespace Setono\Payum\QuickPay\Tests\Action;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\GatewayAwareInterface;
-use Payum\Core\Tests\GenericActionTest;
 use ReflectionClass;
 use ReflectionException;
 use Setono\Payum\QuickPay\Tests\ApiTestTrait;
+use Setono\Payum\QuickPay\Tests\GenericActionTestCase;
 
-abstract class ActionTestAbstract extends GenericActionTest
+abstract class ActionTestAbstract extends GenericActionTestCase
 {
     use ApiTestTrait;
 

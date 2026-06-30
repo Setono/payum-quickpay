@@ -24,6 +24,7 @@
         "infection/infection": "^0.29.8",
         "php-http/guzzle7-adapter": "^1.0",
         "php-http/message": "^1.16",
+        "phpspec/prophecy-phpunit": "^2.5",
         "phpstan/extension-installer": "^1.4",
         "phpstan/phpstan": "^2.2",
         "phpstan/phpstan-phpunit": "^2.0",
@@ -52,16 +53,7 @@
             "php-http/discovery": false,
             "phpstan/extension-installer": true
         },
-        "preferred-install": {
-            "payum/core": "source",
-            "*": "dist"
-        },
         "sort-packages": true
-    },
-    "extra": {
-        "branch-alias": {
-            "dev-master": "1.2-dev"
-        }
     },
     "scripts": {
         "all": [

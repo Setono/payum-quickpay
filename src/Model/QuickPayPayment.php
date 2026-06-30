@@ -32,7 +32,7 @@ class QuickPayPayment extends QuickPayModel
 
     protected ?int $fee;
 
-    public static function createFromResponse(ResponseInterface $response, string $url = null): self
+    public static function createFromResponse(ResponseInterface $response, ?string $url = null): self
     {
         $body = (string) $response->getBody();
 
