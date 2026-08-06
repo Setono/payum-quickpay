@@ -51,14 +51,14 @@ All HTTP and (de)serialization is delegated to [`setono/quickpay-php-sdk`](https
 typed `payments()` endpoints, request/response DTOs, non-exhaustive `PaymentState`/`OperationType` enums,
 a `QuickpayException` hierarchy, and a timing-safe `CallbackValidator`. Basic auth, the mandatory
 `Accept-Version: v10` header and host pinning to `api.quickpay.net` all live in the SDK. The SDK is
-currently pinned at `^1.0.0-alpha.3`. The SDK is pre-1.0 and every alpha has tightened its contract, so
-the gateway tracks the newest alpha rather than supporting a matrix of them — and the explicit minimum
-keeps the `--prefer-lowest` CI job on the same release. alpha.2 added the client-wide `synchronized`
-default the gateway relies on (alpha.1 genuinely cannot run it); alpha.3 turned the unconditionally
-required request fields into required constructor params (`CreatePaymentRequest::$orderId`/`$currency`,
-`$amount` on `CreateLinkRequest`/`CaptureRequest`/`RefundRequest`) — every call site here already passes
-them, so a missing one is now a `TypeError` at the call site instead of a `ValidationException` after a
-round trip.
+currently constrained to `^1.0@beta`, resolving to `1.0.0-beta.1`. The beta declares the API surface
+stable for 1.0 with no further BC breaks planned, so the constraint no longer has to chase individual
+releases the way it did through the alphas — `@beta` also excludes the alphas outright, which matters
+because the gateway cannot run on alpha.1 (no client-wide `synchronized`) and would break on alpha.1–2
+(request fields only became required constructor params in alpha.3).
+
+Consumers therefore need `"minimum-stability": "beta"` with `"prefer-stable": true` until 1.0.0 is
+tagged; the README and `docs/UPGRADE-2.0.md` say so.
 
 ### Wiring
 

@@ -10,7 +10,7 @@ handling, and modernizes the test suite. This is a major release with breaking c
   project provides a PSR-18 client and PSR-17 factories (e.g. `composer require kriswallsmith/buzz
   nyholm/psr7`, or any other implementation).
 - Until `setono/quickpay-php-sdk` has a stable release, your project needs
-  `"minimum-stability": "alpha"` and `"prefer-stable": true`.
+  `"minimum-stability": "beta"` and `"prefer-stable": true`.
 
 ## Gateway options
 
