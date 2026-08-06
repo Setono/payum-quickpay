@@ -49,6 +49,16 @@ final class Api
         return $this->orderPrefix;
     }
 
+    /**
+     * The payment-window method restriction, in Quickpay's own comma-separated format: method names
+     * and/or groups (`creditcard`), each optionally prefixed with `!` to exclude it — e.g.
+     * `creditcard,!jcb,!visa-us`. Naming any method turns the list into an allowlist: everything not
+     * named is rejected. Returns `null` when unrestricted, which leaves the parameter off the request
+     * so the account's own configuration applies.
+     *
+     * @see https://learn.quickpay.net/tech-talk/appendixes/payment-methods/ for the format and the
+     *      full list of accepted values
+     */
     public function getPaymentMethods(): ?string
     {
         return '' !== $this->paymentMethods ? $this->paymentMethods : null;
