@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Request\Api;
+namespace Setono\Payum\Quickpay\Request\Api;
 
 use Payum\Core\Request\Generic;
 

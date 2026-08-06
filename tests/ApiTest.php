@@ -2,14 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests;
+namespace Setono\Payum\Quickpay\Tests;
 
-use Exception;
-use GuzzleHttp\Psr7\Response;
-use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Exception\LogicException;
 use PHPUnit\Framework\TestCase;
-use Setono\Payum\QuickPay\Api;
+use Setono\Payum\Quickpay\Api;
+use Setono\Quickpay\Client\Endpoint\PaymentsEndpoint;
 
 class ApiTest extends TestCase
 {
@@ -17,34 +14,48 @@ class ApiTest extends TestCase
 
     /**
      * @test
-     *
-     * @throws Exception
      */
-    public function shouldValidateChecksum(): void
+    public function shouldExposeConfiguredOptions(): void
     {
-        $body = 'This is a fine looking body';
-        $checksum = Api::checksum($body, '1234');
-        $response = new Response(200, ['QuickPay-Checksum-Sha256' => $checksum], $body);
-        Api::assertValidResponse($response, '1234');
-
-        try {
-            Api::assertValidResponse($response, '12345');
-        } catch (LogicException $le) {
-            self::assertEquals('Invalid checksum', $le->getMessage());
-        }
+        self::assertSame('test-privatekey', $this->api->getPrivateKey());
+        self::assertSame('ut', $this->api->getOrderPrefix());
+        self::assertSame('visa', $this->api->getPaymentMethods());
+        self::assertSame('en', $this->api->getLanguage());
+        self::assertTrue($this->api->isAutoCapture());
+        self::assertFalse($this->api->isSynchronized());
+        self::assertSame(266017, $this->api->getAgreementId());
+        self::assertNull($this->api->getBrandingId());
+        self::assertInstanceOf(PaymentsEndpoint::class, $this->api->payments());
     }
 
     /**
      * @test
-     *
-     * @throws Exception
      */
-    public function getPaymentShouldFailOnInvalidPaymentInfo(): void
+    public function shouldReportTheSynchronizedFlagOfTheClient(): void
     {
-        try {
-            $this->api->getPayment(new ArrayObject(), false);
-        } catch (LogicException $le) {
-            self::assertEquals('Payment does not exist', $le->getMessage());
-        }
+        self::assertFalse($this->createApi()->isSynchronized());
+        self::assertTrue($this->createApi(synchronized: true)->isSynchronized());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldReturnNullPaymentMethodsWhenUnrestricted(): void
+    {
+        $api = new Api(client: $this->api->getClient(), privateKey: 'test-privatekey');
+
+        self::assertNull($api->getPaymentMethods());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldCreateCallbackValidatorBoundToThePrivateKey(): void
+    {
+        $validator = $this->api->createCallbackValidator();
+
+        $body = '{"foo":"bar"}';
+        self::assertTrue($validator->isValid($body, hash_hmac('sha256', $body, 'test-privatekey')));
+        self::assertFalse($validator->isValid($body, 'not-the-checksum'));
     }
 }

@@ -2,16 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Model\Token;
-use Payum\Core\Request\Convert;
 use Payum\Core\Request\Refund;
-use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
-use Setono\Payum\QuickPay\Action\RefundAction;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
+use Setono\Payum\Quickpay\Action\RefundAction;
+use Setono\Quickpay\Enum\OperationType;
+use Setono\Quickpay\Enum\PaymentState;
+use Setono\Quickpay\Exception\ValidationException;
 
 class RefundActionTest extends ActionTestAbstract
 {
@@ -26,70 +24,93 @@ class RefundActionTest extends ActionTestAbstract
      */
     public function shouldRefundPayment(): void
     {
-        $payment = $this->createPayment();
-
-        $token = new Token();
-        $token->setTargetUrl('theCallbackUrl');
-        $token->setAfterUrl('theContinueUrl');
-        $token->setGatewayName('quickpay');
-
-        $convert = new Convert($payment, 'array', $token);
-
-        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
-
-        $convertPaymentAction = new ConvertPaymentAction();
-        $convertPaymentAction->setGateway($this->gateway);
-        $convertPaymentAction->setApi($this->api);
-        $convertPaymentAction->execute($convert);
-
-        $payment->setDetails($convert->getResult());
-        $details = ArrayObject::ensureArrayObject($payment->getDetails());
-        $token->setDetails($details);
-
-        // Authorize payment with test card.
-        $details['card'] = $this->getTestCard()->toArray();
-        $details['acquirer'] = 'clearhaus';
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_NEW,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE)],
-        ]);
-        $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
-        self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $quickpayPayment->getLatestOperation()->getType());
-
-        // Capture payment.
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_PROCESSED,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CAPTURE)],
-        ]);
-        $quickpayPayment = $this->api->capturePayment($details['quickpayPayment'], $details);
-        self::assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
 
         /** @var Refund $refund */
-        $refund = new $this->requestClass($token);
-        $refund->setModel($details);
+        $refund = new $this->requestClass($details);
 
-        /** @var RefundAction $action */
-        $action = new $this->actionClass();
+        $action = new RefundAction();
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
-        // The refund operation itself.
         $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_PROCESSED,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_REFUND)],
+            'state' => PaymentState::Processed->value,
+            'operations' => [$this->operation(OperationType::Refund)],
         ]);
+
         $action->execute($refund);
 
-        // Reload to assert the refund operation.
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_PROCESSED,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_REFUND)],
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'POST', '#/payments/1001/refund$#');
+        self::assertSame(100, $this->decodeBody($requests[0])['amount']);
+    }
+
+    /**
+     * @test
+     */
+    public function shouldRefundThePartialAmountWhenTheDetailsCarryAnOverride(): void
+    {
+        $details = new ArrayObject([
+            'quickpayPaymentId' => 1001,
+            'amount' => 1000,
+            'refund_amount' => 250,
         ]);
-        $quickpayPayment = $this->api->getPayment(new ArrayObject(['quickpayPaymentId' => $details['quickpayPayment']->getId()]));
-        self::assertEquals(QuickPayPaymentOperation::TYPE_REFUND, $quickpayPayment->getLatestOperation()->getType());
+
+        /** @var Refund $refund */
+        $refund = new $this->requestClass($details);
+
+        $action = new RefundAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 750,
+            'operations' => [$this->operation(OperationType::Refund, amount: 250)],
+        ]);
+
+        $action->execute($refund);
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        self::assertSame(250, $this->decodeBody($requests[0])['amount'], 'The override must win over the full amount');
+
+        self::assertFalse(
+            $details->offsetExists('refund_amount'),
+            'The override must be consumed, or the next refund would silently be partial too',
+        );
+        self::assertSame(1000, $details['amount'], 'The full amount must be left alone');
+    }
+
+    /**
+     * A failed call did not carry out the instruction, so the override has to survive for a retry —
+     * otherwise retrying a failed partial refund would refund the full amount.
+     *
+     * @test
+     */
+    public function shouldKeepTheOverrideWhenTheRefundFails(): void
+    {
+        $details = new ArrayObject([
+            'quickpayPaymentId' => 1001,
+            'amount' => 1000,
+            'refund_amount' => 250,
+        ]);
+
+        /** @var Refund $refund */
+        $refund = new $this->requestClass($details);
+
+        $action = new RefundAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queueResponse('{"message":"Validation error"}', 400);
+
+        try {
+            $action->execute($refund);
+            self::fail('Expected the validation error to surface');
+        } catch (ValidationException) {
+            self::assertSame(250, $details['refund_amount']);
+        }
     }
 }

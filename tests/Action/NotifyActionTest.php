@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Exception\LogicException;
+use Payum\Core\Reply\HttpResponse;
 use Payum\Core\Request\Notify;
-use Setono\Payum\QuickPay\Action\NotifyAction;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
+use Setono\Payum\Quickpay\Action\NotifyAction;
+use Setono\Quickpay\Callback\CallbackValidator;
+use Setono\Quickpay\Enum\OperationType;
+use Setono\Quickpay\Enum\PaymentState;
 
 class NotifyActionTest extends ActionTestAbstract
 {
@@ -20,86 +21,81 @@ class NotifyActionTest extends ActionTestAbstract
     /**
      * @test
      */
-    public function shouldHandleNotify(): void
+    public function shouldConfirmPaymentWhenChecksumIsValid(): void
     {
-        $payment = $this->createPayment();
-
-        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
-        $quickpayPayment = $this->api->getPayment(new ArrayObject(['payment' => $payment]));
-
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_NEW,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE, QuickPayPaymentOperation::STATUS_CODE_APPROVED, 100)],
+        $body = '{"id":1001}';
+        $this->httpRequestAction->setHttpRequest($body, [
+            CallbackValidator::CHECKSUM_HEADER => hash_hmac('sha256', $body, 'test-privatekey'),
         ]);
-        $this->api->authorizePayment($quickpayPayment, new ArrayObject([
-            'card' => $this->getTestCard()->toArray(),
-            'acquirer' => 'clearhaus',
-            'amount' => $payment->getTotalAmount(),
-        ]));
 
-        /** @var Notify $notify */
-        $notify = new $this->requestClass([]);
-        $notify->setModel(new ArrayObject([]));
+        // ConfirmPayment reloads the payment and, with auto_capture on + matching amount, captures.
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'operations' => [$this->operation(OperationType::Authorize, amount: 100)],
+        ]);
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'operations' => [$this->operation(OperationType::Capture)],
+        ]);
 
-        /** @var NotifyAction $action */
-        $action = new $this->actionClass();
+        $action = new NotifyAction();
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
-        // No payment id in the model -> ConfirmPayment fails (no HTTP call).
+        $action->execute($this->notify());
+
+        $requests = $this->getRequests();
+        self::assertCount(2, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+        $this->assertRequest($requests[1], 'POST', '#/payments/1001/capture$#');
+    }
+
+    /**
+     * @test
+     */
+    public function shouldRejectInvalidChecksum(): void
+    {
+        $this->httpRequestAction->setHttpRequest('{"id":1001}', [
+            CallbackValidator::CHECKSUM_HEADER => 'an-invalid-checksum',
+        ]);
+
+        $action = new NotifyAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
         try {
-            $action->execute($notify);
-        } catch (LogicException $le) {
-            self::assertEquals('The payment has not been created', $le->getMessage());
+            $action->execute($this->notify());
+            self::fail('An HttpResponse reply should have been thrown');
+        } catch (HttpResponse $reply) {
+            self::assertSame(400, $reply->getStatusCode());
         }
 
-        // Wrong amount -> the authorized amount does not match (ConfirmPayment reloads the payment).
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_NEW,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE, QuickPayPaymentOperation::STATUS_CODE_APPROVED, 100)],
-        ]);
-        $notify->setModel(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId(),
-            'amount' => $payment->getTotalAmount() - 1,
-        ]));
+        self::assertCount(0, $this->getRequests(), 'No API call should be made for an invalid callback');
+    }
+
+    /**
+     * @test
+     */
+    public function shouldRejectMissingChecksum(): void
+    {
+        $this->httpRequestAction->setHttpRequest('{"id":1001}', []);
+
+        $action = new NotifyAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
 
         try {
-            $action->execute($notify);
-        } catch (LogicException $le) {
-            self::assertStringStartsWith('Authorized amount does not match', $le->getMessage());
+            $action->execute($this->notify());
+            self::fail('An HttpResponse reply should have been thrown');
+        } catch (HttpResponse $reply) {
+            self::assertSame(400, $reply->getStatusCode());
         }
 
-        // Correct amount -> the payment is captured (reload, then capture).
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_NEW,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE, QuickPayPaymentOperation::STATUS_CODE_APPROVED, 100)],
-        ]);
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_PROCESSED,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CAPTURE)],
-        ]);
-        $notify->setModel(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId(),
-            'amount' => $payment->getTotalAmount(),
-        ]));
+        self::assertCount(0, $this->getRequests(), 'No API call should be made for an unsigned callback');
+    }
 
-        $action->execute($notify);
-
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_PROCESSED,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_CAPTURE)],
-        ]);
-        $quickpayPayment = $this->api->getPayment(new ArrayObject([
-            'quickpayPaymentId' => $quickpayPayment->getId(),
-        ]));
-
-        self::assertEquals(QuickPayPayment::STATE_PROCESSED, $quickpayPayment->getState());
-        self::assertEquals(QuickPayPaymentOperation::TYPE_CAPTURE, $quickpayPayment->getLatestOperation()->getType());
-        self::assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $quickpayPayment->getLatestOperation()->getStatusCode());
+    private function notify(): Notify
+    {
+        return new Notify(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]));
     }
 }

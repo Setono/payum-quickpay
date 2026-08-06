@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action\Api;
+namespace Setono\Payum\Quickpay\Action\Api;
 
 use Payum\Core\Exception\UnsupportedApiException;
-use Setono\Payum\QuickPay\Api;
+use Setono\Payum\Quickpay\Api;
 
 trait ApiAwareTrait
 {

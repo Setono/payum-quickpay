@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action\Api;
+namespace Setono\Payum\Quickpay\Action\Api;
 
 use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
@@ -12,8 +12,10 @@ use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
-use Setono\Payum\QuickPay\Request\Api\ConfirmPayment;
+use Setono\Payum\Quickpay\Operations;
+use Setono\Payum\Quickpay\Request\Api\ConfirmPayment;
+use Setono\Quickpay\Enum\OperationType;
+use Setono\Quickpay\Request\Payment\CaptureRequest;
 
 class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, ApiAwareInterface
 {
@@ -32,24 +34,38 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
             throw new LogicException('The payment has not been created');
         }
 
-        $quickpayPayment = $this->api->getPayment($model, false);
+        $payment = $this->api->payments()->getById((int) $model['quickpayPaymentId']);
 
-        $latestOperation = $quickpayPayment->getLatestOperation();
-
+        $latestOperation = Operations::latest($payment->operations);
         if (null === $latestOperation) {
-            throw new LogicException('The payment does not have a `latest operation`');
+            // A payment can legitimately have no operations yet — Quickpay fires a callback when the
+            // payment is merely created, which becomes visible as soon as an account-wide callback url
+            // (Settings → Integration) is configured. There is nothing to confirm, so do nothing.
+            // Throwing here would 500 the notify endpoint, and Quickpay would retry a callback that
+            // can never succeed.
+            return;
         }
 
-        if (1 === (int) $this->api->getOption('auto_capture') && QuickPayPaymentOperation::TYPE_AUTHORIZE === $latestOperation->getType()) {
-            if ($quickpayPayment->getAuthorizedAmount() === (int) $model['amount']) {
-                $this->api->capturePayment($quickpayPayment, $model);
-            } else {
-                throw new LogicException(sprintf('Authorized amount does not match. Authorized %s expected %s', $quickpayPayment->getAuthorizedAmount(), $model['amount']));
+        if ($this->api->isAutoCapture() && OperationType::Authorize === $latestOperation->type()) {
+            $authorizedAmount = Operations::authorizedAmount($payment->operations);
+            $expectedAmount = (int) $model['amount'];
+
+            if ($authorizedAmount !== $expectedAmount) {
+                throw new LogicException(sprintf(
+                    'Authorized amount does not match. Authorized %s expected %s',
+                    $authorizedAmount,
+                    $expectedAmount,
+                ));
             }
+
+            $this->api->payments()->capture(
+                (int) $model['quickpayPaymentId'],
+                new CaptureRequest(amount: $expectedAmount),
+            );
         }
     }
 
-    public function supports($request)
+    public function supports($request): bool
     {
         return $request instanceof ConfirmPayment && $request->getModel() instanceof ArrayAccess;
     }

@@ -2,21 +2,17 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Model\Token;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Authorize;
-use Payum\Core\Request\Convert;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryInterface;
 use ReflectionClass;
 use ReflectionException;
-use Setono\Payum\QuickPay\Action\AuthorizeAction;
-use Setono\Payum\QuickPay\Action\ConvertPaymentAction;
-use Setono\Payum\QuickPay\Model\QuickPayPayment;
-use Setono\Payum\QuickPay\Model\QuickPayPaymentOperation;
+use Setono\Payum\Quickpay\Action\AuthorizeAction;
 
 class AuthorizeActionTest extends ActionTestAbstract
 {
@@ -39,26 +35,19 @@ class AuthorizeActionTest extends ActionTestAbstract
     /**
      * @test
      */
-    public function shouldRedirectToPaymentLink(): void
+    public function shouldCreatePaymentLinkAndRedirectToIt(): void
     {
-        $payment = $this->createPayment();
-
         $token = new Token();
         $token->setTargetUrl('theCallbackUrl');
         $token->setAfterUrl('theContinueUrl');
         $token->setGatewayName('quickpay');
 
-        $convert = new Convert($payment, 'array', $token);
-
-        $this->queuePayment(['id' => 1001, 'state' => QuickPayPayment::STATE_INITIAL]);
-
-        $convertPaymentAction = new ConvertPaymentAction();
-        $convertPaymentAction->setGateway($this->gateway);
-        $convertPaymentAction->setApi($this->api);
-        $convertPaymentAction->execute($convert);
-
-        $payment->setDetails($convert->getResult());
-        $details = ArrayObject::ensureArrayObject($payment->getDetails());
+        $details = new ArrayObject([
+            'quickpayPaymentId' => 1001,
+            'amount' => 100,
+            'continue_url' => 'theContinueUrl',
+            'cancel_url' => 'theContinueUrl',
+        ]);
         $token->setDetails($details);
 
         /** @var Authorize $authorize */
@@ -68,46 +57,36 @@ class AuthorizeActionTest extends ActionTestAbstract
         $tokenFactory = $this->prophesize(GenericTokenFactoryInterface::class);
         $tokenFactory->createNotifyToken('quickpay', $details)->shouldBeCalledOnce()->willReturn($token);
 
-        /** @var AuthorizeAction $action */
-        $action = new $this->actionClass();
+        $action = new AuthorizeAction();
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
         $action->setGenericTokenFactory($tokenFactory->reveal());
 
-        // Executing the action creates the payment link and redirects to it.
         $this->queueResponse('{"url":"https://payment.quickpay.net/payments/1001/payment-window"}');
 
         try {
             $action->execute($authorize);
+            self::fail('An HttpRedirect reply should have been thrown');
         } catch (HttpRedirect $redirect) {
-            self::assertStringStartsWith('https://payment.quickpay.net/payments/', $redirect->getUrl());
+            self::assertSame('https://payment.quickpay.net/payments/1001/payment-window', $redirect->getUrl());
         }
 
-        // Authorize payment with test card.
-        $details['card'] = $this->getTestCard()->toArray();
-        $details['acquirer'] = 'clearhaus';
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_NEW,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE)],
-        ]);
-        $quickpayPayment = $this->api->authorizePayment($details['quickpayPayment'], $details);
+        // The callback url is built from the notify token.
+        self::assertSame('theCallbackUrl', $details['callback_url']);
 
-        // Validate that we received the payment from the operation.
-        self::assertEquals($details['quickpayPayment']->getId(), $quickpayPayment->getId());
+        // The link request shape.
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'PUT', '#/payments/1001/link$#');
 
-        // Reload payment to get the status of the authorize operation.
-        $this->queuePayment([
-            'id' => 1001,
-            'state' => QuickPayPayment::STATE_NEW,
-            'operations' => [$this->operation(QuickPayPaymentOperation::TYPE_AUTHORIZE)],
-        ]);
-        $quickpayPayment = $this->api->getPayment(new ArrayObject(['quickpayPaymentId' => $quickpayPayment->getId()]));
-
-        // Validate authorize operation.
-        $latestOperation = $quickpayPayment->getLatestOperation();
-        self::assertEquals(QuickPayPaymentOperation::TYPE_AUTHORIZE, $latestOperation->getType());
-        self::assertEquals(QuickPayPaymentOperation::STATUS_CODE_APPROVED, $latestOperation->getStatusCode());
-        self::assertEquals($details['amount'], $latestOperation->getAmount());
+        $body = $this->decodeBody($requests[0]);
+        self::assertSame(100, $body['amount']);
+        self::assertSame('theContinueUrl', $body['continue_url']);
+        self::assertSame('theContinueUrl', $body['cancel_url']);
+        self::assertSame('theCallbackUrl', $body['callback_url']);
+        self::assertSame('en', $body['language']);
+        self::assertSame('visa', $body['payment_methods']);
+        self::assertTrue($body['auto_capture']);
+        self::assertSame(266017, $body['agreement_id']);
     }
 }

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Action;
+namespace Setono\Payum\Quickpay\Action;
 
 use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
@@ -14,7 +14,9 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Capture;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
-use Setono\Payum\QuickPay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Amounts;
+use Setono\Quickpay\Request\Payment\CaptureRequest;
 
 class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
 {
@@ -31,9 +33,13 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        $quickpayPayment = $this->api->getPayment($model);
+        $this->api->payments()->capture(
+            (int) $model['quickpayPaymentId'],
+            new CaptureRequest(amount: Amounts::forOperation($model, 'capture_amount')),
+        );
 
-        $this->api->capturePayment($quickpayPayment, $model);
+        // Only once the API has accepted it — a failed call leaves the instruction in place to retry.
+        Amounts::consume($model, 'capture_amount');
     }
 
     public function supports($request): bool

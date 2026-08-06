@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests\Action;
+namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\GatewayAwareInterface;
 use ReflectionClass;
 use ReflectionException;
-use Setono\Payum\QuickPay\Tests\ApiTestTrait;
-use Setono\Payum\QuickPay\Tests\GenericActionTestCase;
+use Setono\Payum\Quickpay\Tests\ApiTestTrait;
+use Setono\Payum\Quickpay\Tests\GenericActionTestCase;
 
 abstract class ActionTestAbstract extends GenericActionTestCase
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Setono\Payum\QuickPay\Tests;
+namespace Setono\Payum\Quickpay\Tests;
 
 use ArrayObject;
 use Iterator;
