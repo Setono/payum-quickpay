@@ -114,7 +114,15 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   only ever matched "Transaction in wrong state for this operation". Do not tighten that pattern to an
   exact string; the unit test asserted on an invented fixture, which is precisely how the mismatch
   survived until the e2e harness cancelled a real captured payment.
-- **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. It fetches the raw
+- **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. **Quickpay routes
+  callbacks to two different urls** (verified live, 2026-08): the payment-window authorize goes to the
+  per-payment `callback_url` on the link — the notify token `AuthorizeAction` mints — while API-initiated
+  `capture`/`refund`/`cancel` go to the **account-wide** url (manager → Settings → Integration), which is
+  empty by default, so those callbacks are simply not delivered. That url is static for every payment and
+  cannot carry a `payum_token`, so Payum's token routing cannot serve it; an endpoint for it must resolve
+  the payment from the body's `order_id` (`order_prefix` + payum number) and execute `Notify` against
+  that model — `NotifyAction` needs only the model. See `examples/e2e/listen.php` and
+  `docs/UPGRADE-2.0.md`. It fetches the raw
   body + `QuickPay-Checksum-Sha256` header (via Payum's `GetHttpRequest`), **verifies the HMAC signature**
   with the SDK `CallbackValidator`, and rejects an invalid/unsigned callback with a 400 `HttpResponse`
   before delegating to the internal `ConfirmPayment` request.

@@ -45,6 +45,46 @@ response. Ensure:
   (`Payum\Core\Bridge\Symfony\Action\GetHttpRequestAction`, used by Sylius/Symfony) does; the plain-PHP
   bridge does not, so a pure plain-PHP setup must supply a header-capable `GetHttpRequest` action.
 
+## Quickpay sends callbacks to two different places
+
+This is not new in 2.0, but it is not obvious and nothing in the gateway hints at it. Verified against a
+live account (2026-08):
+
+| Origin | Callback goes to |
+|---|---|
+| The customer paying in the hosted payment window | the **per-payment** `callback_url` on the payment link — the Payum notify token url `AuthorizeAction` mints |
+| `capture` / `refund` / `cancel` issued through the API | the **account-wide** callback url (manager → Settings → Integration) |
+
+So the gateway's notify token only ever receives the authorize callback. If the account-wide url is
+empty — the default — **operation callbacks are not delivered anywhere at all**, and a shop waiting to
+be told that its capture settled waits forever.
+
+If you rely on those confirmations, you need both halves:
+
+1. Set the account-wide callback url in Quickpay, and
+2. point it at an endpoint that resolves the payment **from the callback body**, because that url is one
+   static url for every payment and therefore cannot carry a `payum_token` — Payum's usual notify
+   routing cannot work for it. Match on `order_id` (it is `order_prefix` + the Payum payment number),
+   load your payment, and execute `Notify` against that model; `NotifyAction` needs only the model, and
+   verifies the HMAC itself either way. `examples/e2e/listen.php` does exactly this.
+
+Alternatively, skip callbacks for operations entirely: enable the `synchronized` option so
+capture/refund/cancel block until the transaction is settled, or poll `GetStatus`, which re-fetches from
+Quickpay.
+
+## Order ids are now validated before they are sent
+
+`ConvertPaymentAction` builds `order_id` as `order_prefix` + the Payum payment number, and now enforces
+Quickpay's **4–20 character** rule on the result, throwing a `LogicException` if it falls outside.
+
+Nothing that worked in 1.x stops working — Quickpay rejected those order ids anyway — but the failure
+now happens at conversion time and as a different exception type, rather than as a `ValidationException`
+after a network round trip. Check that your `order_prefix` and payment numbers together stay in range.
+
+The same guard also rejects a payment with no number at all. That used to degrade silently: the
+concatenation produced an order id consisting of nothing but the prefix, which with a prefix of 4+
+characters is *valid*, so every such payment was created under the same order id.
+
 ## Removed / changed classes
 
 These were internal implementation details; they are gone in 2.0:
