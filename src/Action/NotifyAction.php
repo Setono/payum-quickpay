@@ -57,14 +57,17 @@ class NotifyAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
     }
 
     /**
-     * Reads the Quickpay checksum header off the (Symfony-bridge populated) `headers` property of the
-     * http request. The lookup is case-insensitive because Payum's bridges normalize header casing
-     * inconsistently, and the value may be a list (PSR/Symfony) or a plain string.
+     * Reads the Quickpay checksum header off the `headers` property of the http request. The lookup is
+     * case-insensitive because the bridges normalize header casing inconsistently, and the value may be
+     * a list or a plain string.
      */
     private function extractChecksum(GetHttpRequest $httpRequest): string
     {
-        // `headers` is a dynamic property set by Payum's Symfony bridge (Payum\Core\Bridge\Symfony\
-        // Action\GetHttpRequestAction), so it is read defensively through get_object_vars().
+        // `headers` is not declared on GetHttpRequest — it is a dynamic property populated by whichever
+        // payum/core GetHttpRequest bridge the consumer wired, and only the Symfony one
+        // (Payum\Core\Bridge\Symfony\Action\GetHttpRequestAction) sets it; the PlainPhp bridge does not.
+        // Hence the defensive read through get_object_vars(): a bridge that leaves it unset yields no
+        // checksum, and execute() rejects the callback with a 400.
         $headers = get_object_vars($httpRequest)['headers'] ?? [];
         if (!is_array($headers)) {
             return '';
