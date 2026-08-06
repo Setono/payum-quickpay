@@ -13,7 +13,6 @@ use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Cancel;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
-use Setono\Quickpay\Exception\ValidationException;
 
 class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -29,22 +28,11 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        try {
-            $this->api->payments()->cancel((int) $model['quickpayPaymentId']);
-        } catch (ValidationException $e) {
-            // Quickpay rejects cancelling a payment that is already captured or cancelled. Treat only
-            // that case as a no-op, so cancelling is idempotent; any other validation error is a real
-            // failure and must surface.
-            //
-            // It has to be matched on the message: the response carries no error code for it
-            // (`error_code` is null and `errors` is empty). The wording is not stable — v10 has
-            // returned both "Transaction in wrong state for this operation" and (observed live,
-            // 2026-08) "Validation error: Payment is not in a valid state for cancel" — so match the
-            // stable part loosely rather than pinning an exact string.
-            if (1 !== preg_match('/not (?:in )?a valid state|wrong state/i', (string) $e->getMessageText())) {
-                throw $e;
-            }
-        }
+        // Errors are deliberately not caught here. Quickpay rejects cancelling an already captured or
+        // cancelled payment with a `ValidationException`, and that surfaces to the caller: it is a real
+        // state conflict, and swallowing it would tell a shop it had cancelled a payment whose money is
+        // still held. A caller that genuinely wants a no-op can catch the typed exception itself.
+        $this->api->payments()->cancel((int) $model['quickpayPaymentId']);
     }
 
     public function supports($request): bool

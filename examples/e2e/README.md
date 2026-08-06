@@ -168,8 +168,9 @@ a capture may still show the pre-operation state — the settled state arrives i
   running `capture`.
 - **Details stay scalar:** `e2e:operate status` prints the details array; no objects, and
   `quickpayPaymentId` is the only handle the gateway needs.
-- **Idempotent cancel:** `cancel` on an already captured payment succeeds as a no-op (`CancelAction`
-  swallows Quickpay's "Transaction in wrong state for this operation").
+- **Cancel fails loudly:** `cancel` on an already captured payment surfaces Quickpay's
+  `ValidationException` ("Payment is not in a valid state for cancel") rather than pretending to
+  succeed — the money is still held, and the caller needs to know.
 - **Status mapping:** compare `status` against the payment in the Quickpay manager across the card
   scenarios above — approved, rejected, capture-rejected.
 

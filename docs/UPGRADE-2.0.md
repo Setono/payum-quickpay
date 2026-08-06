@@ -72,6 +72,27 @@ Alternatively, skip callbacks for operations entirely: enable the `synchronized`
 capture/refund/cancel block until the transaction is settled, or poll `GetStatus`, which re-fetches from
 Quickpay.
 
+## Cancelling a captured payment throws
+
+`CancelAction` does not swallow Quickpay's rejection of a cancel against an already captured or
+cancelled payment. It surfaces as a `Setono\Quickpay\Exception\ValidationException` ("Payment is not in
+a valid state for cancel").
+
+In practice this is not a change: the code did try to swallow it, by matching an error message Quickpay
+no longer sends, so the exception has been reaching callers regardless. The attempt has been removed
+rather than repaired — keying a money-affecting decision on an unstable message string is fragile, and
+reporting success for a payment whose money is still held is worse than failing.
+
+If you were relying on cancel being a no-op, catch the exception yourself:
+
+```php
+try {
+    $gateway->execute(new Cancel($payment));
+} catch (ValidationException $e) {
+    // already captured or cancelled — decide whether to refund instead
+}
+```
+
 ## A partial refund no longer reports as fully refunded
 
 `StatusAction` used to decide from the latest operation alone: if it was a refund, the payment was

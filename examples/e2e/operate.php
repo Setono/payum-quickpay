@@ -94,8 +94,8 @@ try {
             break;
 
         case 'cancel':
-            // CancelAction swallows Quickpay's "Transaction in wrong state for this operation", so
-            // cancelling an already captured or cancelled payment is a no-op rather than an error.
+            // Cancelling an already captured or cancelled payment is a real state conflict: Quickpay
+            // rejects it and the exception surfaces here rather than being swallowed.
             $gateway->execute(new Cancel($payment));
             fwrite(STDOUT, "cancel    ... requested\n");
             $showStatus();

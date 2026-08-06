@@ -107,13 +107,12 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   off) is the single toggle that flips them to synchronous (`?synchronized`). The `Payment` these calls
   return is deliberately ignored — on the async path it is a snapshot taken when the operation was
   queued (`pending: true`, pre-operation `state`/`balance`), so `StatusAction` re-fetches instead of
-  trusting it. `CancelAction` catches the typed `ValidationException` and swallows the invalid-state
-  case (so cancel is idempotent), rethrowing anything else. It matches the message with a loose regex
-  because the response carries no error code for it **and Quickpay's wording is not stable** — a live
-  account returned "Validation error: Payment is not in a valid state for cancel" where the code had
-  only ever matched "Transaction in wrong state for this operation". Do not tighten that pattern to an
-  exact string; the unit test asserted on an invented fixture, which is precisely how the mismatch
-  survived until the e2e harness cancelled a real captured payment.
+  trusting it. `CancelAction` catches **nothing** — cancelling an already captured or cancelled payment
+  fails with a `ValidationException` and that reaches the caller. It used to try to swallow that case
+  for idempotency by matching the error message, which was both fragile (Quickpay's wording drifted from
+  "Transaction in wrong state for this operation" to "Validation error: Payment is not in a valid state
+  for cancel", so the guard silently never fired) and wrong in substance: reporting success for a
+  payment whose money is still held. A caller wanting a no-op can catch the typed exception itself.
 - **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. **Quickpay routes
   callbacks to two different urls** (verified live, 2026-08): the payment-window authorize goes to the
   per-payment `callback_url` on the link — the notify token `AuthorizeAction` mints — while API-initiated
