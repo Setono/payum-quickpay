@@ -40,9 +40,9 @@ class ApiTest extends TestCase
     /**
      * @test
      */
-    public function shouldReturnNullPaymentMethodsWhenEmpty(): void
+    public function shouldReturnNullPaymentMethodsWhenUnrestricted(): void
     {
-        $api = new Api(client: $this->api->getClient(), privateKey: 'test-privatekey', paymentMethods: '');
+        $api = new Api(client: $this->api->getClient(), privateKey: 'test-privatekey');
 
         self::assertNull($api->getPaymentMethods());
     }

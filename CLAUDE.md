@@ -73,7 +73,9 @@ client whose `isSynchronized()` disagrees with the gateway option is rejected wi
 rather than silently overriding it. `payment_methods` accepts a string **or** a list of strings and is
 normalized to Quickpay's comma-separated form by `normalizePaymentMethods()` — a `(string)` cast of a
 list would have sent the literal `Array`, which reads as an allowlist of one unknown method and rejects
-every payment; anything that is neither shape throws rather than being coerced.
+every payment; anything that is neither shape throws rather than being coerced. Empty configuration
+normalizes to `null` — as `agreement` and `branding_id` already did — so the empty-string Payum default
+never reaches `Api`, and `null` is what keeps the parameter off the request entirely.
 
 ### Actions (`src/Action/`)
 

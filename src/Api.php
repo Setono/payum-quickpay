@@ -21,7 +21,7 @@ final class Api
         private readonly ClientInterface $client,
         private readonly string $privateKey,
         private readonly string $orderPrefix = '',
-        private readonly string $paymentMethods = '',
+        private readonly ?string $paymentMethods = null,
         private readonly string $language = 'en',
         private readonly bool $autoCapture = false,
         private readonly ?int $agreementId = null,
@@ -53,15 +53,18 @@ final class Api
      * The payment-window method restriction, in Quickpay's own comma-separated format: method names
      * and/or groups (`creditcard`), each optionally prefixed with `!` to exclude it — e.g.
      * `creditcard,!jcb,!visa-us`. Naming any method turns the list into an allowlist: everything not
-     * named is rejected. Returns `null` when unrestricted, which leaves the parameter off the request
-     * so the account's own configuration applies.
+     * named is rejected.
+     *
+     * `null` — not `''` — is what leaves the payment unrestricted: it keeps the parameter off the
+     * request entirely, so the account's own configuration applies. {@see QuickpayGatewayFactory}
+     * normalizes empty configuration to `null` for that reason.
      *
      * @see https://learn.quickpay.net/tech-talk/appendixes/payment-methods/ for the format and the
      *      full list of accepted values
      */
     public function getPaymentMethods(): ?string
     {
-        return '' !== $this->paymentMethods ? $this->paymentMethods : null;
+        return $this->paymentMethods;
     }
 
     public function getLanguage(): string

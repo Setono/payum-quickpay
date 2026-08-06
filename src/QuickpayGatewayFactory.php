@@ -104,16 +104,22 @@ class QuickpayGatewayFactory extends GatewayFactory
      * rejected, with nothing in the configuration that looks wrong. So accept both shapes, and reject
      * anything else outright rather than coercing it into a silently broken restriction.
      *
+     * Empty configuration — the default `''`, an empty list, or a list of blanks — becomes `null`, the
+     * value that leaves the restriction off the request altogether. The empty string is a Payum config
+     * artifact and stops here, exactly as `agreement` and `branding_id` do.
+     *
      * @throws LogicException if the option is neither a string nor a list of strings
      */
-    private static function normalizePaymentMethods(mixed $paymentMethods): string
+    private static function normalizePaymentMethods(mixed $paymentMethods): ?string
     {
         if (null === $paymentMethods) {
-            return '';
+            return null;
         }
 
         if (is_string($paymentMethods)) {
-            return $paymentMethods;
+            $paymentMethods = trim($paymentMethods);
+
+            return '' !== $paymentMethods ? $paymentMethods : null;
         }
 
         if (!is_array($paymentMethods)) {
@@ -140,6 +146,6 @@ class QuickpayGatewayFactory extends GatewayFactory
             }
         }
 
-        return implode(',', $methods);
+        return [] !== $methods ? implode(',', $methods) : null;
     }
 }

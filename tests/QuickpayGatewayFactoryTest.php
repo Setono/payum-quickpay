@@ -128,7 +128,6 @@ class QuickpayGatewayFactoryTest extends TestCase
     {
         $factory = new QuickpayGatewayFactory();
 
-        self::assertNull(self::createApi($factory, [])->getPaymentMethods());
         self::assertSame(
             'creditcard,!jcb',
             self::createApi($factory, ['payment_methods' => 'creditcard,!jcb'])->getPaymentMethods(),
@@ -137,7 +136,40 @@ class QuickpayGatewayFactoryTest extends TestCase
             'creditcard,!jcb',
             self::createApi($factory, ['payment_methods' => ['creditcard', ' !jcb ', '']])->getPaymentMethods(),
         );
-        self::assertNull(self::createApi($factory, ['payment_methods' => []])->getPaymentMethods());
+    }
+
+    /**
+     * Empty configuration must reach the Api as null, not as the empty string it is written as in the
+     * gateway options — null is what keeps `payment_methods` off the request entirely.
+     *
+     * @test
+     *
+     * @dataProvider emptyPaymentMethodsProvider
+     */
+    public function shouldNormalizeEmptyPaymentMethodsToNull(mixed $paymentMethods): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        self::assertNull(self::createApi($factory, ['payment_methods' => $paymentMethods])->getPaymentMethods());
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function emptyPaymentMethodsProvider(): iterable
+    {
+        yield 'the default empty string' => [''];
+        yield 'a blank string' => ['   '];
+        yield 'an empty list' => [[]];
+        yield 'a list of blanks' => [['', ' ']];
+    }
+
+    /**
+     * @test
+     */
+    public function shouldDefaultPaymentMethodsToNull(): void
+    {
+        self::assertNull(self::createApi(new QuickpayGatewayFactory(), [])->getPaymentMethods());
     }
 
     /**
