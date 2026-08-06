@@ -86,7 +86,7 @@ class QuickpayGatewayFactory extends GatewayFactory
                     client: $client,
                     privateKey: (string) $config['privatekey'],
                     orderPrefix: (string) $config['order_prefix'],
-                    paymentMethods: (string) $config['payment_methods'],
+                    paymentMethods: self::normalizePaymentMethods($config['payment_methods']),
                     language: (string) $config['language'],
                     autoCapture: (bool) (int) $config['auto_capture'],
                     agreementId: '' !== (string) $config['agreement'] ? (int) $config['agreement'] : null,
@@ -94,5 +94,52 @@ class QuickpayGatewayFactory extends GatewayFactory
                 );
             };
         }
+    }
+
+    /**
+     * Quickpay wants `payment_methods` as one comma-separated string (see {@see Api::getPaymentMethods()}),
+     * but a list is the natural way to write it in YAML or a stored gateway-config blob. Casting a list
+     * with `(string)` would raise an "Array to string conversion" warning and send the literal `Array`,
+     * which Quickpay reads as an allowlist naming one unknown method — every payment would then be
+     * rejected, with nothing in the configuration that looks wrong. So accept both shapes, and reject
+     * anything else outright rather than coercing it into a silently broken restriction.
+     *
+     * @throws LogicException if the option is neither a string nor a list of strings
+     */
+    private static function normalizePaymentMethods(mixed $paymentMethods): string
+    {
+        if (null === $paymentMethods) {
+            return '';
+        }
+
+        if (is_string($paymentMethods)) {
+            return $paymentMethods;
+        }
+
+        if (!is_array($paymentMethods)) {
+            throw new LogicException(sprintf(
+                'The "payment_methods" option must be a string or a list of strings, %s given',
+                get_debug_type($paymentMethods),
+            ));
+        }
+
+        $methods = [];
+
+        foreach ($paymentMethods as $paymentMethod) {
+            if (!is_string($paymentMethod)) {
+                throw new LogicException(sprintf(
+                    'The "payment_methods" option must be a string or a list of strings, but the list contains %s',
+                    get_debug_type($paymentMethod),
+                ));
+            }
+
+            $paymentMethod = trim($paymentMethod);
+
+            if ('' !== $paymentMethod) {
+                $methods[] = $paymentMethod;
+            }
+        }
+
+        return implode(',', $methods);
     }
 }

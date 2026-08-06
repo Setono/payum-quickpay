@@ -70,7 +70,10 @@ defaulted. The closure constructs the SDK `Client` from the api key **and the `s
 accepts a prebuilt `Setono\Quickpay\Client\ClientInterface` via the optional `quickpay.client` option —
 used by tests). Because `synchronized` is a constructor-only default on the SDK client, an injected
 client whose `isSynchronized()` disagrees with the gateway option is rejected with a `LogicException`
-rather than silently overriding it.
+rather than silently overriding it. `payment_methods` accepts a string **or** a list of strings and is
+normalized to Quickpay's comma-separated form by `normalizePaymentMethods()` — a `(string)` cast of a
+list would have sent the literal `Array`, which reads as an allowlist of one unknown method and rejects
+every payment; anything that is neither shape throws rather than being coerced.
 
 ### Actions (`src/Action/`)
 
@@ -85,7 +88,11 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
 - **Convert** → `ConvertPaymentAction` — turns a Payum `PaymentInterface` into the details array; creates
   the Quickpay payment (via `CreatePaymentRequest`) if absent and stores **only scalars** —
   `quickpayPaymentId`, `amount`, `currency`, `order_id` — plus `continue_url`/`cancel_url` from the
-  token's after-URL. It never persists DTO/model objects.
+  token's after-URL. It never persists DTO/model objects. On the create path only, it asserts the
+  currency via `assertCurrencyCode()`: Payum types `getCurrencyCode()` as `@return string` but its model
+  property is nullable, and the SDK's `CreatePaymentRequest` now requires a non-null currency, so a
+  missing one would otherwise be a `TypeError` from inside the DTO. Both parameters are `mixed` so
+  PHPStan does not fold the check away as always-true.
 - **Authorize** → `AuthorizeAction` — builds a notify (callback) token into `callback_url`, creates a
   payment link (`createLink` + `CreateLinkRequest`), and **throws `HttpRedirect`** to Quickpay's hosted
   payment window.

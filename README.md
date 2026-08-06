@@ -38,7 +38,7 @@ Integration — used to verify callback signatures). Other options are optional:
 | `apikey`          | —       | **Required.** Quickpay API key.                                      |
 | `privatekey`      | —       | **Required.** Private key; used to verify the callback HMAC.         |
 | `auto_capture`    | `0`     | Capture automatically once an approved authorize is confirmed.       |
-| `payment_methods` | `''`    | Restrict the payment-window methods (e.g. `creditcard`).             |
+| `payment_methods` | `''`    | Restrict the payment-window methods (e.g. `creditcard`). See below.  |
 | `order_prefix`    | `''`    | Prepended to the Payum payment number to form the Quickpay order id. |
 | `language`        | `en`    | Payment-window language.                                             |
 | `synchronized`    | `false` | Run capture/refund/cancel synchronously instead of via callbacks.    |
@@ -61,6 +61,22 @@ $payum = (new PayumBuilder)
         'factory' => 'quickpay'
     ])
     ->getPayum();
+```
+
+### `payment_methods`
+
+Quickpay takes this as one comma-separated list of method names and/or groups, each optionally prefixed
+with `!` to exclude it — see the
+[payment methods appendix](https://learn.quickpay.net/tech-talk/appendixes/payment-methods/) for the
+accepted values. Naming any method turns the list into an allowlist: everything not named is rejected.
+Leave it empty to apply your account's own configuration.
+
+The gateway accepts either shape, so a list is fine where that reads better:
+
+```php
+'payment_methods' => 'creditcard,!jcb,!visa-us',
+// or
+'payment_methods' => ['creditcard', '!jcb', '!visa-us'],
 ```
 
 ## Usage

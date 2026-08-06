@@ -6,6 +6,7 @@ namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
+use Payum\Core\Exception\LogicException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\Model\Payment;
 use Payum\Core\Model\Token;
@@ -94,6 +95,31 @@ class ConvertPaymentActionTest extends TestCase
         self::assertSame('DKK', $body['currency']);
         self::assertArrayNotHasKey('card', $body);
         self::assertArrayNotHasKey('payment', $body);
+    }
+
+    /**
+     * @test
+     */
+    public function shouldThrowWhenCreatingAPaymentWithoutACurrency(): void
+    {
+        $payment = new Payment();
+        $payment->setNumber('000000000001');
+        $payment->setTotalAmount(100);
+
+        $convert = new Convert($payment, 'array');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('"000000000001": it has no currency code');
+
+        try {
+            $action->execute($convert);
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'The create request must not be issued');
+        }
     }
 
     /**

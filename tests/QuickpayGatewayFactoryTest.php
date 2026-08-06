@@ -124,6 +124,51 @@ class QuickpayGatewayFactoryTest extends TestCase
     /**
      * @test
      */
+    public function shouldAcceptPaymentMethodsAsAStringOrAList(): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        self::assertNull(self::createApi($factory, [])->getPaymentMethods());
+        self::assertSame(
+            'creditcard,!jcb',
+            self::createApi($factory, ['payment_methods' => 'creditcard,!jcb'])->getPaymentMethods(),
+        );
+        self::assertSame(
+            'creditcard,!jcb',
+            self::createApi($factory, ['payment_methods' => ['creditcard', ' !jcb ', '']])->getPaymentMethods(),
+        );
+        self::assertNull(self::createApi($factory, ['payment_methods' => []])->getPaymentMethods());
+    }
+
+    /**
+     * @test
+     *
+     * @dataProvider invalidPaymentMethodsProvider
+     */
+    public function shouldThrowWhenPaymentMethodsIsNeitherStringNorListOfStrings(mixed $paymentMethods): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('must be a string or a list of strings');
+
+        self::createApi($factory, ['payment_methods' => $paymentMethods]);
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function invalidPaymentMethodsProvider(): iterable
+    {
+        yield 'object' => [new stdClass()];
+        yield 'int' => [42];
+        yield 'list containing a non-string' => [['creditcard', 42]];
+        yield 'list containing an object' => [['creditcard', new stdClass()]];
+    }
+
+    /**
+     * @test
+     */
     public function shouldThrowWhenInjectedClientIsInvalid(): void
     {
         $factory = new QuickpayGatewayFactory();
