@@ -36,21 +36,41 @@ if ('' === $base) {
 if ('POST' === $method && '/notify' === $path) {
     $payum = e2e_payum($base);
 
-    try {
-        // The notify token hash rides in the callback url's query string, so $_REQUEST carries it.
-        $token = $payum->getHttpRequestVerifier()->verify($_REQUEST);
-    } catch (Throwable $e) {
-        http_response_code(400);
-        e2e_log('CALLBACK REJECTED (token): ' . $e->getMessage());
-        echo "invalid token\n";
+    // Two shapes of callback arrive here:
+    //  - the payment-window callback, sent to the per-payment notify token url AuthorizeAction built,
+    //    so it carries ?payum_token and Payum resolves the model from it;
+    //  - a callback sent to the account-wide url (Settings → Integration), which is one static url for
+    //    every payment and therefore cannot carry a token — resolve those by the order_id in the body.
+    // Either way NotifyAction verifies the HMAC itself; the subject only tells it which model to act on.
+    $via = 'token';
 
-        return;
+    if (isset($_REQUEST['payum_token'])) {
+        try {
+            $subject = $payum->getHttpRequestVerifier()->verify($_REQUEST);
+        } catch (Throwable $e) {
+            http_response_code(400);
+            e2e_log('CALLBACK REJECTED (token): ' . $e->getMessage());
+            echo "invalid token\n";
+
+            return;
+        }
+    } else {
+        $via = 'order_id';
+        $subject = e2e_payment_from_callback_body($payum, (string) file_get_contents('php://input'));
+
+        if (null === $subject) {
+            http_response_code(404);
+            e2e_log('CALLBACK REJECTED (no payum_token, and no stored payment matches the body order_id)');
+            echo "unknown payment\n";
+
+            return;
+        }
     }
 
-    $gateway = $payum->getGateway($token->getGatewayName());
+    $gateway = $payum->getGateway('quickpay');
 
     try {
-        $gateway->execute(new Notify($token));
+        $gateway->execute(new Notify($subject));
     } catch (HttpResponse $reply) {
         // NotifyAction rejects an unsigned or tampered callback with a 400 before acting on it.
         http_response_code($reply->getStatusCode());
@@ -67,7 +87,7 @@ if ('POST' === $method && '/notify' === $path) {
     }
 
     // Verified and handled. Report what the gateway made of it.
-    $gateway->execute($status = new GetHumanStatus($token));
+    $gateway->execute($status = new GetHumanStatus($subject));
 
     // After execution the request carries the details the actions worked on, not the token.
     $model = $status->getModel();
@@ -75,7 +95,8 @@ if ('POST' === $method && '/notify' === $path) {
     $details = $model instanceof ArrayAccess ? (array) $model : [];
 
     e2e_log(sprintf(
-        'CALLBACK OK  payum_status=%s quickpay_id=%s order_id=%s amount=%s',
+        'CALLBACK OK  via=%s payum_status=%s quickpay_id=%s order_id=%s amount=%s',
+        $via,
         $status->getValue(),
         is_scalar($details['quickpayPaymentId'] ?? null) ? (string) $details['quickpayPaymentId'] : '-',
         is_scalar($details['order_id'] ?? null) ? (string) $details['order_id'] : '-',

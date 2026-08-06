@@ -246,6 +246,38 @@ function e2e_create_payment(Payum $payum, int $amount, string $currency): Paymen
 }
 
 /**
+ * Resolve the Payum payment a callback refers to, from the callback body alone.
+ *
+ * Needed for callbacks sent to the **account-wide** callback url (Quickpay manager → Settings →
+ * Integration). That is one static url for every payment, so unlike the per-payment notify token url
+ * the gateway builds for the payment window, it cannot carry a `payum_token`. `NotifyAction` itself
+ * never needs the token — only the model — so matching on `order_id` is enough here.
+ */
+function e2e_payment_from_callback_body(Payum $payum, string $rawBody): ?Payment
+{
+    /** @var mixed $data */
+    $data = json_decode($rawBody, true);
+
+    if (!is_array($data) || !isset($data['order_id']) || !is_string($data['order_id'])) {
+        return null;
+    }
+
+    // The gateway builds order_id as order_prefix . number, so strip the prefix back off.
+    $prefix = e2e_env('QUICKPAY_ORDER_PREFIX', false);
+    $number = '' !== $prefix && str_starts_with($data['order_id'], $prefix)
+        ? substr($data['order_id'], strlen($prefix))
+        : $data['order_id'];
+
+    /** @var StorageInterface $storage */
+    $storage = $payum->getStorage(Payment::class);
+
+    /** @var Payment|null $payment */
+    $payment = $storage->find($number);
+
+    return $payment;
+}
+
+/**
  * Load a persisted payment by its number, or exit with guidance.
  */
 function e2e_find_payment(Payum $payum, string $number): Payment
