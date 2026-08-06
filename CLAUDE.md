@@ -143,6 +143,11 @@ has for a **partial** operation. `Amounts::forOperation($details, 'refund_amount
 override key when present and falls back to `amount`, rejecting anything non-numeric or non-positive.
 The keys are `capture_amount` and `refund_amount`.
 
+Quickpay accepts **repeated** captures against one authorization and repeated refunds against what is
+captured — verified live 2026-08 (authorize 1000 → capture 250 → capture 250 → refund 250 → refund 250,
+balance 0). `StatusAction` reports `captured` throughout and only `refunded` at a zero balance, so the
+mark says "something is held", never how much.
+
 `Amounts::consume()` deletes the key, and the actions call it **only after the API accepted the call** —
 details are usually persisted with the payment, so a leftover key would outlive its operation and make
 the next one silently partial, while a failed call must keep the instruction for a retry. The deliberate

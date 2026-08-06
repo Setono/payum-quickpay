@@ -117,6 +117,24 @@ key, so a retry still refunds what you asked for.
 Set the key freshly for each partial operation rather than relying on a previous one: re-executing a
 *successful* partial refund against a reloaded payment would fall back to the full `amount`.
 
+**Both can be repeated.** Quickpay accepts several captures against one authorization, so an order can
+be captured in instalments as it ships, and several refunds against what has been captured. Verified
+live (2026-08) — authorize 1000, capture 250, capture 250, refund 250, refund 250, ending at a zero
+balance. Multi-capture is acquirer-dependent in card processing generally, so confirm it with yours
+before designing around it.
+
+The status follows the **balance**, not the last operation:
+
+| After | Balance | `GetStatus` |
+|---|---|---|
+| capture 250 of 1000 | 250 | `captured` |
+| a second capture of 250 | 500 | `captured` |
+| refund 250 | 250 | `captured` — money is still held |
+| refund the last 250 | 0 | `refunded` |
+
+So `captured` means "something is held", not "all of it". Read `balance` from Quickpay when you need
+the actual figure.
+
 Note what the status becomes afterwards. Payum has no "partially refunded" mark, so `GetStatus` reports
 a payment with an outstanding balance as **`captured`**, and only reports `refunded` once the balance
 reaches zero. Read the remaining amount from Quickpay (the payment's `balance`) rather than inferring it
