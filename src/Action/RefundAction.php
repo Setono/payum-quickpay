@@ -32,7 +32,6 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         $this->api->payments()->refund(
             (int) $model['quickpayPaymentId'],
             new RefundRequest(amount: (int) $model['amount']),
-            synchronized: $this->api->isSynchronized(),
         );
     }
 

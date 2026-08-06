@@ -56,7 +56,35 @@ class CaptureActionTest extends ActionTestAbstract
         $requests = $this->getRequests();
         self::assertCount(1, $requests);
         $this->assertRequest($requests[0], 'POST', '#/payments/1001/capture$#');
+        self::assertSame('', $requests[0]->getUri()->getQuery(), 'Operations are asynchronous unless the gateway is configured otherwise');
         self::assertSame(100, $this->decodeBody($requests[0])['amount']);
+    }
+
+    /**
+     * @test
+     */
+    public function shouldCaptureSynchronouslyWhenTheApiIsSynchronized(): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
+
+        /** @var Capture $capture */
+        $capture = new $this->requestClass($details);
+
+        $action = new CaptureAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->createApi(synchronized: true));
+
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'operations' => [$this->operation(OperationType::Capture)],
+        ]);
+
+        $action->execute($capture);
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'POST', '#/payments/1001/capture$#');
+        self::assertSame('synchronized', $requests[0]->getUri()->getQuery());
     }
 
     /**

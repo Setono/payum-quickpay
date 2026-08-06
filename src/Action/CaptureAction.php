@@ -35,7 +35,6 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
         $this->api->payments()->capture(
             (int) $model['quickpayPaymentId'],
             new CaptureRequest(amount: (int) $model['amount']),
-            synchronized: $this->api->isSynchronized(),
         );
     }
 

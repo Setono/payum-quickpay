@@ -31,7 +31,7 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
         try {
-            $this->api->payments()->cancel((int) $model['quickpayPaymentId'], synchronized: $this->api->isSynchronized());
+            $this->api->payments()->cancel((int) $model['quickpayPaymentId']);
         } catch (QuickpayException $e) {
             // Quickpay rejects cancelling a payment that is already captured/cancelled with a
             // "Transaction in wrong state for this operation" error. Treat that as a no-op so a

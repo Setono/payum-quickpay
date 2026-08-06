@@ -56,7 +56,6 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
             $this->api->payments()->capture(
                 (int) $model['quickpayPaymentId'],
                 new CaptureRequest(amount: $expectedAmount),
-                synchronized: $this->api->isSynchronized(),
             );
         }
     }

@@ -25,7 +25,7 @@ not already have them, install e.g.:
 composer require kriswallsmith/buzz nyholm/psr7
 ```
 
-> **Note:** the SDK is currently released as `1.0.0-alpha.1`. Until a stable release is tagged, your
+> **Note:** the SDK is currently released as `1.0.0-alpha.2`. Until a stable release is tagged, your
 > project needs `"minimum-stability": "alpha"` (with `"prefer-stable": true`) for Composer to resolve it.
 
 ## Configuration

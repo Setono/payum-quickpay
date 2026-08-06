@@ -51,7 +51,8 @@ All HTTP and (de)serialization is delegated to [`setono/quickpay-php-sdk`](https
 typed `payments()` endpoints, request/response DTOs, non-exhaustive `PaymentState`/`OperationType` enums,
 a `QuickpayException` hierarchy, and a timing-safe `CallbackValidator`. Basic auth, the mandatory
 `Accept-Version: v10` header and host pinning to `api.quickpay.net` all live in the SDK. The SDK is
-currently pinned at `^1.0@alpha`.
+currently pinned at `^1.0.0-alpha.2` (alpha.2 added the client-wide `synchronized` default, which the
+gateway relies on — hence the minimum, which also keeps the `--prefer-lowest` CI job honest).
 
 ### Wiring
 
@@ -59,8 +60,11 @@ currently pinned at `^1.0@alpha`.
 `payum.action.*` key and defines `payum.api` — a factory closure that builds the `Api` value object.
 Required options are just `apikey` and `privatekey`; other options (`payment_methods`, `auto_capture`,
 `order_prefix`, `language`, `synchronized`, `agreement` → link `agreementId`, `branding_id`) are
-defaulted. The closure constructs the SDK `Client` from the api key (or accepts a prebuilt
-`Setono\Quickpay\Client\ClientInterface` via the optional `quickpay.client` option — used by tests).
+defaulted. The closure constructs the SDK `Client` from the api key **and the `synchronized` flag** (or
+accepts a prebuilt `Setono\Quickpay\Client\ClientInterface` via the optional `quickpay.client` option —
+used by tests). Because `synchronized` is a constructor-only default on the SDK client, an injected
+client whose `isSynchronized()` disagrees with the gateway option is rejected with a `LogicException`
+rather than silently overriding it.
 
 ### Actions (`src/Action/`)
 
@@ -80,8 +84,9 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   payment link (`createLink` + `CreateLinkRequest`), and **throws `HttpRedirect`** to Quickpay's hosted
   payment window.
 - **Capture / Refund / Cancel** → call `Api::payments()->capture/refund/cancel(...)`. Operations are
-  asynchronous by default (final state arrives via the callback); `Api::isSynchronized()` (the
-  `synchronized` option, default off) is the single toggle that flips them to synchronous. `CancelAction`
+  asynchronous by default (final state arrives via the callback); the actions pass no per-call
+  `synchronized` argument — the SDK client's client-wide default (from the `synchronized` option, default
+  off) is the single toggle that flips them to synchronous (`?synchronized`). `CancelAction`
   catches the typed `QuickpayException` and swallows the "Transaction in wrong state for this operation"
   case (so cancel is idempotent), rethrowing anything else.
 - **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. It fetches the raw
@@ -99,8 +104,9 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
 A `final`, immutable value object injected as `payum.api`. It performs **no HTTP itself** — it wraps the
 configured SDK `ClientInterface` (exposed via `getClient()` / `payments()`) plus the behavior options the
 actions need (`getOrderPrefix()`, `getPaymentMethods()`, `getLanguage()`, `isAutoCapture()`,
-`isSynchronized()`, `getAgreementId()`, `getBrandingId()`), and exposes `createCallbackValidator()` for
-notify verification.
+`getAgreementId()`, `getBrandingId()`), and exposes `createCallbackValidator()` for notify verification.
+`isSynchronized()` is not a state of its own — it reads through to the wrapped client, so there is one
+source of truth for the flag.
 
 ### Operations helper (`src/Operations.php`)
 

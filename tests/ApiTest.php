@@ -31,6 +31,15 @@ class ApiTest extends TestCase
     /**
      * @test
      */
+    public function shouldReportTheSynchronizedFlagOfTheClient(): void
+    {
+        self::assertFalse($this->createApi()->isSynchronized());
+        self::assertTrue($this->createApi(synchronized: true)->isSynchronized());
+    }
+
+    /**
+     * @test
+     */
     public function shouldReturnNullPaymentMethodsWhenEmpty(): void
     {
         $api = new Api(client: $this->api->getClient(), privateKey: 'test-privatekey', paymentMethods: '');

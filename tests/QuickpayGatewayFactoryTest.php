@@ -97,6 +97,33 @@ class QuickpayGatewayFactoryTest extends TestCase
     /**
      * @test
      */
+    public function shouldBuildClientWithTheConfiguredSynchronizedFlag(): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        self::assertFalse(self::createApi($factory, [])->isSynchronized());
+        self::assertTrue(self::createApi($factory, ['synchronized' => true])->isSynchronized());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldThrowWhenInjectedClientDisagreesOnSynchronized(): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('is not synchronized');
+
+        self::createApi($factory, [
+            'quickpay.client' => new Client('injected-key'),
+            'synchronized' => true,
+        ]);
+    }
+
+    /**
+     * @test
+     */
     public function shouldThrowWhenInjectedClientIsInvalid(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -134,6 +161,25 @@ class QuickpayGatewayFactoryTest extends TestCase
         self::assertEquals('quickpay', $config['payum.factory_name']);
         self::assertArrayHasKey('payum.factory_title', $config);
         self::assertEquals('Quickpay', $config['payum.factory_title']);
+    }
+
+    /**
+     * Builds the {@see Api} that the "payum.api" factory closure produces for the given gateway
+     * options, on top of the two required ones.
+     *
+     * @param array<string, mixed> $options
+     */
+    private static function createApi(QuickpayGatewayFactory $factory, array $options): Api
+    {
+        $config = $factory->createConfig(array_replace([
+            'apikey' => '1234',
+            'privatekey' => 'private',
+        ], $options));
+
+        $api = $config['payum.api'](ArrayObject::ensureArrayObject($config));
+        self::assertInstanceOf(Api::class, $api);
+
+        return $api;
     }
 
     /**

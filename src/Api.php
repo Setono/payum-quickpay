@@ -24,7 +24,6 @@ final class Api
         private readonly string $paymentMethods = '',
         private readonly string $language = 'en',
         private readonly bool $autoCapture = false,
-        private readonly bool $synchronized = false,
         private readonly ?int $agreementId = null,
         private readonly ?int $brandingId = null,
     ) {
@@ -65,9 +64,14 @@ final class Api
         return $this->autoCapture;
     }
 
+    /**
+     * Whether the payment operations (capture/refund/cancel) wait for the completed transaction
+     * instead of relying on the callback. This lives on the SDK client as its client-wide default —
+     * {@see QuickpayGatewayFactory} builds the client from the gateway's `synchronized` option.
+     */
     public function isSynchronized(): bool
     {
-        return $this->synchronized;
+        return $this->client->isSynchronized();
     }
 
     public function getAgreementId(): ?int

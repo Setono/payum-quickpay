@@ -39,16 +39,7 @@ trait ApiTestTrait
 
         $this->httpClient = new MockHttpClient();
 
-        $this->api = new Api(
-            client: new Client('test-apikey', $this->httpClient),
-            privateKey: 'test-privatekey',
-            orderPrefix: 'ut',
-            paymentMethods: 'visa',
-            language: 'en',
-            autoCapture: true,
-            synchronized: false,
-            agreementId: 266017,
-        );
+        $this->api = $this->createApi();
 
         // A real gateway is needed so actions that dispatch sub-requests stay offline:
         // NotifyAction -> GetHttpRequest (StubGetHttpRequestAction) and -> ConfirmPayment.
@@ -62,6 +53,25 @@ trait ApiTestTrait
         $gateway->addAction($confirmPaymentAction);
         $gateway->addAction($this->httpRequestAction);
         $this->gateway = $gateway;
+    }
+
+    /**
+     * The {@see Api} the tests run against. `$synchronized` mirrors the gateway option of the same
+     * name: it is set as the SDK client's client-wide default, so the payment operations append the
+     * `?synchronized` flag. The client always wraps the shared mock HTTP client, so responses queued
+     * on the test case are served to every Api built here.
+     */
+    protected function createApi(bool $synchronized = false): Api
+    {
+        return new Api(
+            client: new Client('test-apikey', $this->httpClient, synchronized: $synchronized),
+            privateKey: 'test-privatekey',
+            orderPrefix: 'ut',
+            paymentMethods: 'visa',
+            language: 'en',
+            autoCapture: true,
+            agreementId: 266017,
+        );
     }
 
     protected function queueResponse(string $body, int $status = 200): void

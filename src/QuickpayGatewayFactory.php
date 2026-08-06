@@ -58,14 +58,27 @@ class QuickpayGatewayFactory extends GatewayFactory
             $config['payum.api'] = static function (ArrayObject $config): Api {
                 $config->validateNotEmpty($config['payum.required_options']);
 
+                $synchronized = (bool) $config['synchronized'];
+
                 // Consumers (and the test suite) may inject a preconfigured SDK client — e.g. one
                 // built around a specific PSR-18 client — via the "quickpay.client" option.
                 // Otherwise we build one from the api key and let php-http/discovery find a client.
-                $client = $config['quickpay.client'] ?? new Client((string) $config['apikey']);
+                $client = $config['quickpay.client'] ?? new Client((string) $config['apikey'], synchronized: $synchronized);
                 if (!$client instanceof ClientInterface) {
                     throw new LogicException(sprintf(
                         'The "quickpay.client" option must be an instance of %s',
                         ClientInterface::class,
+                    ));
+                }
+
+                // The SDK client carries the synchronized flag as a client-wide default, and it can
+                // only be set on its constructor. An injected client that disagrees with the gateway
+                // option would silently win, so reject the mismatch instead.
+                if ($client->isSynchronized() !== $synchronized) {
+                    throw new LogicException(sprintf(
+                        'The injected "quickpay.client" is %ssynchronized, but the gateway is configured with "synchronized" = %s. Construct the client with the same value.',
+                        $client->isSynchronized() ? '' : 'not ',
+                        $synchronized ? 'true' : 'false',
                     ));
                 }
 
@@ -76,7 +89,6 @@ class QuickpayGatewayFactory extends GatewayFactory
                     paymentMethods: (string) $config['payment_methods'],
                     language: (string) $config['language'],
                     autoCapture: (bool) (int) $config['auto_capture'],
-                    synchronized: (bool) $config['synchronized'],
                     agreementId: '' !== (string) $config['agreement'] ? (int) $config['agreement'] : null,
                     brandingId: '' !== (string) $config['branding_id'] ? (int) $config['branding_id'] : null,
                 );

@@ -63,3 +63,8 @@ These were internal implementation details; they are gone in 2.0:
 You can pass a preconfigured SDK client through the new `quickpay.client` option (a
 `Setono\Quickpay\Client\ClientInterface`) — useful for wiring a cached Valinor builder or a specific
 PSR-18 client. When omitted, the gateway builds one from `apikey` via discovery.
+
+The `synchronized` option is carried by the SDK client itself (`Client::__construct(..., synchronized:
+true)`), and it can only be set there. An injected client must therefore be constructed with the same
+value as the gateway's `synchronized` option — a mismatch throws a `LogicException` when the gateway is
+built, rather than letting one of the two win silently.
