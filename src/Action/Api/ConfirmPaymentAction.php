@@ -38,7 +38,12 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
 
         $latestOperation = Operations::latest($payment->operations);
         if (null === $latestOperation) {
-            throw new LogicException('The payment does not have a `latest operation`');
+            // A payment can legitimately have no operations yet — Quickpay fires a callback when the
+            // payment is merely created, which becomes visible as soon as an account-wide callback url
+            // (Settings → Integration) is configured. There is nothing to confirm, so do nothing.
+            // Throwing here would 500 the notify endpoint, and Quickpay would retry a callback that
+            // can never succeed.
+            return;
         }
 
         if ($this->api->isAutoCapture() && OperationType::Authorize === $latestOperation->type()) {

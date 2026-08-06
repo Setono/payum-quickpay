@@ -33,18 +33,25 @@ class ConfirmPaymentActionTest extends TestCase
     }
 
     /**
+     * A callback can arrive for a payment that has no operations yet — Quickpay fires one when the
+     * payment is merely created, which becomes visible as soon as an account-wide callback url is
+     * configured. There is nothing to confirm, so it must be a no-op: throwing would 500 the notify
+     * endpoint and have Quickpay retry a callback that can never succeed.
+     *
      * @test
      */
-    public function shouldThrowWhenThereIsNoLatestOperation(): void
+    public function shouldDoNothingWhenThereIsNoLatestOperation(): void
     {
         $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
 
         $action = $this->action($this->api);
 
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('latest operation');
-
         $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
+
+        // Only the fetch — no capture may follow from a payment with nothing to confirm.
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
     }
 
     /**
