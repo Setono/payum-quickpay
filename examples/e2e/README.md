@@ -78,16 +78,29 @@ It serves the Payum token urls: `POST /notify` (the callback, handled by the rea
 
 ### Terminal B — the tunnel
 
+`expose/` holds a small client image. Build it once, then share the listener:
+
 ```bash
-docker run --rm -e EXPOSE_TOKEN=<your-token> exposedev/expose \
+docker build -t expose-client examples/e2e/expose
+docker run --rm -e EXPOSE_TOKEN=<your-token> expose-client \
   share http://host.docker.internal:8000 --server=eu-1
 ```
 
-On macOS / Docker Desktop reach the host via `host.docker.internal` (`--network host` does not work
-there). Copy the public `https://<random>.<region>.sharedwithexpose.com` URL — on the free tier it
-changes every session.
+We build our own image because **the Expose project's own Dockerfile builds the Expose _server_, not
+the share client**. The entrypoint re-applies `EXPOSE_TOKEN` via `expose token` on every run, since
+that config does not persist in an ephemeral container.
 
-> No Docker? `composer global require exposedev/expose && expose token <t> && expose share http://localhost:8000 --server=eu-1`
+On macOS / Docker Desktop reach the host via `host.docker.internal` — `--network host` does **not**
+work there. A LAN IP (`http://192.168.2.100:8000`) also works if your firewall allows it. Copy the
+public `https://<random>.<region>.sharedwithexpose.com` URL — on the free tier it changes every
+session, which is why it is never hardcoded.
+
+> No Docker? Install the client on the host instead:
+> ```bash
+> composer global require exposedev/expose
+> expose token <your-token>
+> expose share http://localhost:8000 --server=eu-1
+> ```
 
 ### Terminal C — create a payment
 
