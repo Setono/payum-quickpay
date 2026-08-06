@@ -109,8 +109,13 @@ $model['capture_amount'] = 250;
 $quickpay->execute(new Capture($model));
 ```
 
-The keys are per operation and are read only when present — leave them unset for the full amount.
-**Clear them once the operation is done**, or the next one will be partial too.
+The keys are per operation and are read only when present — leave them unset for the full amount. The
+gateway **consumes the key once the API has accepted the operation**, so the next capture or refund is
+for the full amount again and a stale key cannot silently make it partial. A failed operation keeps its
+key, so a retry still refunds what you asked for.
+
+Set the key freshly for each partial operation rather than relying on a previous one: re-executing a
+*successful* partial refund against a reloaded payment would fall back to the full `amount`.
 
 Note what the status becomes afterwards. Payum has no "partially refunded" mark, so `GetStatus` reports
 a payment with an outstanding balance as **`captured`**, and only reports `refunded` once the balance

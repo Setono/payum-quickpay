@@ -37,6 +37,9 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
             (int) $model['quickpayPaymentId'],
             new CaptureRequest(amount: Amounts::forOperation($model, 'capture_amount')),
         );
+
+        // Only once the API has accepted it — a failed call leaves the instruction in place to retry.
+        Amounts::consume($model, 'capture_amount');
     }
 
     public function supports($request): bool

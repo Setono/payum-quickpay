@@ -58,4 +58,24 @@ final class Amounts
 
         return $amount;
     }
+
+    /**
+     * Consume the override, so the next operation on the same payment is not silently partial too.
+     *
+     * Call this only after the operation succeeded. The details are commonly persisted with the
+     * payment, so a leftover key outlives the operation it was meant for — but if the call failed, the
+     * instruction was never carried out and must survive for a retry.
+     *
+     * Note the flip side: a *successful* partial operation that is somehow executed a second time
+     * against the reloaded payment will fall back to the full `amount`. Set the key again for each
+     * partial operation rather than relying on what a previous one left behind.
+     *
+     * @param ArrayAccess<string, mixed> $details
+     */
+    public static function consume(ArrayAccess $details, string $overrideKey): void
+    {
+        if ($details->offsetExists($overrideKey)) {
+            $details->offsetUnset($overrideKey);
+        }
+    }
 }

@@ -141,8 +141,14 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
 Payum's `Capture`/`Refund` requests carry no amount, so the details array is the only channel a caller
 has for a **partial** operation. `Amounts::forOperation($details, 'refund_amount')` reads the per-operation
 override key when present and falls back to `amount`, rejecting anything non-numeric or non-positive.
-The keys are `capture_amount` and `refund_amount`; callers must clear them afterwards or the next
-operation inherits them.
+The keys are `capture_amount` and `refund_amount`.
+
+`Amounts::consume()` deletes the key, and the actions call it **only after the API accepted the call** —
+details are usually persisted with the payment, so a leftover key would outlive its operation and make
+the next one silently partial, while a failed call must keep the instruction for a retry. The deliberate
+trade-off: re-executing a *successful* partial operation against a reloaded payment now falls back to
+the full amount. That is the rarer case, but it is the more expensive one, so the docs tell callers to
+set the key per operation rather than lean on what a previous one left behind.
 
 ### Api (`src/Api.php`)
 

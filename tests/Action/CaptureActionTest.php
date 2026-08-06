@@ -89,6 +89,12 @@ class CaptureActionTest extends ActionTestAbstract
         $requests = $this->getRequests();
         self::assertCount(1, $requests);
         self::assertSame(250, $this->decodeBody($requests[0])['amount']);
+
+        self::assertFalse(
+            $details->offsetExists('capture_amount'),
+            'The override must be consumed, or the next capture would silently be partial too',
+        );
+        self::assertSame(1000, $details['amount'], 'The full amount must be left alone');
     }
 
     /**

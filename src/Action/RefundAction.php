@@ -34,6 +34,9 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
             (int) $model['quickpayPaymentId'],
             new RefundRequest(amount: Amounts::forOperation($model, 'refund_amount')),
         );
+
+        // Only once the API has accepted it — a failed call leaves the instruction in place to retry.
+        Amounts::consume($model, 'refund_amount');
     }
 
     public function supports($request): bool

@@ -82,6 +82,32 @@ class AmountsTest extends TestCase
     /**
      * @test
      */
+    public function shouldConsumeTheOverrideAndLeaveTheFullAmount(): void
+    {
+        $details = new ArrayObject(['amount' => 1000, 'refund_amount' => 250]);
+
+        Amounts::consume($details, 'refund_amount');
+
+        self::assertFalse($details->offsetExists('refund_amount'));
+        self::assertSame(1000, $details['amount']);
+        self::assertSame(1000, Amounts::forOperation($details, 'refund_amount'), 'The next operation falls back to the full amount');
+    }
+
+    /**
+     * @test
+     */
+    public function shouldConsumeNothingWhenNoOverrideWasSet(): void
+    {
+        $details = new ArrayObject(['amount' => 1000]);
+
+        Amounts::consume($details, 'refund_amount');
+
+        self::assertSame(1000, $details['amount']);
+    }
+
+    /**
+     * @test
+     */
     public function shouldThrowWhenNeitherKeyIsPresent(): void
     {
         $this->expectException(LogicException::class);
