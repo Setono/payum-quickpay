@@ -132,7 +132,52 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * @test
      */
-    public function shouldMarkProcessedWithRefundAsRefunded(): void
+    public function shouldMarkProcessedWithRefundAsRefundedWhenTheBalanceIsEmpty(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 0,
+            'operations' => [$this->operation(OperationType::Refund)],
+        ]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertSame($request::STATUS_REFUNDED, $request->getValue());
+    }
+
+    /**
+     * A partial refund leaves money captured, and Payum has no partial mark — so the payment is still
+     * captured, not refunded. Reporting it as refunded would tell a shop the customer got everything
+     * back when most of it is still held.
+     *
+     * @test
+     */
+    public function shouldMarkProcessedWithAPartialRefundAsStillCaptured(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            // Captured 1000, refunded 250, so 750 is still held.
+            'balance' => 750,
+            'operations' => [
+                $this->operation(OperationType::Capture, amount: 1000),
+                $this->operation(OperationType::Refund, amount: 250),
+            ],
+        ]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertSame($request::STATUS_CAPTURED, $request->getValue());
+    }
+
+    /**
+     * `balance` is nullable in the API. Absent, fall back to treating a refund as full rather than
+     * inventing a number.
+     *
+     * @test
+     */
+    public function shouldMarkProcessedWithRefundAsRefundedWhenTheBalanceIsAbsent(): void
     {
         $this->queuePayment([
             'state' => PaymentState::Processed->value,

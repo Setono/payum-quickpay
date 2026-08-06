@@ -278,6 +278,30 @@ function e2e_payment_from_callback_body(Payum $payum, string $rawBody): ?Payment
 }
 
 /**
+ * Stage a partial capture/refund by writing the gateway's amount-override key onto the details, when
+ * an amount was passed on the command line. Returns the amount, or null for a full-amount operation.
+ *
+ * The caller restores the original details afterwards — leaving the key behind would silently make the
+ * next operation partial too.
+ *
+ * @param list<string> $positional
+ */
+function e2e_partial_amount(Payment $payment, array $positional, string $key): ?int
+{
+    if (!isset($positional[2])) {
+        return null;
+    }
+
+    $amount = (int) $positional[2];
+
+    $details = $payment->getDetails();
+    $details[$key] = $amount;
+    $payment->setDetails($details);
+
+    return $amount;
+}
+
+/**
  * Load a persisted payment by its number, or exit with guidance.
  */
 function e2e_find_payment(Payum $payum, string $number): Payment

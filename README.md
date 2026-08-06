@@ -95,7 +95,27 @@ $model = new \ArrayObject([
 $quickpay->execute(new Capture($model));
 ```
 
-[ico-version]: https://img.shields.io/packagist/v/setono/payum-quickpay.svg?style=flat-square
+### Partial captures and refunds
+
+By default a capture or refund is issued for the full `amount` in the details. Payum's `Capture` and
+`Refund` requests carry no amount of their own, so a partial operation is expressed by setting an
+override key on the details first:
+
+```php
+$model['refund_amount'] = 250;          // minor units, like every amount here
+$quickpay->execute(new Refund($model));
+
+$model['capture_amount'] = 250;
+$quickpay->execute(new Capture($model));
+```
+
+The keys are per operation and are read only when present — leave them unset for the full amount.
+**Clear them once the operation is done**, or the next one will be partial too.
+
+Note what the status becomes afterwards. Payum has no "partially refunded" mark, so `GetStatus` reports
+a payment with an outstanding balance as **`captured`**, and only reports `refunded` once the balance
+reaches zero. Read the remaining amount from Quickpay (the payment's `balance`) rather than inferring it
+from the Payum mark. https://img.shields.io/packagist/v/setono/payum-quickpay.svg?style=flat-square
 [ico-license]: https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square
 [ico-github-actions]: https://github.com/Setono/payum-quickpay/workflows/build/badge.svg
 [ico-code-coverage]: https://codecov.io/gh/Setono/payum-quickpay/branch/1.x/graph/badge.svg

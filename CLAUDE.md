@@ -130,7 +130,19 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   `auto_capture` is on and the latest operation is an approved authorize whose amount matches, it captures
   automatically.
 - **GetStatus** → `StatusAction` — maps the SDK `PaymentState` + latest operation to Payum marks
-  (`markCaptured`, `markRefunded`, `markAuthorized`, `markFailed`, etc.).
+  (`markCaptured`, `markRefunded`, `markAuthorized`, `markFailed`, etc.). The refund branch is **not**
+  decided by the operation alone: it consults the payment's `balance` (captured minus refunded), so a
+  partial refund stays `markCaptured` and only a zero balance is `markRefunded`. Payum has no partial
+  mark, and reporting a partly refunded payment as fully refunded is a lie a shop acts on. A null
+  `balance` falls back to treating the refund as full.
+
+### Amounts (`src/Amounts.php`)
+
+Payum's `Capture`/`Refund` requests carry no amount, so the details array is the only channel a caller
+has for a **partial** operation. `Amounts::forOperation($details, 'refund_amount')` reads the per-operation
+override key when present and falls back to `amount`, rejecting anything non-numeric or non-positive.
+The keys are `capture_amount` and `refund_amount`; callers must clear them afterwards or the next
+operation inherits them.
 
 ### Api (`src/Api.php`)
 

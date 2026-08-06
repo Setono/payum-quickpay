@@ -67,7 +67,18 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
                 if (Operations::isApprovedOfType($latestOperation, OperationType::Capture)) {
                     $request->markCaptured();
                 } elseif (Operations::isApprovedOfType($latestOperation, OperationType::Refund)) {
-                    $request->markRefunded();
+                    // A refund does not necessarily empty the payment. Quickpay's `balance` is what is
+                    // still captured (captured minus refunded), so a partial refund leaves it positive
+                    // and the money is, in Payum's vocabulary, still captured — there is no partial
+                    // mark to reach for. Only a balance of zero is genuinely refunded.
+                    //
+                    // `balance` is nullable in the API; when it is absent, fall back to treating any
+                    // refund as full rather than inventing a number.
+                    if (null === $payment->balance || 0 === $payment->balance) {
+                        $request->markRefunded();
+                    } else {
+                        $request->markCaptured();
+                    }
                 } elseif (Operations::isApprovedOfType($latestOperation, OperationType::Cancel)) {
                     $request->markCanceled();
                 } else {

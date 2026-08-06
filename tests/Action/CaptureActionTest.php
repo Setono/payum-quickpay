@@ -63,6 +63,37 @@ class CaptureActionTest extends ActionTestAbstract
     /**
      * @test
      */
+    public function shouldCaptureThePartialAmountWhenTheDetailsCarryAnOverride(): void
+    {
+        $details = new ArrayObject([
+            'quickpayPaymentId' => 1001,
+            'amount' => 1000,
+            'capture_amount' => 250,
+        ]);
+
+        /** @var Capture $capture */
+        $capture = new $this->requestClass($details);
+
+        $action = new CaptureAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 250,
+            'operations' => [$this->operation(OperationType::Capture, amount: 250)],
+        ]);
+
+        $action->execute($capture);
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        self::assertSame(250, $this->decodeBody($requests[0])['amount']);
+    }
+
+    /**
+     * @test
+     */
     public function shouldCaptureSynchronouslyWhenTheApiIsSynchronized(): void
     {
         $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);

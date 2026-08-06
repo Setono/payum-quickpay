@@ -72,6 +72,28 @@ Alternatively, skip callbacks for operations entirely: enable the `synchronized`
 capture/refund/cancel block until the transaction is settled, or poll `GetStatus`, which re-fetches from
 Quickpay.
 
+## A partial refund no longer reports as fully refunded
+
+`StatusAction` used to decide from the latest operation alone: if it was a refund, the payment was
+marked **refunded** — even when only part of the money had been sent back. A shop reading that mark
+would believe the customer got everything back while most of it was still held.
+
+It now consults Quickpay's `balance` (what is still captured, i.e. captured minus refunded):
+
+| Situation | Mark |
+|---|---|
+| latest operation is a capture | `captured` |
+| latest operation is a refund, balance still positive | `captured` |
+| latest operation is a refund, balance zero | `refunded` |
+| `balance` absent from the response | `refunded`, as before |
+
+Payum has no partial mark to reach for, so "still captured until fully refunded" is the closest honest
+mapping. If your code branches on `STATUS_REFUNDED`, check it still behaves the way you want for a
+partially refunded payment — it will now stay `captured` where it previously flipped to `refunded`.
+
+Partial operations themselves are set through the new `capture_amount` / `refund_amount` details keys;
+see the README.
+
 ## Order ids are now validated before they are sent
 
 `ConvertPaymentAction` builds `order_id` as `order_prefix` + the Payum payment number, and now enforces

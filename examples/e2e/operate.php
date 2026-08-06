@@ -6,9 +6,12 @@ declare(strict_types=1);
  * Drive the rest of the payment lifecycle through Payum, against a payment created earlier.
  *
  *   php examples/e2e/operate.php status  <payumNumber>
- *   php examples/e2e/operate.php capture <payumNumber>
+ *   php examples/e2e/operate.php capture <payumNumber> [amount]
  *   php examples/e2e/operate.php refund  <payumNumber> [amount]
  *   php examples/e2e/operate.php cancel  <payumNumber>
+ *
+ * Passing an amount performs a PARTIAL capture or refund, which the gateway expresses through the
+ * `capture_amount` / `refund_amount` details keys (Payum's requests carry no amount of their own).
  *
  * `<payumNumber>` is the number printed by e2e:create — the Payum payment, not the Quickpay id. Each
  * command executes the corresponding Payum request against the real gateway, so this exercises
@@ -63,31 +66,27 @@ try {
             break;
 
         case 'capture':
-            $gateway->execute(new Capture($payment));
-            fwrite(STDOUT, "capture   ... requested\n");
+            $amount = e2e_partial_amount($payment, $positional, 'capture_amount');
+
+            try {
+                $gateway->execute(new Capture($payment));
+                fwrite(STDOUT, sprintf("capture   ... requested %s\n", null === $amount ? '(full amount)' : (string) $amount));
+            } finally {
+                $payment->setDetails($before);
+            }
+
             $showStatus();
 
             break;
 
         case 'refund':
-            // RefundAction refunds details['amount'], so a partial refund means pointing that at the
-            // amount for the duration of the call. Worth knowing: the gateway has no partial-refund
-            // parameter of its own.
-            $amount = isset($positional[2]) ? (int) $positional[2] : null;
-
-            if (null !== $amount) {
-                $details = $payment->getDetails();
-                $details['amount'] = $amount;
-                $payment->setDetails($details);
-            }
+            $amount = e2e_partial_amount($payment, $positional, 'refund_amount');
 
             try {
                 $gateway->execute(new Refund($payment));
                 fwrite(STDOUT, sprintf("refund    ... requested %s\n", null === $amount ? '(full amount)' : (string) $amount));
             } finally {
-                if (null !== $amount) {
-                    $payment->setDetails($before);
-                }
+                $payment->setDetails($before);
             }
 
             $showStatus();
