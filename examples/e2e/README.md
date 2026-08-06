@@ -83,8 +83,11 @@ It serves the Payum token urls: `POST /notify` (the callback, handled by the rea
 ```bash
 docker build -t expose-client examples/e2e/expose
 docker run --rm -e EXPOSE_TOKEN=<your-token> expose-client \
-  share http://host.docker.internal:8000 --server=eu-1
+  share http://host.docker.internal:8000
 ```
+
+Do **not** pass `--server=eu-1` on the free tier — that region is Pro-only and fails with
+*"This server region requires an Expose Pro license"*. Omitting `--server` uses the free shared server.
 
 We build our own image because **the Expose project's own Dockerfile builds the Expose _server_, not
 the share client**. The entrypoint re-applies `EXPOSE_TOKEN` via `expose token` on every run, since
@@ -99,7 +102,7 @@ session, which is why it is never hardcoded.
 > ```bash
 > composer global require exposedev/expose
 > expose token <your-token>
-> expose share http://localhost:8000 --server=eu-1
+> expose share http://localhost:8000
 > ```
 
 ### Terminal C — create a payment

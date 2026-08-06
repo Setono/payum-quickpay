@@ -8,7 +8,9 @@
 # cannot be localhost. It fronts `composer e2e:listen`.
 #
 #   docker build -t expose-client examples/e2e/expose
-#   docker run --rm -e EXPOSE_TOKEN=<your-token> expose-client share http://host.docker.internal:8000 --server=eu-1
+#   docker run --rm -e EXPOSE_TOKEN=<your-token> expose-client share http://host.docker.internal:8000
+#
+# Do not add --server=eu-1: that region is Pro-only and the free tier rejects it.
 FROM php:8.3-cli
 
 RUN apt-get update \

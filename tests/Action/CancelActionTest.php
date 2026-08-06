@@ -46,9 +46,19 @@ class CancelActionTest extends ActionTestAbstract
     }
 
     /**
+     * Quickpay reports an already finalized payment as an invalid-state error; the action treats it as
+     * a no-op so cancelling is idempotent.
+     *
+     * Both wordings are covered because the API's phrasing has changed: the second one is what a live
+     * account actually returned when cancelling a captured payment (2026-08), and the first is what
+     * this test used to assert on its own — an invented fixture that let the action's message match go
+     * stale unnoticed until the e2e harness cancelled a real captured payment.
+     *
      * @test
+     *
+     * @dataProvider invalidStateMessageProvider
      */
-    public function shouldSwallowWrongStateError(): void
+    public function shouldSwallowInvalidStateError(string $message): void
     {
         $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
 
@@ -59,13 +69,44 @@ class CancelActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
-        // Quickpay reports an already finalized payment as a wrong-state error; the action treats it
-        // as a no-op so cancelling is idempotent.
-        $this->queueResponse('{"message":"Transaction in wrong state for this operation"}', 400);
+        $this->queueResponse(json_encode(['message' => $message, 'errors' => [], 'error_code' => null], \JSON_THROW_ON_ERROR), 400);
 
         $action->execute($cancel);
 
         self::assertCount(1, $this->getRequests());
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function invalidStateMessageProvider(): iterable
+    {
+        yield 'older wording' => ['Transaction in wrong state for this operation'];
+        yield 'live wording, 2026-08' => ['Validation error: Payment is not in a valid state for cancel'];
+        // The match is deliberately case-insensitive: if the wording can drift, so can the casing.
+        yield 'different casing' => ['Transaction in WRONG STATE for this operation'];
+    }
+
+    /**
+     * A validation error carrying no message at all must not be mistaken for the invalid-state case.
+     *
+     * @test
+     */
+    public function shouldRethrowValidationErrorWithoutAMessage(): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
+
+        /** @var Cancel $cancel */
+        $cancel = new $this->requestClass($details);
+
+        $action = new CancelAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queueResponse('{}', 400);
+
+        $this->expectException(ValidationException::class);
+        $action->execute($cancel);
     }
 
     /**

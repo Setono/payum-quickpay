@@ -104,9 +104,13 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   off) is the single toggle that flips them to synchronous (`?synchronized`). The `Payment` these calls
   return is deliberately ignored — on the async path it is a snapshot taken when the operation was
   queued (`pending: true`, pre-operation `state`/`balance`), so `StatusAction` re-fetches instead of
-  trusting it. `CancelAction`
-  catches the typed `QuickpayException` and swallows the "Transaction in wrong state for this operation"
-  case (so cancel is idempotent), rethrowing anything else.
+  trusting it. `CancelAction` catches the typed `ValidationException` and swallows the invalid-state
+  case (so cancel is idempotent), rethrowing anything else. It matches the message with a loose regex
+  because the response carries no error code for it **and Quickpay's wording is not stable** — a live
+  account returned "Validation error: Payment is not in a valid state for cancel" where the code had
+  only ever matched "Transaction in wrong state for this operation". Do not tighten that pattern to an
+  exact string; the unit test asserted on an invented fixture, which is precisely how the mismatch
+  survived until the e2e harness cancelled a real captured payment.
 - **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. It fetches the raw
   body + `QuickPay-Checksum-Sha256` header (via Payum's `GetHttpRequest`), **verifies the HMAC signature**
   with the SDK `CallbackValidator`, and rejects an invalid/unsigned callback with a 400 `HttpResponse`

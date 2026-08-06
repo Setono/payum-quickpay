@@ -13,8 +13,7 @@ use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Cancel;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
-use Setono\Quickpay\Exception\QuickpayException;
-use Setono\Quickpay\Exception\ResponseAwareException;
+use Setono\Quickpay\Exception\ValidationException;
 
 class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -32,16 +31,19 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         try {
             $this->api->payments()->cancel((int) $model['quickpayPaymentId']);
-        } catch (QuickpayException $e) {
-            // Quickpay rejects cancelling a payment that is already captured/cancelled with a
-            // "Transaction in wrong state for this operation" error. Treat that as a no-op so a
-            // cancel is idempotent; rethrow anything else.
-            if ($e instanceof ResponseAwareException &&
-                false !== stripos((string) $e->getMessageText(), 'Transaction in wrong state for this operation')) {
-                return;
+        } catch (ValidationException $e) {
+            // Quickpay rejects cancelling a payment that is already captured or cancelled. Treat only
+            // that case as a no-op, so cancelling is idempotent; any other validation error is a real
+            // failure and must surface.
+            //
+            // It has to be matched on the message: the response carries no error code for it
+            // (`error_code` is null and `errors` is empty). The wording is not stable — v10 has
+            // returned both "Transaction in wrong state for this operation" and (observed live,
+            // 2026-08) "Validation error: Payment is not in a valid state for cancel" — so match the
+            // stable part loosely rather than pinning an exact string.
+            if (1 !== preg_match('/not (?:in )?a valid state|wrong state/i', (string) $e->getMessageText())) {
+                throw $e;
             }
-
-            throw $e;
         }
     }
 
