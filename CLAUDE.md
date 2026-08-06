@@ -134,6 +134,26 @@ on those models now lives in the stateless `Operations` helper over a `list<Oper
 `isApproved()` (status code `20000`), `isApprovedOfType()`, `isLatestApproved()`, `authorizedAmount()`.
 `StatusAction` and `ConfirmPaymentAction` decisions are driven by these helpers plus the SDK enums.
 
+## End-to-end harness (`examples/e2e/`)
+
+Committed dev tooling that exercises the gateway against the **real** Quickpay API — deliberately
+**outside** the phpstan/ecs/dep-analyser paths (`src` + `tests`), so check those scripts with `php -l`.
+`bootstrap.php` builds a framework-less Payum (`PayumBuilder` + `FilesystemStorage` under
+`examples/e2e/var/payum`, so the CLI scripts and the web listener share state) and everything runs
+through real Payum requests, not the SDK directly. Scripts: `composer e2e:smoke` (no browser/tunnel —
+create + link + status), `e2e:listen` (built-in server serving the Payum token urls), `e2e:create`
+(full flow, prints the payment-window url), `e2e:operate` (`status|capture|refund|cancel`).
+
+Two things it encodes that are easy to get wrong:
+- `HeaderAwareGetHttpRequestAction` — payum/core's plain-PHP bridge does **not** populate
+  `GetHttpRequest::$headers`, so outside Symfony every callback would be rejected as unsigned. It is
+  registered via `addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])`.
+- `RefundAction` refunds `details['amount']`, so a partial refund means pointing that at the amount for
+  the duration of the call — the gateway has no partial-refund parameter of its own.
+
+Credentials come from a gitignored `.env.local` (see `.env.local.example`); `examples/e2e/var/` is
+gitignored too. Quickpay has no sandbox — you use the production API key and a test **card**.
+
 ## Testing
 
 Tests mirror `src/` under `tests/` and are **fully offline and deterministic** — no network, no shared

@@ -68,6 +68,10 @@
             "@check-style",
             "@analyse"
         ],
+        "e2e:create": "php examples/e2e/create-payment.php",
+        "e2e:listen": "php -S 0.0.0.0:8000 examples/e2e/listen.php",
+        "e2e:operate": "php examples/e2e/operate.php",
+        "e2e:smoke": "php examples/e2e/smoke.php",
         "fix-style": "ecs check --fix",
         "infection": "infection --threads=max",
         "phpunit": "phpunit",

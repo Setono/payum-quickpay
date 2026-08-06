@@ -3,3 +3,7 @@
 /.build
 /composer.lock
 /.phpunit.cache
+
+# e2e harness: real credentials, and its filesystem storage / callback log (payment data).
+/.env.local
+/examples/e2e/var

@@ -1,4 +1,6 @@
 /tests                      export-ignore
+/examples                   export-ignore
+/.env.local.example         export-ignore
 /.github                    export-ignore
 /.editorconfig              export-ignore
 /.gitattributes             export-ignore
