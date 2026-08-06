@@ -22,6 +22,13 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
     use ApiAwareTrait;
 
     /**
+     * Quickpay's accepted `order_id` length, verified against the live API.
+     */
+    private const ORDER_ID_MIN_LENGTH = 4;
+
+    private const ORDER_ID_MAX_LENGTH = 20;
+
+    /**
      * @param mixed|Convert $request
      */
     public function execute($request): void
@@ -38,15 +45,14 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         // Only scalars are stored in the details so they survive serialization by the consumer.
         // `quickpayPaymentId` is the single source of truth; the payment is re-fetched when needed.
         if (!isset($details['quickpayPaymentId'])) {
-            // Only the create path needs a currency — a payment that already carries a
-            // quickpayPaymentId is unaffected.
-            $currency = self::assertCurrencyCode(
-                $paymentModel->getCurrencyCode(),
-                $paymentModel->getNumber(),
-            );
+            // Only the create path needs these — a payment that already carries a quickpayPaymentId is
+            // unaffected.
+            $number = self::assertNotEmptyString($paymentModel->getNumber(), 'number');
+            $currency = self::assertNotEmptyString($paymentModel->getCurrencyCode(), 'currency code', $number);
+            $orderId = self::assertOrderId($this->api->getOrderPrefix() . $number);
 
             $payment = $this->api->payments()->create(new CreatePaymentRequest(
-                orderId: $this->api->getOrderPrefix() . $paymentModel->getNumber(),
+                orderId: $orderId,
                 currency: $currency,
             ));
 
@@ -67,24 +73,64 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
     }
 
     /**
-     * Payum documents {@see PaymentInterface::getCurrencyCode()} as `@return string`, but the property is
-     * nullable on Payum's own payment model, so the docblock cannot be trusted at runtime. The SDK
-     * requires a non-null currency on {@see CreatePaymentRequest}, so without this a payment saved
-     * without one would blow up as a `TypeError` raised inside the DTO, naming neither the payment nor
-     * the cause. Both parameters are `mixed` for that reason — it is what they really are, and it stops
-     * static analysis from folding the check away as always-true.
+     * Payum documents {@see PaymentInterface::getNumber()} and {@see PaymentInterface::getCurrencyCode()}
+     * as `@return string`, but both properties are nullable on Payum's own payment model, so neither
+     * docblock can be trusted at runtime. `$value` is `mixed` for that reason — it is what these really
+     * are, and it stops static analysis from folding the check away as always-true.
      *
-     * @throws LogicException if the payment carries no usable currency code
+     * The two fail differently without this. A missing currency reaches the non-nullable
+     * {@see CreatePaymentRequest::$currency} and blows up as a `TypeError` raised inside the DTO,
+     * naming neither the payment nor the cause. A missing number is worse: it is concatenated, so it
+     * degrades silently — see {@see self::assertOrderId()}.
+     *
+     * @throws LogicException if the payment carries no usable value
      */
-    private static function assertCurrencyCode(mixed $currencyCode, mixed $paymentNumber): string
+    private static function assertNotEmptyString(mixed $value, string $what, string $paymentNumber = ''): string
     {
-        if (!is_string($currencyCode) || '' === $currencyCode) {
+        if (!is_string($value) || '' === $value) {
             throw new LogicException(sprintf(
-                'Cannot create a Quickpay payment for the Payum payment "%s": it has no currency code.',
-                is_string($paymentNumber) && '' !== $paymentNumber ? $paymentNumber : '(unknown)',
+                'Cannot create a Quickpay payment for the Payum payment "%s": it has no %s.',
+                '' !== $paymentNumber ? $paymentNumber : '(unknown)',
+                $what,
             ));
         }
 
-        return $currencyCode;
+        return $value;
+    }
+
+    /**
+     * Quickpay requires `order_id` to be 4–20 characters, and the gateway builds it by concatenating
+     * the `order_prefix` option with the Payum payment number. Checking the result here turns two
+     * failures into one clear exception at the call site:
+     *
+     * - too long, or too short, would otherwise come back as a `ValidationException` after a network
+     *   round trip, blaming a field the caller never set directly;
+     * - and if the number were ever empty, the concatenation would degrade to the bare prefix — which,
+     *   when the prefix is itself 4+ characters, is a *valid* order id, so every such payment would be
+     *   created under the SAME order id with nothing complaining at all.
+     *
+     * `strlen()` counts bytes rather than characters. Quickpay's order ids are ASCII in practice (a
+     * Payum payment number plus your prefix), and pulling in ext-mbstring for this would cost more than
+     * the check is worth.
+     *
+     * @throws LogicException if the resulting order id falls outside Quickpay's accepted length
+     */
+    private static function assertOrderId(string $orderId): string
+    {
+        $length = strlen($orderId);
+
+        if ($length < self::ORDER_ID_MIN_LENGTH || $length > self::ORDER_ID_MAX_LENGTH) {
+            throw new LogicException(sprintf(
+                'The Quickpay order id "%s" is %d characters, but Quickpay requires between %d and %d. '
+                . 'It is built from the "order_prefix" gateway option and the Payum payment number — '
+                . 'adjust the prefix so the two together stay within that range.',
+                $orderId,
+                $length,
+                self::ORDER_ID_MIN_LENGTH,
+                self::ORDER_ID_MAX_LENGTH,
+            ));
+        }
+
+        return $orderId;
     }
 }

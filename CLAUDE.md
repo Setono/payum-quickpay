@@ -90,11 +90,14 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
 - **Convert** → `ConvertPaymentAction` — turns a Payum `PaymentInterface` into the details array; creates
   the Quickpay payment (via `CreatePaymentRequest`) if absent and stores **only scalars** —
   `quickpayPaymentId`, `amount`, `currency`, `order_id` — plus `continue_url`/`cancel_url` from the
-  token's after-URL. It never persists DTO/model objects. On the create path only, it asserts the
-  currency via `assertCurrencyCode()`: Payum types `getCurrencyCode()` as `@return string` but its model
-  property is nullable, and the SDK's `CreatePaymentRequest` now requires a non-null currency, so a
-  missing one would otherwise be a `TypeError` from inside the DTO. Both parameters are `mixed` so
-  PHPStan does not fold the check away as always-true.
+  token's after-URL. It never persists DTO/model objects. On the create path only it asserts its inputs:
+  Payum types `getNumber()`/`getCurrencyCode()` as `@return string` but both model properties are
+  nullable, so `assertNotEmptyString()` takes `mixed` (which also stops PHPStan folding the checks away
+  as always-true). A missing currency would be a `TypeError` from inside the SDK DTO; a missing number
+  is worse, degrading silently to an order id that is nothing but the prefix. `assertOrderId()` then
+  enforces Quickpay's **4–20 character** `order_id` rule on `order_prefix . number` — which also catches
+  that silent case, except when the prefix alone is 4+ characters, where it would otherwise create every
+  payment under the same order id.
 - **Authorize** → `AuthorizeAction` — builds a notify (callback) token into `callback_url`, creates a
   payment link (`createLink` + `CreateLinkRequest`), and **throws `HttpRedirect`** to Quickpay's hosted
   payment window.

@@ -233,7 +233,9 @@ function e2e_create_payment(Payum $payum, int $amount, string $currency): Paymen
 
     /** @var Payment $payment */
     $payment = $storage->create();
-    $payment->setNumber(date('ymdHis') . bin2hex(random_bytes(2)));
+    // Quickpay's order_id must be 4-20 characters and the gateway builds it as order_prefix + number,
+    // so keep the number short enough to leave room for a prefix (14 here allows up to 6).
+    $payment->setNumber(date('ymdHis') . bin2hex(random_bytes(1)));
     $payment->setTotalAmount($amount);
     $payment->setCurrencyCode($currency);
     $payment->setDescription('payum-quickpay e2e');

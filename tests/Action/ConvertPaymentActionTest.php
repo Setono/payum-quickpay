@@ -123,6 +123,100 @@ class ConvertPaymentActionTest extends TestCase
     }
 
     /**
+     * A missing number would not throw on its own — it is concatenated with the order prefix, so it
+     * degrades silently into an order id that is nothing but the prefix.
+     *
+     * @test
+     */
+    public function shouldThrowWhenCreatingAPaymentWithoutANumber(): void
+    {
+        $payment = new Payment();
+        $payment->setTotalAmount(100);
+        $payment->setCurrencyCode('DKK');
+
+        $convert = new Convert($payment, 'array');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('it has no number');
+
+        try {
+            $action->execute($convert);
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'The create request must not be issued');
+        }
+    }
+
+    /**
+     * @test
+     *
+     * @dataProvider outOfRangeOrderIdProvider
+     */
+    public function shouldThrowWhenTheOrderIdIsOutsideQuickpaysLength(string $number, string $expected): void
+    {
+        $payment = new Payment();
+        $payment->setNumber($number);
+        $payment->setTotalAmount(100);
+        $payment->setCurrencyCode('DKK');
+
+        $convert = new Convert($payment, 'array');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage($expected);
+
+        try {
+            $action->execute($convert);
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'The create request must not be issued');
+        }
+    }
+
+    /**
+     * The api under test carries the order prefix "ut", so the number contributes the rest.
+     *
+     * @return iterable<string, array{string, string}>
+     */
+    public static function outOfRangeOrderIdProvider(): iterable
+    {
+        yield 'one under the minimum' => ['1', 'The Quickpay order id "ut1" is 3 characters'];
+        yield 'one over the maximum' => [str_repeat('9', 19), 'is 21 characters'];
+    }
+
+    /**
+     * @test
+     */
+    public function shouldAcceptOrderIdsAtBothEndsOfTheRange(): void
+    {
+        // "ut" + 2 = 4 characters, the minimum; and "ut" + 18 = 20, the maximum.
+        foreach (['12' => 'ut12', str_repeat('9', 18) => 'ut' . str_repeat('9', 18)] as $number => $expectedOrderId) {
+            $payment = new Payment();
+            $payment->setNumber((string) $number);
+            $payment->setTotalAmount(100);
+            $payment->setCurrencyCode('DKK');
+
+            $convert = new Convert($payment, 'array');
+
+            $action = new ConvertPaymentAction();
+            $action->setGateway($this->gateway);
+            $action->setApi($this->api);
+
+            $this->queuePayment(['id' => 1001, 'order_id' => $expectedOrderId]);
+
+            $action->execute($convert);
+
+            $requests = $this->getRequests();
+            self::assertSame($expectedOrderId, $this->decodeBody($requests[array_key_last($requests)])['order_id']);
+        }
+    }
+
+    /**
      * @test
      */
     public function shouldNotCreateAgainWhenPaymentAlreadyExists(): void
