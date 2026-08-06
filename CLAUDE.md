@@ -51,8 +51,14 @@ All HTTP and (de)serialization is delegated to [`setono/quickpay-php-sdk`](https
 typed `payments()` endpoints, request/response DTOs, non-exhaustive `PaymentState`/`OperationType` enums,
 a `QuickpayException` hierarchy, and a timing-safe `CallbackValidator`. Basic auth, the mandatory
 `Accept-Version: v10` header and host pinning to `api.quickpay.net` all live in the SDK. The SDK is
-currently pinned at `^1.0.0-alpha.2` (alpha.2 added the client-wide `synchronized` default, which the
-gateway relies on — hence the minimum, which also keeps the `--prefer-lowest` CI job honest).
+currently pinned at `^1.0.0-alpha.3`. The SDK is pre-1.0 and every alpha has tightened its contract, so
+the gateway tracks the newest alpha rather than supporting a matrix of them — and the explicit minimum
+keeps the `--prefer-lowest` CI job on the same release. alpha.2 added the client-wide `synchronized`
+default the gateway relies on (alpha.1 genuinely cannot run it); alpha.3 turned the unconditionally
+required request fields into required constructor params (`CreatePaymentRequest::$orderId`/`$currency`,
+`$amount` on `CreateLinkRequest`/`CaptureRequest`/`RefundRequest`) — every call site here already passes
+them, so a missing one is now a `TypeError` at the call site instead of a `ValidationException` after a
+round trip.
 
 ### Wiring
 
@@ -86,7 +92,10 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
 - **Capture / Refund / Cancel** → call `Api::payments()->capture/refund/cancel(...)`. Operations are
   asynchronous by default (final state arrives via the callback); the actions pass no per-call
   `synchronized` argument — the SDK client's client-wide default (from the `synchronized` option, default
-  off) is the single toggle that flips them to synchronous (`?synchronized`). `CancelAction`
+  off) is the single toggle that flips them to synchronous (`?synchronized`). The `Payment` these calls
+  return is deliberately ignored — on the async path it is a snapshot taken when the operation was
+  queued (`pending: true`, pre-operation `state`/`balance`), so `StatusAction` re-fetches instead of
+  trusting it. `CancelAction`
   catches the typed `QuickpayException` and swallows the "Transaction in wrong state for this operation"
   case (so cancel is idempotent), rethrowing anything else.
 - **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. It fetches the raw
