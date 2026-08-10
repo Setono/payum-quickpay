@@ -21,6 +21,31 @@ class RefundActionTest extends ActionTestAbstract
     protected $actionClass = RefundAction::class;
 
     /**
+     * A model without a quickpayPaymentId has no payment to refund. The guard throws before any
+     * HTTP happens — without it, `(int) null = 0` would reach the API as a request on payment 0.
+     *
+     * @test
+     */
+    public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
+    {
+        /** @var Refund $refund */
+        $refund = new $this->requestClass(new ArrayObject(['amount' => 100]));
+
+        $action = new RefundAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('quickpayPaymentId');
+
+        try {
+            $action->execute($refund);
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'No API call may be made for a payment that does not exist yet');
+        }
+    }
+
+    /**
      * With no explicit amount, a refund is for whatever is still refundable — the balance. Defaulting
      * to the payment's full `amount` would be rejected outright the moment anything had already been
      * refunded, since a payment is refundable only up to what is captured.

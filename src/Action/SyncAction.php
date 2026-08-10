@@ -13,6 +13,7 @@ use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Sync;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Details;
 
 /**
  * Refreshes the scalar snapshot in the details from Quickpay.
@@ -44,7 +45,7 @@ class SyncAction implements ActionInterface, ApiAwareInterface, GatewayAwareInte
             return;
         }
 
-        $payment = $this->api->payments()->getById((int) $model['quickpayPaymentId']);
+        $payment = $this->api->payments()->getById(Details::paymentId($model));
 
         $model['balance'] = $payment->balance;
         $model['state'] = $payment->state;

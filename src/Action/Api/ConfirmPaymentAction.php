@@ -12,6 +12,7 @@ use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
+use Setono\Payum\Quickpay\Details;
 use Setono\Payum\Quickpay\Operations;
 use Setono\Payum\Quickpay\Request\Api\ConfirmPayment;
 use Setono\Quickpay\Enum\OperationType;
@@ -30,11 +31,10 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
         RequestNotSupportedException::assertSupports($this, $request);
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
-        if (!$model->offsetExists('quickpayPaymentId')) {
-            throw new LogicException('The payment has not been created');
-        }
 
-        $payment = $this->api->payments()->getById((int) $model['quickpayPaymentId']);
+        $paymentId = Details::paymentId($model);
+
+        $payment = $this->api->payments()->getById($paymentId);
 
         // Persist the balance before any early return below, so a callback for a payment with nothing
         // to confirm still refreshes it.
@@ -69,7 +69,7 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
             }
 
             $this->api->payments()->capture(
-                (int) $model['quickpayPaymentId'],
+                $paymentId,
                 new CaptureRequest(amount: $expectedAmount),
             );
         }

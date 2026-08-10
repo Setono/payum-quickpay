@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\LogicException;
 use Payum\Core\Request\Capture;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use ReflectionClass;
@@ -126,6 +127,31 @@ class CaptureActionTest extends ActionTestAbstract
         self::assertCount(1, $requests);
         $this->assertRequest($requests[0], 'POST', '#/payments/1001/capture$#');
         self::assertSame('synchronized', $requests[0]->getUri()->getQuery());
+    }
+
+    /**
+     * A model without a quickpayPaymentId has no payment to capture. The guard throws before any
+     * HTTP happens — without it, `(int) null = 0` would reach the API as `POST /payments/0/capture`.
+     *
+     * @test
+     */
+    public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
+    {
+        /** @var Capture $capture */
+        $capture = new $this->requestClass(new ArrayObject(['amount' => 100]));
+
+        $action = new CaptureAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('quickpayPaymentId');
+
+        try {
+            $action->execute($capture);
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'No API call may be made for a payment that does not exist yet');
+        }
     }
 
     /**
