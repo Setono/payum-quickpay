@@ -50,7 +50,10 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             case PaymentState::New:
-                if (Operations::isLatestApproved($operations, OperationType::Authorize)) {
+                // Decided by the last APPROVED operation, not the last one recorded: a trailing
+                // rejected or pending attempt (say, a capture that failed) must not make an
+                // authorized payment — whose money is still held — report as failed.
+                if (Operations::isApprovedOfType(Operations::latestApproved($operations), OperationType::Authorize)) {
                     $request->markAuthorized();
                 } else {
                     $request->markFailed();
@@ -67,10 +70,14 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             case PaymentState::Processed:
-                $latestOperation = Operations::latest($operations);
-                if (Operations::isApprovedOfType($latestOperation, OperationType::Capture)) {
+                // Same principle as above: the list may end in a rejected or still-pending attempt
+                // (a refund the acquirer bounced, an async operation not yet settled), and deciding
+                // from that trailing attempt would flip a payment whose money is demonstrably still
+                // held to `unknown`. The last approved operation is what actually happened.
+                $latestApproved = Operations::latestApproved($operations);
+                if (Operations::isApprovedOfType($latestApproved, OperationType::Capture)) {
                     $request->markCaptured();
-                } elseif (Operations::isApprovedOfType($latestOperation, OperationType::Refund)) {
+                } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Refund)) {
                     // A refund does not necessarily empty the payment. Quickpay's `balance` is what is
                     // still captured (captured minus refunded), so a partial refund leaves it positive
                     // and the money is, in Payum's vocabulary, still captured — there is no partial
@@ -83,7 +90,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
                     } else {
                         $request->markCaptured();
                     }
-                } elseif (Operations::isApprovedOfType($latestOperation, OperationType::Cancel)) {
+                } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Cancel)) {
                     $request->markCanceled();
                 } else {
                     $request->markUnknown();
