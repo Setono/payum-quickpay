@@ -101,6 +101,51 @@ class ConfirmPaymentActionTest extends TestCase
     }
 
     /**
+     * A rejected authorize — a declined card is routine in the payment window — also arrives as a
+     * callback, and its latest operation has type `authorize`. Capturing it is impossible and
+     * throwing would 500 the notify endpoint, making Quickpay retry a callback that can never
+     * succeed. It must be a silent no-op.
+     *
+     * @test
+     */
+    public function shouldNotCaptureWhenTheLatestAuthorizeIsRejected(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Rejected->value,
+            'operations' => [$this->operation(OperationType::Authorize, '40000', amount: 100)],
+        ]);
+
+        $action = $this->action($this->api);
+        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
+
+        // Only the reload — no capture, and no exception.
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+    }
+
+    /**
+     * Same for an authorize that is still pending: it has no status code yet, so there is no outcome
+     * to confirm. The next callback (or a re-fetch) will tell.
+     *
+     * @test
+     */
+    public function shouldNotCaptureWhenTheLatestAuthorizeIsStillPending(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Pending->value,
+            'operations' => [$this->operation(OperationType::Authorize, null, amount: 100, pending: true)],
+        ]);
+
+        $action = $this->action($this->api);
+        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+    }
+
+    /**
      * @test
      */
     public function shouldThrowWhenAuthorizedAmountDoesNotMatch(): void

@@ -51,6 +51,38 @@ class NotifyActionTest extends ActionTestAbstract
     }
 
     /**
+     * The callback for a DECLINED payment must complete without error: the api under test has
+     * auto_capture on, and a rejected authorize has type `authorize` — but there is nothing to
+     * capture. Throwing here would 500 the notify endpoint and have Quickpay retry a callback that
+     * can never succeed.
+     *
+     * @test
+     */
+    public function shouldCompleteQuietlyWhenTheAuthorizeWasDeclined(): void
+    {
+        $body = '{"id":1001}';
+        $this->httpRequestAction->setHttpRequest($body, [
+            CallbackValidator::CHECKSUM_HEADER => hash_hmac('sha256', $body, 'test-privatekey'),
+        ]);
+
+        $this->queuePayment([
+            'state' => PaymentState::Rejected->value,
+            'operations' => [$this->operation(OperationType::Authorize, '40000', amount: 100)],
+        ]);
+
+        $action = new NotifyAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $action->execute($this->notify());
+
+        // Only the reload — the declined authorize is not captured.
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+    }
+
+    /**
      * @test
      */
     public function shouldRejectInvalidChecksum(): void
