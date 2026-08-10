@@ -57,8 +57,8 @@ class QuickpayGatewayFactoryTest extends TestCase
     {
         $factory = new QuickpayGatewayFactory();
         $gateway = $factory->create([
-            'apikey' => '1234',
-            'privatekey' => '1234',
+            'api_key' => '1234',
+            'private_key' => '1234',
         ]);
         self::assertInstanceOf(Gateway::class, $gateway);
         self::assertNotEmpty(self::readProperty($gateway, 'apis'));
@@ -78,8 +78,8 @@ class QuickpayGatewayFactoryTest extends TestCase
 
         $factory = new QuickpayGatewayFactory();
         $config = $factory->createConfig([
-            'apikey' => '1234',
-            'privatekey' => 'private',
+            'api_key' => '1234',
+            'private_key' => 'private',
             'quickpay.client' => $client,
             'order_prefix' => 'sylius-',
         ]);
@@ -205,12 +205,71 @@ class QuickpayGatewayFactoryTest extends TestCase
     {
         $factory = new QuickpayGatewayFactory();
         $config = $factory->createConfig([
-            'apikey' => '1234',
-            'privatekey' => 'private',
+            'api_key' => '1234',
+            'private_key' => 'private',
             'quickpay.client' => new stdClass(),
         ]);
 
         $this->expectException(LogicException::class);
+
+        $config['payum.api'](ArrayObject::ensureArrayObject($config));
+    }
+
+    /**
+     * The credentials were `apikey` / `privatekey` in 1.x. They are required, so every consumer sets
+     * them — and Sylius stores the gateway configuration keyed by exactly these names, so dropping the
+     * old spellings would break every existing shop until its stored config was migrated.
+     *
+     * @test
+     */
+    public function shouldAcceptTheDeprecatedCredentialOptionNames(): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        $config = $factory->createConfig([
+            'apikey' => 'old-api-key',
+            'privatekey' => 'old-private-key',
+        ]);
+
+        $api = $config['payum.api'](ArrayObject::ensureArrayObject($config));
+
+        self::assertInstanceOf(Api::class, $api);
+        self::assertSame('old-private-key', $api->getPrivateKey());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldPreferTheCurrentNamesWhenBothAreGiven(): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        $config = $factory->createConfig([
+            'apikey' => 'old-api-key',
+            'privatekey' => 'old-private-key',
+            'api_key' => 'current-api-key',
+            'private_key' => 'current-private-key',
+        ]);
+
+        $api = $config['payum.api'](ArrayObject::ensureArrayObject($config));
+
+        self::assertSame('current-private-key', $api->getPrivateKey());
+    }
+
+    /**
+     * The deprecated names must satisfy the required-options validation too — otherwise a 1.x config
+     * would fail before ever reaching the alias.
+     *
+     * @test
+     */
+    public function shouldStillRequireCredentialsUnderEitherSpelling(): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        $config = $factory->createConfig(['apikey' => 'only-the-api-key']);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('private_key');
 
         $config['payum.api'](ArrayObject::ensureArrayObject($config));
     }
@@ -271,8 +330,8 @@ class QuickpayGatewayFactoryTest extends TestCase
     private static function createApi(QuickpayGatewayFactory $factory, array $options): Api
     {
         $config = $factory->createConfig(array_replace([
-            'apikey' => '1234',
-            'privatekey' => 'private',
+            'api_key' => '1234',
+            'private_key' => 'private',
         ], $options));
 
         $api = $config['payum.api'](ArrayObject::ensureArrayObject($config));

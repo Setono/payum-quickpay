@@ -35,8 +35,8 @@ Integration — used to verify callback signatures). Other options are optional:
 
 | Option            | Default | Description                                                          |
 |-------------------|---------|----------------------------------------------------------------------|
-| `apikey`          | —       | **Required.** Quickpay API key.                                      |
-| `privatekey`      | —       | **Required.** Private key; used to verify the callback HMAC.         |
+| `api_key`         | —       | **Required.** Quickpay API key.                                      |
+| `private_key`     | —       | **Required.** Private key; used to verify the callback HMAC.         |
 | `auto_capture`    | `0`     | Capture automatically once an approved authorize is confirmed.       |
 | `payment_methods` | `''`    | Restrict the payment-window methods (e.g. `creditcard`). See below.  |
 | `order_prefix`    | `''`    | Prepended to the Payum payment number to form the Quickpay order id. |
@@ -44,6 +44,9 @@ Integration — used to verify callback signatures). Other options are optional:
 | `synchronized`    | `false` | Run capture/refund/cancel synchronously instead of via callbacks.    |
 | `agreement`       | `''`    | Optional payment-window agreement id.                                |
 | `branding_id`     | `''`    | Optional payment-window branding id.                                 |
+
+The 1.x spellings `apikey` and `privatekey` are still accepted as deprecated aliases, so an existing
+gateway configuration keeps working. They will be removed in 3.0.
 
 ```php
 <?php

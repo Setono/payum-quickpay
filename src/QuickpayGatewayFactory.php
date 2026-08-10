@@ -38,9 +38,11 @@ class QuickpayGatewayFactory extends GatewayFactory
         ]);
 
         if (!$config->offsetExists('payum.api')) {
+            self::aliasDeprecatedOptions($config);
+
             $config['payum.default_options'] = [
-                'apikey' => '',
-                'privatekey' => '',
+                'api_key' => '',
+                'private_key' => '',
                 'payment_methods' => '',
                 'auto_capture' => 0,
                 'order_prefix' => '',
@@ -53,8 +55,8 @@ class QuickpayGatewayFactory extends GatewayFactory
             ];
             $config->defaults($config['payum.default_options']);
             $config['payum.required_options'] = [
-                'apikey',
-                'privatekey',
+                'api_key',
+                'private_key',
             ];
 
             $config['payum.api'] = static function (ArrayObject $config): Api {
@@ -65,7 +67,7 @@ class QuickpayGatewayFactory extends GatewayFactory
                 // Consumers (and the test suite) may inject a preconfigured SDK client — e.g. one
                 // built around a specific PSR-18 client — via the "quickpay.client" option.
                 // Otherwise we build one from the api key and let php-http/discovery find a client.
-                $client = $config['quickpay.client'] ?? new Client((string) $config['apikey'], synchronized: $synchronized);
+                $client = $config['quickpay.client'] ?? new Client((string) $config['api_key'], synchronized: $synchronized);
                 if (!$client instanceof ClientInterface) {
                     throw new LogicException(sprintf(
                         'The "quickpay.client" option must be an instance of %s',
@@ -86,7 +88,7 @@ class QuickpayGatewayFactory extends GatewayFactory
 
                 return new Api(
                     client: $client,
-                    privateKey: (string) $config['privatekey'],
+                    privateKey: (string) $config['private_key'],
                     orderPrefix: (string) $config['order_prefix'],
                     paymentMethods: self::normalizePaymentMethods($config['payment_methods']),
                     language: (string) $config['language'],
@@ -95,6 +97,30 @@ class QuickpayGatewayFactory extends GatewayFactory
                     brandingId: '' !== (string) $config['branding_id'] ? (int) $config['branding_id'] : null,
                 );
             };
+        }
+    }
+
+    /**
+     * Every other multi-word option is snake_case (`payment_methods`, `auto_capture`, `order_prefix`,
+     * `branding_id`), so the credentials are `api_key` and `private_key`. The 1.x spellings `apikey` and
+     * `privatekey` still work.
+     *
+     * They are aliased rather than dropped because, unlike the misspelled `syncronized` that 2.0 removed
+     * outright, these two are required and therefore set by **every** consumer — and Sylius stores the
+     * gateway configuration as JSON keyed by exactly these names, so a hard rename would break every
+     * existing shop until its stored config was migrated. The aliases are deprecated and will go in 3.0.
+     *
+     * Must run before the defaults are applied: once `api_key` exists (as `''`), there is no longer any
+     * way to tell that the consumer only supplied the old spelling.
+     *
+     * @param ArrayObject<string, mixed> $config
+     */
+    private static function aliasDeprecatedOptions(ArrayObject $config): void
+    {
+        foreach (['apikey' => 'api_key', 'privatekey' => 'private_key'] as $deprecated => $current) {
+            if ($config->offsetExists($deprecated) && !$config->offsetExists($current)) {
+                $config[$current] = $config[$deprecated];
+            }
         }
     }
 

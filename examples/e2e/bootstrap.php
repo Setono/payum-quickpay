@@ -205,8 +205,8 @@ function e2e_payum(string $baseUrl): Payum
         })
         ->addGateway('quickpay', [
             'factory' => 'quickpay',
-            'apikey' => e2e_env('QUICKPAY_API_KEY'),
-            'privatekey' => e2e_env('QUICKPAY_PRIVATE_KEY'),
+            'api_key' => e2e_env('QUICKPAY_API_KEY'),
+            'private_key' => e2e_env('QUICKPAY_PRIVATE_KEY'),
             'order_prefix' => e2e_env('QUICKPAY_ORDER_PREFIX', false),
             'language' => e2e_env('QUICKPAY_LANGUAGE', false) ?: 'en',
             'payment_methods' => e2e_env('QUICKPAY_PAYMENT_METHODS', false),
