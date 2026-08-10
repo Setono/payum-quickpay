@@ -6,7 +6,10 @@
         ]
     },
     "logs": {
-        "text": "php://stderr"
+        "text": "php://stderr",
+        "stryker": {
+            "badge": "2.x"
+        }
     },
     "minMsi": 65,
     "minCoveredMsi": 70

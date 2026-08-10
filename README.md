@@ -4,6 +4,7 @@
 [![Software License][ico-license]](LICENSE)
 [![Build Status][ico-github-actions]][link-github-actions]
 [![Code Coverage][ico-code-coverage]][link-code-coverage]
+[![Mutation testing badge][ico-infection]][link-infection]
 
 This component enables the use of Quickpay with Payum. Under the hood it uses the
 [`setono/quickpay-php-sdk`](https://github.com/Setono/quickpay-php-sdk) client.
@@ -110,7 +111,7 @@ uses. `quickpayPaymentId` is the single source of truth — everything else is a
 | `order_id` | `Convert` | `order_prefix` + the Payum payment number. |
 | `continue_url`, `cancel_url` | `Convert` | From the token's after-URL. |
 | `callback_url` | `Authorize` | The notify token url given to Quickpay. |
-| `balance` | `GetStatus`, `Sync`, `Notify` | **What is still captured** — captured minus refunded. |
+| `balance` | `GetStatus`, `Sync`, `Notify`, `Refund` | **What is still captured** — captured minus refunded. |
 | `state` | `Sync` | Quickpay's own payment state. |
 | `capture_amount`, `refund_amount` | *you* | Optional partial-operation amounts; see below. |
 
@@ -181,7 +182,9 @@ the `balance` details key for the actual figure rather than inferring it from th
 [ico-license]: https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square
 [ico-github-actions]: https://github.com/Setono/payum-quickpay/actions/workflows/build.yaml/badge.svg?branch=2.x
 [ico-code-coverage]: https://codecov.io/gh/Setono/payum-quickpay/branch/2.x/graph/badge.svg
+[ico-infection]: https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2FSetono%2Fpayum-quickpay%2F2.x
 
 [link-packagist]: https://packagist.org/packages/setono/payum-quickpay
 [link-github-actions]: https://github.com/Setono/payum-quickpay/actions/workflows/build.yaml?query=branch%3A2.x
 [link-code-coverage]: https://codecov.io/gh/Setono/payum-quickpay/branch/2.x
+[link-infection]: https://dashboard.stryker-mutator.io/reports/github.com/Setono/payum-quickpay/2.x
