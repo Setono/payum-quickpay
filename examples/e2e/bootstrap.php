@@ -19,11 +19,10 @@ use Payum\Core\PayumBuilder;
 use Payum\Core\Registry\StorageRegistryInterface;
 use Payum\Core\Storage\FilesystemStorage;
 use Payum\Core\Storage\StorageInterface;
-use Setono\Payum\Quickpay\Examples\E2E\HeaderAwareGetHttpRequestAction;
+use Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction;
 use Setono\Payum\Quickpay\QuickpayGatewayFactory;
 
 require __DIR__ . '/../../vendor/autoload.php';
-require __DIR__ . '/HeaderAwareGetHttpRequestAction.php';
 
 e2e_load_dotenv();
 
