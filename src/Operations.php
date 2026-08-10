@@ -37,6 +37,27 @@ final class Operations
         return $operations[array_key_last($operations)];
     }
 
+    /**
+     * The most recent approved operation, or null if nothing has been approved (yet).
+     *
+     * An operation list may end in rejected or still-pending attempts — a failed refund, an
+     * asynchronous capture that has not settled. A status decision must not let such a trailing
+     * attempt mask what actually happened to the money, so it reads the last operation that DID
+     * succeed rather than the last one recorded.
+     *
+     * @param list<Operation> $operations
+     */
+    public static function latestApproved(array $operations): ?Operation
+    {
+        foreach (array_reverse($operations) as $operation) {
+            if (self::isApproved($operation)) {
+                return $operation;
+            }
+        }
+
+        return null;
+    }
+
     public static function isApproved(Operation $operation): bool
     {
         return self::APPROVED_STATUS_CODE === $operation->qpStatusCode;

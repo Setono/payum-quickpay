@@ -191,6 +191,104 @@ class StatusActionTest extends ActionTestAbstract
     }
 
     /**
+     * A trailing REJECTED attempt must not mask what actually happened: capture 1000, then a refund
+     * the acquirer bounced — the 1000 is demonstrably still held, so the payment is still captured,
+     * not unknown.
+     *
+     * @test
+     */
+    public function shouldStayCapturedWhenARefundAttemptWasRejected(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
+            'operations' => [
+                $this->operation(OperationType::Capture, amount: 1000),
+                $this->operation(OperationType::Refund, '40000', amount: 250),
+            ],
+        ]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertSame($request::STATUS_CAPTURED, $request->getValue());
+    }
+
+    /**
+     * Same for a PENDING attempt: an asynchronous refund that has not settled yet has no outcome,
+     * so the status keeps reporting the last operation that did succeed.
+     *
+     * @test
+     */
+    public function shouldStayCapturedWhileARefundIsStillPending(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
+            'operations' => [
+                $this->operation(OperationType::Capture, amount: 1000),
+                $this->operation(OperationType::Refund, null, amount: 250, pending: true),
+            ],
+        ]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertSame($request::STATUS_CAPTURED, $request->getValue());
+    }
+
+    /**
+     * And in the `new` state: an authorized payment whose capture attempt was rejected is still
+     * authorized — the money is still held and a retry is possible. It must not report as failed.
+     *
+     * @test
+     */
+    public function shouldStayAuthorizedWhenACaptureAttemptWasRejected(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'operations' => [
+                $this->operation(OperationType::Authorize, amount: 1000),
+                $this->operation(OperationType::Capture, '40000', amount: 1000),
+            ],
+        ]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertTrue($request->isAuthorized(), 'Request should be marked as authorized');
+    }
+
+    /**
+     * @test
+     */
+    public function shouldMarkNewWithoutAnyOperationsAsFailed(): void
+    {
+        $this->queuePayment(['state' => PaymentState::New->value, 'operations' => []]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertTrue($request->isFailed(), 'Request should be marked as failed');
+    }
+
+    /**
+     * The SDK's PaymentState enum is non-exhaustive by design — Quickpay may grow states. An
+     * unmodeled state maps to unknown rather than anything more confident.
+     *
+     * @test
+     */
+    public function shouldMarkAnUnmodeledStateAsUnknown(): void
+    {
+        $this->queuePayment(['state' => 'some_future_state']);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertSame($request::STATUS_UNKNOWN, $request->getValue());
+    }
+
+    /**
      * @test
      */
     public function shouldMarkProcessedWithCancelAsCanceled(): void
