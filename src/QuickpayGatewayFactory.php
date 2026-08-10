@@ -15,6 +15,7 @@ use Setono\Payum\Quickpay\Action\ConvertPaymentAction;
 use Setono\Payum\Quickpay\Action\NotifyAction;
 use Setono\Payum\Quickpay\Action\RefundAction;
 use Setono\Payum\Quickpay\Action\StatusAction;
+use Setono\Payum\Quickpay\Action\SyncAction;
 use Setono\Quickpay\Client\Client;
 use Setono\Quickpay\Client\ClientInterface;
 
@@ -31,6 +32,7 @@ class QuickpayGatewayFactory extends GatewayFactory
             'payum.action.cancel' => new CancelAction(),
             'payum.action.notify' => new NotifyAction(),
             'payum.action.status' => new StatusAction(),
+            'payum.action.sync' => new SyncAction(),
             'payum.action.convert_payment' => new ConvertPaymentAction(),
             'payum.action.api.confirm_payment' => new ConfirmPaymentAction(),
         ]);

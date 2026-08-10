@@ -40,6 +40,10 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         $payment = $this->api->payments()->getById((int) $model['quickpayPaymentId']);
         $operations = $payment->operations;
 
+        // The payment is already in hand, so persisting the balance costs nothing — and it is the
+        // number a consumer needs for refund handling, which the Payum marks cannot express.
+        $model['balance'] = $payment->balance;
+
         switch ($payment->state()) {
             case PaymentState::Initial:
                 $request->markNew();
