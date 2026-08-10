@@ -67,12 +67,14 @@ tagged; the README and `docs/UPGRADE-2.0.md` say so.
 
 `QuickpayGatewayFactory::populateConfig()` is the composition root. It registers every action under a
 `payum.action.*` key and defines `payum.api` — a factory closure that builds the `Api` value object.
-Required options are just `api_key` and `private_key`. The 1.x spellings `apikey`/`privatekey` remain as
-deprecated aliases, mapped by `aliasDeprecatedOptions()` **before** the defaults are applied — after
-that, `api_key` exists as `''` and there is no way to tell the consumer only supplied the old name.
-Unlike the misspelled `syncronized` that 2.0 dropped outright, these two are required and therefore set
-by every consumer, and Sylius stores the gateway config keyed by them, so a hard rename would break
-every existing shop. Other options (`payment_methods`, `auto_capture`,
+Required options are just `api_key` and `private_key`. Three 1.x names — `apikey`, `privatekey` and
+`agreement` — remain as deprecated aliases, mapped by `aliasDeprecatedOptions()` **before** the defaults
+are applied; after that, `api_key` exists as `''` and there is no way to tell the consumer only supplied
+the old name. They are aliased rather than dropped (unlike the misspelled `syncronized`, which nobody had
+meaningfully set) because Sylius stores the gateway config keyed by these names, so a hard rename would
+break every existing shop. `agreement` is the one to be most careful with: it is optional, so a name that
+stops being read fails **silently** — the link is created without an agreement id and Quickpay falls back
+to the account default. Other options (`payment_methods`, `auto_capture`,
 `order_prefix`, `language`, `synchronized`, `agreement_id` → link `agreementId`, `branding_id`) are
 defaulted. The closure constructs the SDK `Client` from the api key **and the `synchronized` flag** (or
 accepts a prebuilt `Setono\Quickpay\Client\ClientInterface` via the optional `quickpay.client` option —
@@ -87,9 +89,12 @@ never reaches `Api`, and `null` is what keeps the parameter off the request enti
 
 ### Actions (`src/Action/`)
 
-Actions are the unit of behavior. Each implements `ActionInterface` plus the aware-interfaces it needs
-(`ApiAwareInterface` via `Action/Api/ApiAwareTrait`, `GatewayAwareInterface`,
-`GenericTokenFactoryAwareInterface`). `supports()` gates on the Payum request type **and** the model
+Actions are the unit of behavior. Each implements `ActionInterface` plus the aware-interfaces it needs —
+`ApiAwareInterface` (via `Action/Api/ApiAwareTrait`, which types `$api` as `Api` so PHPStan can see
+through it, unlike payum/core's `mixed` version) and `GatewayAwareInterface`. Only `AuthorizeAction`
+implements `GenericTokenFactoryAwareInterface`, because only it mints a token (the notify token for
+`callback_url`); keep it that way, since that interface is the package's one remaining contact with
+payum/core's deprecated `GenericTokenFactoryInterface` (issue #3). `supports()` gates on the Payum request type **and** the model
 being an `ArrayAccess`. The model is normalized with `ArrayObject::ensureArrayObject($request->getModel())`;
 the `quickpayPaymentId` (int) it carries is the single source of truth — actions re-fetch the payment via
 `Api::payments()->getById()` rather than passing the model through as API params.
@@ -204,8 +209,13 @@ Two things it encodes that are easy to get wrong:
 - `HeaderAwareGetHttpRequestAction` — payum/core's plain-PHP bridge does **not** populate
   `GetHttpRequest::$headers`, so outside Symfony every callback would be rejected as unsigned. It is
   registered via `addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])`.
-- `RefundAction` refunds `details['amount']`, so a partial refund means pointing that at the amount for
-  the duration of the call — the gateway has no partial-refund parameter of its own.
+- `listen.php` handles **both** callback shapes: the payment-window one carries a `payum_token`, while a
+  callback sent to the account-wide url cannot, so it resolves the payment from the body's `order_id`
+  instead. The log tags each `via=token` or `via=order_id`, which is how the two-url routing above was
+  established in the first place.
+
+`e2e:operate` takes an optional amount on `capture` and `refund`, setting the `capture_amount` /
+`refund_amount` details keys.
 
 Credentials come from a gitignored `.env.local` (see `.env.local.example`); `examples/e2e/var/` is
 gitignored too. Quickpay has no sandbox — you use the production API key and a test **card**.

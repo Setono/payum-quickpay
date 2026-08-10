@@ -110,7 +110,7 @@ uses. `quickpayPaymentId` is the single source of truth — everything else is a
 | `order_id` | `Convert` | `order_prefix` + the Payum payment number. |
 | `continue_url`, `cancel_url` | `Convert` | From the token's after-URL. |
 | `callback_url` | `Authorize` | The notify token url given to Quickpay. |
-| `balance` | `GetStatus`, `Sync`, `Notify` | **What is still captured** — captured minus refunded. |
+| `balance` | `GetStatus`, `Sync`, `Notify`, `Refund` | **What is still captured** — captured minus refunded. |
 | `state` | `Sync` | Quickpay's own payment state. |
 | `capture_amount`, `refund_amount` | *you* | Optional partial-operation amounts; see below. |
 
