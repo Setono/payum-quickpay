@@ -50,7 +50,13 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
             return;
         }
 
-        if ($this->api->isAutoCapture() && OperationType::Authorize === $latestOperation->type()) {
+        // Only an APPROVED authorize is worth capturing. The callback also fires for a rejected
+        // authorize (a declined card is routine in the payment window) and for one still pending —
+        // both have type `authorize`, so gating on the type alone would fall through to the amount
+        // check below, find an authorized amount of 0 and throw. Throwing 500s the notify endpoint
+        // and has Quickpay retry a callback that can never succeed; a not-approved authorize is
+        // simply nothing to confirm.
+        if ($this->api->isAutoCapture() && Operations::isApprovedOfType($latestOperation, OperationType::Authorize)) {
             $authorizedAmount = Operations::authorizedAmount($payment->operations);
             $expectedAmount = (int) $model['amount'];
 

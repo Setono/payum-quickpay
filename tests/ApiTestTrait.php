@@ -108,15 +108,18 @@ trait ApiTestTrait
     }
 
     /**
+     * A pending operation — the shape an asynchronous operation has until Quickpay finishes
+     * processing it — carries no status code yet, hence the nullable `$statusCode`.
+     *
      * @return array<string, mixed>
      */
-    protected function operation(OperationType $type, string $statusCode = Operations::APPROVED_STATUS_CODE, int $amount = 100): array
+    protected function operation(OperationType $type, ?string $statusCode = Operations::APPROVED_STATUS_CODE, int $amount = 100, bool $pending = false): array
     {
         return [
             'id' => 1,
             'type' => $type->value,
             'amount' => $amount,
-            'pending' => false,
+            'pending' => $pending,
             'qp_status_code' => $statusCode,
         ];
     }
