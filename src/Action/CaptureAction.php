@@ -12,17 +12,14 @@ use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Capture;
-use Payum\Core\Security\GenericTokenFactoryAwareInterface;
-use Payum\Core\Security\GenericTokenFactoryAwareTrait;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Amounts;
 use Setono\Quickpay\Request\Payment\CaptureRequest;
 
-class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
+class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
     use GatewayAwareTrait;
     use ApiAwareTrait;
-    use GenericTokenFactoryAwareTrait;
 
     /**
      * @param mixed|Capture $request
