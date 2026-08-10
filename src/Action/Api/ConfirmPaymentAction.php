@@ -36,6 +36,10 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
 
         $payment = $this->api->payments()->getById((int) $model['quickpayPaymentId']);
 
+        // Persist the balance before any early return below, so a callback for a payment with nothing
+        // to confirm still refreshes it.
+        $model['balance'] = $payment->balance;
+
         $latestOperation = Operations::latest($payment->operations);
         if (null === $latestOperation) {
             // A payment can legitimately have no operations yet — Quickpay fires a callback when the

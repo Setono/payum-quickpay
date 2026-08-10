@@ -218,6 +218,28 @@ class QuickpayGatewayFactoryTest extends TestCase
     /**
      * @test
      */
+    public function shouldRegisterAnActionForEveryRequestTheGatewaySupports(): void
+    {
+        $config = (new QuickpayGatewayFactory())->createConfig();
+
+        foreach ([
+            'payum.action.capture',
+            'payum.action.authorize',
+            'payum.action.refund',
+            'payum.action.cancel',
+            'payum.action.notify',
+            'payum.action.status',
+            'payum.action.sync',
+            'payum.action.convert_payment',
+            'payum.action.api.confirm_payment',
+        ] as $key) {
+            self::assertArrayHasKey($key, $config, sprintf('Missing %s', $key));
+        }
+    }
+
+    /**
+     * @test
+     */
     public function shouldAllowCreateGatewayConfig(): void
     {
         $factory = new QuickpayGatewayFactory();

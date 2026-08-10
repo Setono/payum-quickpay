@@ -222,6 +222,33 @@ class StatusActionTest extends ActionTestAbstract
         self::assertSame($request::STATUS_UNKNOWN, $request->getValue());
     }
 
+    /**
+     * The payment is fetched anyway to decide the status, so the balance it carries is written back
+     * into the details — it is the number the Payum marks cannot express, and re-fetching it downstream
+     * would cost another API call.
+     *
+     * @test
+     */
+    public function shouldPersistTheBalanceIntoTheDetails(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 750,
+            'operations' => [
+                $this->operation(OperationType::Capture, amount: 1000),
+                $this->operation(OperationType::Refund, amount: 250),
+            ],
+        ]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        /** @var ArrayObject<string, mixed> $details */
+        $details = $request->getModel();
+
+        self::assertSame(750, $details['balance']);
+    }
+
     private function statusRequest(): GetHumanStatus
     {
         $request = new GetHumanStatus([]);

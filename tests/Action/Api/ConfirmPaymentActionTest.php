@@ -55,6 +55,28 @@ class ConfirmPaymentActionTest extends TestCase
     }
 
     /**
+     * The callback path fetches the payment anyway, so the balance it carries is persisted — including
+     * on the nothing-to-confirm path above, which is the one that runs for every operation callback.
+     *
+     * @test
+     */
+    public function shouldPersistTheBalanceIntoTheDetails(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 750,
+            'operations' => [$this->operation(OperationType::Refund, amount: 250)],
+        ]);
+
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000]);
+
+        $this->action($this->api)->execute(new ConfirmPayment($details));
+
+        self::assertSame(750, $details['balance']);
+        self::assertCount(1, $this->getRequests(), 'A refund operation is not auto-captured');
+    }
+
+    /**
      * @test
      */
     public function shouldCaptureWhenAutoCaptureAndAmountMatches(): void

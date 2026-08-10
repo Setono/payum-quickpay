@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\LogicException;
 use Payum\Core\Request\Refund;
 use Setono\Payum\Quickpay\Action\RefundAction;
 use Setono\Quickpay\Enum\OperationType;
@@ -20,11 +21,55 @@ class RefundActionTest extends ActionTestAbstract
     protected $actionClass = RefundAction::class;
 
     /**
+     * With no explicit amount, a refund is for whatever is still refundable — the balance. Defaulting
+     * to the payment's full `amount` would be rejected outright the moment anything had already been
+     * refunded, since a payment is refundable only up to what is captured.
+     *
      * @test
      */
-    public function shouldRefundPayment(): void
+    public function shouldRefundTheRemainingBalanceByDefault(): void
     {
-        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000]);
+
+        /** @var Refund $refund */
+        $refund = new $this->requestClass($details);
+
+        $action = new RefundAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        // 250 of the 1000 was already refunded elsewhere, so only 750 is refundable.
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 750,
+            'operations' => [$this->operation(OperationType::Capture, amount: 1000)],
+        ]);
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 0,
+            'operations' => [$this->operation(OperationType::Refund, amount: 750)],
+        ]);
+
+        $action->execute($refund);
+
+        $requests = $this->getRequests();
+        self::assertCount(2, $requests, 'The default path fetches the payment, then refunds');
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+        $this->assertRequest($requests[1], 'POST', '#/payments/1001/refund$#');
+        self::assertSame(750, $this->decodeBody($requests[1])['amount']);
+
+        self::assertSame(750, $details['balance'], 'The fetched balance is persisted for the caller');
+        self::assertSame(1000, $details['amount'], 'The full amount is left alone');
+    }
+
+    /**
+     * @test
+     *
+     * @dataProvider nothingRefundableProvider
+     */
+    public function shouldThrowWhenThereIsNothingLeftToRefund(?int $balance, string $expectedMessage): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000]);
 
         /** @var Refund $refund */
         $refund = new $this->requestClass($details);
@@ -35,15 +80,28 @@ class RefundActionTest extends ActionTestAbstract
 
         $this->queuePayment([
             'state' => PaymentState::Processed->value,
-            'operations' => [$this->operation(OperationType::Refund)],
+            'balance' => $balance,
+            'operations' => [$this->operation(OperationType::Refund, amount: 1000)],
         ]);
 
-        $action->execute($refund);
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage($expectedMessage);
 
-        $requests = $this->getRequests();
-        self::assertCount(1, $requests);
-        $this->assertRequest($requests[0], 'POST', '#/payments/1001/refund$#');
-        self::assertSame(100, $this->decodeBody($requests[0])['amount']);
+        try {
+            $action->execute($refund);
+        } finally {
+            // The fetch happened; the refund must not have been attempted.
+            self::assertCount(1, $this->getRequests());
+        }
+    }
+
+    /**
+     * @return iterable<string, array{int|null, string}>
+     */
+    public static function nothingRefundableProvider(): iterable
+    {
+        yield 'fully refunded already' => [0, 'the balance is 0'];
+        yield 'balance absent from the response' => [null, 'the balance is unknown'];
     }
 
     /**
@@ -73,7 +131,8 @@ class RefundActionTest extends ActionTestAbstract
         $action->execute($refund);
 
         $requests = $this->getRequests();
-        self::assertCount(1, $requests);
+        self::assertCount(1, $requests, 'An explicit amount must skip the balance fetch entirely');
+        $this->assertRequest($requests[0], 'POST', '#/payments/1001/refund$#');
         self::assertSame(250, $this->decodeBody($requests[0])['amount'], 'The override must win over the full amount');
 
         self::assertFalse(

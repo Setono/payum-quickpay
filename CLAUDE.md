@@ -128,6 +128,12 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
 - **ConfirmPayment** (internal, `src/Request/Api/` + `Action/Api/ConfirmPaymentAction`) — when
   `auto_capture` is on and the latest operation is an approved authorize whose amount matches, it captures
   automatically.
+- **Sync** → `SyncAction` — Payum's standard "refresh the details from the gateway" request. Fetches by
+  `quickpayPaymentId` and writes the scalar snapshot (`balance`, `state`). A model without a
+  `quickpayPaymentId` has nothing to sync, so it is a no-op rather than a throw. Every action that
+  already fetches the payment (`StatusAction`, `ConfirmPaymentAction`, and `RefundAction` on its default
+  path) also persists `balance` — it costs no extra call and it is the one figure Payum's marks cannot
+  express, so downstream consumers do not have to re-fetch just to learn it.
 - **GetStatus** → `StatusAction` — maps the SDK `PaymentState` + latest operation to Payum marks
   (`markCaptured`, `markRefunded`, `markAuthorized`, `markFailed`, etc.). The refund branch is **not**
   decided by the operation alone: it consults the payment's `balance` (captured minus refunded), so a
@@ -141,6 +147,11 @@ Payum's `Capture`/`Refund` requests carry no amount, so the details array is the
 has for a **partial** operation. `Amounts::forOperation($details, 'refund_amount')` reads the per-operation
 override key when present and falls back to `amount`, rejecting anything non-numeric or non-positive.
 The keys are `capture_amount` and `refund_amount`.
+
+**`RefundAction` does not use that fallback.** With no explicit `refund_amount` it fetches the payment
+and refunds the `balance`, because falling back to the full `amount` is guaranteed to be rejected once
+anything has been refunded — a payment is refundable only up to what is captured. Nothing refundable
+throws a `LogicException` naming the payment and balance. An explicit amount skips the fetch.
 
 Quickpay accepts **repeated** captures against one authorization and repeated refunds against what is
 captured — verified live 2026-08 (authorize 1000 → capture 250 → capture 250 → refund 250 → refund 250,

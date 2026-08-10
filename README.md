@@ -95,11 +95,42 @@ $model = new \ArrayObject([
 $quickpay->execute(new Capture($model));
 ```
 
+### The payment details
+
+The gateway stores **only scalars** in the details, so they survive whatever serialization your storage
+uses. `quickpayPaymentId` is the single source of truth — everything else is a snapshot.
+
+| Key | Written by | Meaning |
+|-----|------------|---------|
+| `quickpayPaymentId` | `Convert` | The Quickpay payment id. Everything else is re-fetched with it. |
+| `amount`, `currency` | `Convert` | The payment total, in minor units. |
+| `order_id` | `Convert` | `order_prefix` + the Payum payment number. |
+| `continue_url`, `cancel_url` | `Convert` | From the token's after-URL. |
+| `callback_url` | `Authorize` | The notify token url given to Quickpay. |
+| `balance` | `GetStatus`, `Sync`, `Notify` | **What is still captured** — captured minus refunded. |
+| `state` | `Sync` | Quickpay's own payment state. |
+| `capture_amount`, `refund_amount` | *you* | Optional partial-operation amounts; see below. |
+
+`balance` is the number to read when you need to know how much money is actually held: Payum's status
+marks cannot express a partial capture or refund. It is refreshed for free by any action that already
+fetches the payment, so you rarely need to ask Quickpay yourself.
+
+To refresh it deliberately, execute Payum's `Sync`:
+
+```php
+$quickpay->execute(new Sync($model));   // updates `balance` and `state`
+```
+
 ### Partial captures and refunds
 
-By default a capture or refund is issued for the full `amount` in the details. Payum's `Capture` and
-`Refund` requests carry no amount of their own, so a partial operation is expressed by setting an
-override key on the details first:
+A capture with no explicit amount is issued for the full `amount` in the details. **A refund with no
+explicit amount is issued for the `balance`** — whatever is still refundable — because defaulting to
+the full amount would be rejected outright once anything had already been refunded, including refunds
+made directly in the Quickpay manager. If nothing is refundable, it throws a `LogicException` saying so
+rather than letting Quickpay return a generic validation error.
+
+Payum's `Capture` and `Refund` requests carry no amount of their own, so a partial operation is
+expressed by setting an override key on the details first:
 
 ```php
 $model['refund_amount'] = 250;          // minor units, like every amount here
@@ -109,7 +140,9 @@ $model['capture_amount'] = 250;
 $quickpay->execute(new Capture($model));
 ```
 
-The keys are per operation and are read only when present — leave them unset for the full amount. The
+The keys are per operation and are read only when present — leave them unset for the default described
+above. An explicit `refund_amount` also skips the balance fetch, so a partial refund costs no extra
+API call. The
 gateway **consumes the key once the API has accepted the operation**, so the next capture or refund is
 for the full amount again and a stale key cannot silently make it partial. A failed operation keeps its
 key, so a retry still refunds what you asked for.

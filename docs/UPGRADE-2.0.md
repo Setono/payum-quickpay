@@ -30,6 +30,10 @@ The details array stored on a payment (the `ArrayObject` model) now contains **o
 - `2.0` stores only `quickpayPaymentId` (int) — the source of truth — plus `amount`, `currency`,
   `order_id`, `continue_url`, `cancel_url`, `callback_url`. The payment is re-fetched from Quickpay when
   needed.
+- Any action that already fetches the payment also writes **`balance`** (what is still captured, i.e.
+  captured minus refunded) back into the details: `GetStatus`, `Notify` and the new `Sync`. It costs no
+  extra API call and it is the one figure Payum's status marks cannot express. `Sync` additionally
+  writes `state`.
 
 If your code reads `$details['quickpayPayment']`, switch to fetching the payment via the SDK using
 `$details['quickpayPaymentId']`.
@@ -92,6 +96,23 @@ try {
     // already captured or cancelled — decide whether to refund instead
 }
 ```
+
+## A refund with no amount refunds the balance
+
+> Changed after `2.0.0-alpha.1`.
+
+`RefundAction` used to default to the payment's full `amount`. That is wrong whenever anything has
+already been refunded — including a refund made directly in the Quickpay manager — because a payment is
+refundable only up to what is captured, so the call was guaranteed to be rejected.
+
+An unqualified `Refund` now fetches the payment and refunds its `balance`, which *is* the maximal
+refundable amount. Nothing left to refund throws a `LogicException` naming the payment and the balance,
+rather than surfacing Quickpay's generic validation error.
+
+An explicit `refund_amount` is unaffected and still skips the fetch entirely.
+
+If you were relying on a bare `Refund` to refund the original total, note that it now refunds only what
+remains — which is the only amount that could ever have succeeded.
 
 ## A partial refund no longer reports as fully refunded
 
