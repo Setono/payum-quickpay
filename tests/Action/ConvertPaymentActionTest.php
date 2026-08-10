@@ -217,6 +217,63 @@ class ConvertPaymentActionTest extends TestCase
     }
 
     /**
+     * A Quickpay payment's currency is fixed at creation — the authorize happens in that currency no
+     * matter what the details say. Overwriting the stored currency, as the action used to, let the
+     * shop believe one currency while Quickpay kept charging in the other.
+     *
+     * @test
+     */
+    public function shouldThrowWhenTheCurrencyChangedAfterCreation(): void
+    {
+        $payment = $this->createPayment();
+        $payment->setCurrencyCode('EUR');
+        $payment->setDetails(['quickpayPaymentId' => 555, 'currency' => 'DKK']);
+
+        $convert = new Convert($payment, 'array');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('cannot change currency');
+
+        try {
+            $action->execute($convert);
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'No request may be issued for a drifted payment');
+        }
+    }
+
+    /**
+     * Payum's model allows a null currency. That is nothing to compare against, so the stored value
+     * — the one the Quickpay payment was actually created with — must survive instead of being
+     * overwritten with null.
+     *
+     * @test
+     */
+    public function shouldKeepTheStoredCurrencyWhenTheModelCarriesNone(): void
+    {
+        $payment = new Payment();
+        $payment->setNumber('000000000001');
+        $payment->setTotalAmount(100);
+        $payment->setDetails(['quickpayPaymentId' => 555, 'currency' => 'DKK']);
+
+        $convert = new Convert($payment, 'array');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+        $action->execute($convert);
+
+        /** @var array<string, mixed> $result */
+        $result = $convert->getResult();
+
+        self::assertSame('DKK', $result['currency']);
+        self::assertCount(0, $this->getRequests());
+    }
+
+    /**
      * @test
      */
     public function shouldNotCreateAgainWhenPaymentAlreadyExists(): void
