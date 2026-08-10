@@ -24,7 +24,11 @@ binaries live in `vendor/bin`, and the user's shell aliases (`ca`, `cf`, etc.) m
 - `composer fix-style` — ECS auto-fix
 - `composer rector` — Rector dry/apply (config in `rector.php`; not run in CI)
 - `composer infection` — Infection mutation testing (`infection.json.dist`: source `src`, gates
-  `minMsi 65` / `minCoveredMsi 70`; needs a coverage driver — CI runs it on PHP 8.3 with pcov)
+  `minMsi 65` / `minCoveredMsi 70`; needs a coverage driver — CI runs it on PHP 8.3 with pcov). The
+  Stryker dashboard upload behind the README badge is **branch-gated** in `infection.json.dist`
+  (`logs.stryker.badge`, currently `2.x`) and needs the `STRYKER_DASHBOARD_API_KEY` repository secret,
+  which the CI job passes through — pull request runs compute the score but publish nothing. Update the
+  gated branch when the working branch changes, or the badge silently stops refreshing.
 - `composer checks` — style check + static analysis
 - `composer all` — `checks` + `test` (the full local gate)
 - `composer normalize` — normalize `composer.json` (CI enforces `--dry-run`)

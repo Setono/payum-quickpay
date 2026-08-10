@@ -225,4 +225,9 @@ jobs:
                     dependency-versions: "${{ matrix.dependencies }}"
 
             -   name: "Run infection/infection"
+                env:
+                    # Uploads the mutation score to the Stryker dashboard for the README badge.
+                    # infection.json.dist gates the upload to the 2.x branch, so pull request runs
+                    # compute the score but publish nothing.
+                    STRYKER_DASHBOARD_API_KEY: "${{ secrets.STRYKER_DASHBOARD_API_KEY }}"
                 run: "composer infection"
