@@ -21,15 +21,19 @@ class CaptureActionTest extends ActionTestAbstract
     protected $actionClass = CaptureAction::class;
 
     /**
+     * A capture needs no token: only `AuthorizeAction` mints one, for the callback url. Implementing
+     * the aware interface here would drag in `GenericTokenFactoryInterface`, which payum/core has
+     * deprecated, for nothing — see #3.
+     *
      * @test
      *
      * @throws ReflectionException
      */
-    public function shouldImplementGenericTokenFactoryAwareInterface(): void
+    public function shouldNotDependOnTheTokenFactory(): void
     {
         $rc = new ReflectionClass($this->actionClass);
 
-        self::assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
+        self::assertFalse($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
 
     /**
