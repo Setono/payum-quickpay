@@ -199,6 +199,123 @@ class QuickpayGatewayFactoryTest extends TestCase
     }
 
     /**
+     * A stored or YAML-sourced gateway config easily stringifies booleans, and the old casts read
+     * the string "true" as FALSE ((int) "true" is 0) and "false" as TRUE — an inverted setting with
+     * nothing in the configuration that looks wrong. Pin every unambiguous spelling.
+     *
+     * @test
+     *
+     * @dataProvider booleanOptionProvider
+     */
+    public function shouldNormalizeTheBooleanOptions(mixed $value, bool $expected): void
+    {
+        $api = self::createApi(new QuickpayGatewayFactory(), [
+            'auto_capture' => $value,
+            'synchronized' => $value,
+        ]);
+
+        self::assertSame($expected, $api->isAutoCapture());
+        self::assertSame($expected, $api->isSynchronized());
+    }
+
+    /**
+     * @return iterable<string, array{mixed, bool}>
+     */
+    public static function booleanOptionProvider(): iterable
+    {
+        yield 'true' => [true, true];
+        yield 'false' => [false, false];
+        yield 'int 1' => [1, true];
+        yield 'int 0' => [0, false];
+        yield 'string 1' => ['1', true];
+        yield 'string 0' => ['0', false];
+        yield 'string true' => ['true', true];
+        yield 'string false' => ['false', false];
+        yield 'empty string (the Payum config artifact)' => ['', false];
+        yield 'null' => [null, false];
+    }
+
+    /**
+     * @test
+     *
+     * @dataProvider ambiguousBooleanProvider
+     */
+    public function shouldThrowWhenABooleanOptionIsAmbiguous(mixed $value): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('must be a boolean');
+
+        self::createApi(new QuickpayGatewayFactory(), ['auto_capture' => $value]);
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function ambiguousBooleanProvider(): iterable
+    {
+        yield 'arbitrary string' => ['yolo'];
+        yield 'int other than 0/1' => [2];
+        yield 'array' => [[true]];
+        yield 'object' => [new stdClass()];
+    }
+
+    /**
+     * @test
+     *
+     * @dataProvider idOptionProvider
+     */
+    public function shouldNormalizeTheIdOptions(mixed $value, ?int $expected): void
+    {
+        $api = self::createApi(new QuickpayGatewayFactory(), [
+            'agreement_id' => $value,
+            'branding_id' => $value,
+        ]);
+
+        self::assertSame($expected, $api->getAgreementId());
+        self::assertSame($expected, $api->getBrandingId());
+    }
+
+    /**
+     * @return iterable<string, array{mixed, int|null}>
+     */
+    public static function idOptionProvider(): iterable
+    {
+        yield 'int' => [266017, 266017];
+        yield 'integer string' => ['266017', 266017];
+        yield 'integer string with whitespace' => [' 266017 ', 266017];
+        yield 'empty string (the Payum config artifact)' => ['', null];
+        yield 'blank string' => ['   ', null];
+        yield 'null' => [null, null];
+    }
+
+    /**
+     * The old `(int)` cast turned a typo like "abc" into agreement id 0 and sent that to Quickpay.
+     *
+     * @test
+     *
+     * @dataProvider invalidIdProvider
+     */
+    public function shouldThrowWhenAnIdOptionIsInvalid(mixed $value): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('must be a positive integer');
+
+        self::createApi(new QuickpayGatewayFactory(), ['agreement_id' => $value]);
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function invalidIdProvider(): iterable
+    {
+        yield 'not a number' => ['abc'];
+        yield 'zero' => [0];
+        yield 'negative' => [-1];
+        yield 'float' => [10.5];
+        yield 'array' => [[266017]];
+    }
+
+    /**
      * @test
      */
     public function shouldThrowWhenInjectedClientIsInvalid(): void

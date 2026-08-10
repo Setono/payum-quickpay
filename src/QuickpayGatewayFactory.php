@@ -74,7 +74,7 @@ class QuickpayGatewayFactory extends GatewayFactory
             $config['payum.api'] = static function (ArrayObject $config): Api {
                 $config->validateNotEmpty($config['payum.required_options']);
 
-                $synchronized = (bool) $config['synchronized'];
+                $synchronized = self::normalizeBool('synchronized', $config['synchronized']);
 
                 // Consumers (and the test suite) may inject a preconfigured SDK client — e.g. one
                 // built around a specific PSR-18 client — via the "quickpay.client" option.
@@ -104,9 +104,9 @@ class QuickpayGatewayFactory extends GatewayFactory
                     orderPrefix: (string) $config['order_prefix'],
                     paymentMethods: self::normalizePaymentMethods($config['payment_methods']),
                     language: (string) $config['language'],
-                    autoCapture: (bool) (int) $config['auto_capture'],
-                    agreementId: '' !== (string) $config['agreement_id'] ? (int) $config['agreement_id'] : null,
-                    brandingId: '' !== (string) $config['branding_id'] ? (int) $config['branding_id'] : null,
+                    autoCapture: self::normalizeBool('auto_capture', $config['auto_capture']),
+                    agreementId: self::normalizeId('agreement_id', $config['agreement_id']),
+                    brandingId: self::normalizeId('branding_id', $config['branding_id']),
                 );
             };
         }
@@ -141,6 +141,80 @@ class QuickpayGatewayFactory extends GatewayFactory
                 $config[$current] = $config[$deprecated];
             }
         }
+    }
+
+    /**
+     * The boolean options (`auto_capture`, `synchronized`) accept booleans plus the unambiguous
+     * scalar spellings a stored or YAML-sourced config produces: `1`/`0` (int or string),
+     * `"true"`/`"false"`, and the empty string (a Payum config artifact, read as false). Anything
+     * else throws rather than being coerced: the old casts turned the string `"true"` into FALSE
+     * (`(int) "true"` is 0) and `"false"` into TRUE — an inverted setting with nothing in the
+     * configuration that looks wrong.
+     *
+     * @throws LogicException if the value cannot be unambiguously read as a boolean
+     */
+    private static function normalizeBool(string $option, mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        // Absent-but-set: a stored config may carry null where the form field was empty. Like the
+        // empty string, it reads as "not configured", i.e. the option's default of false.
+        if (null === $value) {
+            return false;
+        }
+
+        if (is_scalar($value)) {
+            $normalized = filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+
+            if (null !== $normalized) {
+                return $normalized;
+            }
+        }
+
+        throw new LogicException(sprintf(
+            'The "%s" option must be a boolean (or an unambiguous scalar such as 1/0/"true"/"false"), got %s',
+            $option,
+            is_scalar($value) ? var_export($value, true) : get_debug_type($value),
+        ));
+    }
+
+    /**
+     * The id options (`agreement_id`, `branding_id`) are optional positive integers. Empty
+     * configuration — null, `''`, or a blank string — is `null`, which keeps the parameter off the
+     * payment link entirely. Anything that is not a positive integer (or an integer string) throws:
+     * the old `(int)` cast turned a typo like `"abc"` into agreement id 0 and sent that.
+     *
+     * @throws LogicException if the value is neither empty nor a positive integer
+     */
+    private static function normalizeId(string $option, mixed $value): ?int
+    {
+        if (null === $value) {
+            return null;
+        }
+
+        if (is_string($value)) {
+            $value = trim($value);
+
+            if ('' === $value) {
+                return null;
+            }
+
+            if (ctype_digit($value)) {
+                $value = (int) $value;
+            }
+        }
+
+        if (!is_int($value) || $value <= 0) {
+            throw new LogicException(sprintf(
+                'The "%s" option must be a positive integer (or an integer string), got %s',
+                $option,
+                is_scalar($value) ? var_export($value, true) : get_debug_type($value),
+            ));
+        }
+
+        return $value;
     }
 
     /**
