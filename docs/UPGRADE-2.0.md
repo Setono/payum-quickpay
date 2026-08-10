@@ -9,8 +9,9 @@ handling, and modernizes the test suite. This is a major release with breaking c
 - The SDK is built on PSR-18 / PSR-17 and discovers them via `php-http/discovery`. Make sure your
   project provides a PSR-18 client and PSR-17 factories (e.g. `composer require kriswallsmith/buzz
   nyholm/psr7`, or any other implementation).
-- Until `setono/quickpay-php-sdk` has a stable release, your project needs
-  `"minimum-stability": "beta"` and `"prefer-stable": true`.
+- `setono/quickpay-php-sdk` is stable as of `1.0.0`, so **no `minimum-stability` change is needed**. If
+  you tracked the 2.0 alphas and added `"minimum-stability": "beta"` for the SDK's pre-releases, you can
+  drop it again (assuming nothing else in your project needs it).
 
 ## Gateway options
 
