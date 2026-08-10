@@ -54,18 +54,14 @@ All HTTP and (de)serialization is delegated to [`setono/quickpay-php-sdk`](https
 (namespace `Setono\Quickpay\`) — a PSR-18/PSR-17 client (auto-discovered via `php-http/discovery`) with
 typed `payments()` endpoints, request/response DTOs, non-exhaustive `PaymentState`/`OperationType` enums,
 a `QuickpayException` hierarchy, and a timing-safe `CallbackValidator`. Basic auth, the mandatory
-`Accept-Version: v10` header and host pinning to `api.quickpay.net` all live in the SDK. The SDK is
-currently constrained to `^1.0@beta`, resolving to `1.0.0-beta.2` (and to `beta.1` under
-`--prefer-lowest`, which both CI and this package are compatible with — beta.2 only removed
-`CollectionRequestOptions::new()` and the `webmozart/assert` dependency, neither of which this package
-uses). The beta declares the API surface
-stable for 1.0 with no further BC breaks planned, so the constraint no longer has to chase individual
-releases the way it did through the alphas — `@beta` also excludes the alphas outright, which matters
-because the gateway cannot run on alpha.1 (no client-wide `synchronized`) and would break on alpha.1–2
-(request fields only became required constructor params in alpha.3).
+`Accept-Version: v10` header and host pinning to `api.quickpay.net` all live in the SDK. The SDK went
+stable on 2026-08-10, so the constraint is a plain `^1.0` and **consumers need no `minimum-stability`
+setting at all** — that requirement, and the docs describing it, are gone.
 
-Consumers therefore need `"minimum-stability": "beta"` with `"prefer-stable": true` until 1.0.0 is
-tagged; the README and `docs/UPGRADE-2.0.md` say so.
+The pre-release history is worth remembering only because it explains why the constraint used to be so
+specific: the gateway cannot run on alpha.1 (no client-wide `synchronized`) and breaks on alpha.1–2
+(request fields only became required constructor params in alpha.3), so the constraint had to keep
+excluding them. `^1.0` excludes every pre-release outright, so that is no longer a concern.
 
 ### Wiring
 
