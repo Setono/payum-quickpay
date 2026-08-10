@@ -212,7 +212,7 @@ function e2e_payum(string $baseUrl): Payum
             'payment_methods' => e2e_env('QUICKPAY_PAYMENT_METHODS', false),
             'auto_capture' => e2e_bool('QUICKPAY_AUTO_CAPTURE') ? 1 : 0,
             'synchronized' => e2e_bool('QUICKPAY_SYNCHRONIZED'),
-            'agreement' => e2e_env('QUICKPAY_AGREEMENT', false),
+            'agreement_id' => e2e_env('QUICKPAY_AGREEMENT', false),
             'branding_id' => e2e_env('QUICKPAY_BRANDING_ID', false),
         ])
         ->getPayum();

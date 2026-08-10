@@ -229,12 +229,35 @@ class QuickpayGatewayFactoryTest extends TestCase
         $config = $factory->createConfig([
             'apikey' => 'old-api-key',
             'privatekey' => 'old-private-key',
+            'agreement' => '266017',
         ]);
 
         $api = $config['payum.api'](ArrayObject::ensureArrayObject($config));
 
         self::assertInstanceOf(Api::class, $api);
         self::assertSame('old-private-key', $api->getPrivateKey());
+        self::assertSame(266017, $api->getAgreementId());
+    }
+
+    /**
+     * `agreement` is optional, so a name that silently stopped being read would not throw — the payment
+     * link would just be created without an agreement id, falling back to the account default. Pin both
+     * directions.
+     *
+     * @test
+     */
+    public function shouldReadTheAgreementIdUnderEitherName(): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        self::assertSame(266017, self::createApi($factory, ['agreement_id' => '266017'])->getAgreementId());
+        self::assertSame(266017, self::createApi($factory, ['agreement' => '266017'])->getAgreementId());
+        self::assertNull(self::createApi($factory, [])->getAgreementId(), 'Unset stays unset');
+        self::assertSame(
+            266017,
+            self::createApi($factory, ['agreement' => '1', 'agreement_id' => '266017'])->getAgreementId(),
+            'The current name wins',
+        );
     }
 
     /**
