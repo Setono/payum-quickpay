@@ -114,6 +114,12 @@ uses. `quickpayPaymentId` is the single source of truth — everything else is a
 | `state` | `Sync` | Quickpay's own payment state. |
 | `capture_amount`, `refund_amount` | *you* | Optional partial-operation amounts; see below. |
 
+`quickpayPaymentId` is camelCase while everything else is snake_case. That is deliberate and it stays
+that way: the key is persisted with every payment your shop has ever taken, and its **absence** is
+meaningful — the actions read it as "this payment does not exist at Quickpay yet". Renaming it would
+make historical payments report as `new` and could have a capture create a second payment at Quickpay,
+silently, for every row a migration missed. Not worth it for a naming preference.
+
 `balance` is the number to read when you need to know how much money is actually held: Payum's status
 marks cannot express a partial capture or refund. It is refreshed for free by any action that already
 fetches the payment, so you rarely need to ask Quickpay yourself.
