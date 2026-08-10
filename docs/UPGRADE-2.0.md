@@ -16,12 +16,26 @@ handling, and modernizes the test suite. This is a major release with breaking c
 
 - **`merchant` was removed.** Quickpay API v10 authenticates with the API key alone; the option was
   never used. Remove it from your gateway configuration (passing it is harmless — it is ignored).
-- **The credentials are now `api_key` and `private_key`** (snake_case, like every other multi-word
-  option). The 1.x spellings `apikey` and `private_key` still work as **deprecated aliases**, so an
-  existing gateway configuration — including one stored in a database, as Sylius does — keeps working
-  untouched. Prefer the new names; the aliases go in 3.0.
-- **Only the two credentials are required.** `language` is defaulted to `en`.
-- **`agreement` is now optional** and maps to the payment-window `agreement_id`.
+- **Options renamed to say what they are:**
+
+  | 1.x | 2.0 |
+  |-----|-----|
+  | `apikey` | `api_key` |
+  | `privatekey` | `private_key` |
+  | `agreement` | `agreement_id` |
+
+  The credentials are snake_case like every other multi-word option, and `agreement_id` matches its
+  sibling `branding_id` — both are optional integer payment-link ids.
+
+  All three 1.x names still work as **deprecated aliases**, so an existing gateway configuration —
+  including one stored in a database, as Sylius does — keeps working untouched. Prefer the new names;
+  the aliases go in 3.0.
+
+  Worth updating `agreement` sooner rather than later: unlike the credentials it is optional, so if the
+  aliases are ever removed while your config still uses the old name, it fails **silently** — the
+  payment link is created without an agreement id and Quickpay falls back to the account default.
+- **Only the two credentials are required.** `language` is defaulted to `en`, and `agreement_id` is
+  optional.
 - **New options:** `synchronized` (run capture/refund/cancel synchronously instead of relying on the
   callback; default `false`, preserving 1.x behavior) and `branding_id` (payment-window branding).
 - The misspelled, unused `syncronized` option was removed; use `synchronized`.

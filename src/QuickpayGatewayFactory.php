@@ -49,7 +49,7 @@ class QuickpayGatewayFactory extends GatewayFactory
                 'language' => 'en',
                 'synchronized' => false,
                 // optional: maps to CreateLinkRequest::agreementId
-                'agreement' => '',
+                'agreement_id' => '',
                 // optional: maps to the Quickpay branding id on the payment link
                 'branding_id' => '',
             ];
@@ -93,7 +93,7 @@ class QuickpayGatewayFactory extends GatewayFactory
                     paymentMethods: self::normalizePaymentMethods($config['payment_methods']),
                     language: (string) $config['language'],
                     autoCapture: (bool) (int) $config['auto_capture'],
-                    agreementId: '' !== (string) $config['agreement'] ? (int) $config['agreement'] : null,
+                    agreementId: '' !== (string) $config['agreement_id'] ? (int) $config['agreement_id'] : null,
                     brandingId: '' !== (string) $config['branding_id'] ? (int) $config['branding_id'] : null,
                 );
             };
@@ -101,14 +101,17 @@ class QuickpayGatewayFactory extends GatewayFactory
     }
 
     /**
-     * Every other multi-word option is snake_case (`payment_methods`, `auto_capture`, `order_prefix`,
-     * `branding_id`), so the credentials are `api_key` and `private_key`. The 1.x spellings `apikey` and
-     * `privatekey` still work.
+     * The option names say what they are: the credentials are `api_key` and `private_key` (snake_case,
+     * like `payment_methods`, `auto_capture`, `order_prefix`), and `agreement_id` matches its sibling
+     * `branding_id` — both are optional integer payment-link ids. The 1.x spellings `apikey`,
+     * `privatekey` and `agreement` still work.
      *
-     * They are aliased rather than dropped because, unlike the misspelled `syncronized` that 2.0 removed
-     * outright, these two are required and therefore set by **every** consumer — and Sylius stores the
-     * gateway configuration as JSON keyed by exactly these names, so a hard rename would break every
-     * existing shop until its stored config was migrated. The aliases are deprecated and will go in 3.0.
+     * They are aliased rather than dropped because Sylius stores the gateway configuration as JSON keyed
+     * by exactly these names, so a hard rename would break every existing shop until its stored config
+     * was migrated. Unlike the misspelled `syncronized` that 2.0 removed outright — an option nobody had
+     * meaningfully set — these are load-bearing, and `agreement` fails *silently* if missed: it is
+     * optional, so a stale key resolves to `null` and the payment link is simply created without an
+     * agreement id, quietly falling back to the account default. The aliases are deprecated and go in 3.0.
      *
      * Must run before the defaults are applied: once `api_key` exists (as `''`), there is no longer any
      * way to tell that the consumer only supplied the old spelling.
@@ -117,7 +120,11 @@ class QuickpayGatewayFactory extends GatewayFactory
      */
     private static function aliasDeprecatedOptions(ArrayObject $config): void
     {
-        foreach (['apikey' => 'api_key', 'privatekey' => 'private_key'] as $deprecated => $current) {
+        foreach ([
+            'apikey' => 'api_key',
+            'privatekey' => 'private_key',
+            'agreement' => 'agreement_id',
+        ] as $deprecated => $current) {
             if ($config->offsetExists($deprecated) && !$config->offsetExists($current)) {
                 $config[$current] = $config[$deprecated];
             }
@@ -134,7 +141,7 @@ class QuickpayGatewayFactory extends GatewayFactory
      *
      * Empty configuration — the default `''`, an empty list, or a list of blanks — becomes `null`, the
      * value that leaves the restriction off the request altogether. The empty string is a Payum config
-     * artifact and stops here, exactly as `agreement` and `branding_id` do.
+     * artifact and stops here, exactly as `agreement_id` and `branding_id` do.
      *
      * @throws LogicException if the option is neither a string nor a list of strings
      */

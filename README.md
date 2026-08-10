@@ -42,11 +42,11 @@ Integration — used to verify callback signatures). Other options are optional:
 | `order_prefix`    | `''`    | Prepended to the Payum payment number to form the Quickpay order id. |
 | `language`        | `en`    | Payment-window language.                                             |
 | `synchronized`    | `false` | Run capture/refund/cancel synchronously instead of via callbacks.    |
-| `agreement`       | `''`    | Optional payment-window agreement id.                                |
+| `agreement_id`    | `''`    | Optional payment-window agreement id.                                |
 | `branding_id`     | `''`    | Optional payment-window branding id.                                 |
 
-The 1.x spellings `apikey` and `privatekey` are still accepted as deprecated aliases, so an existing
-gateway configuration keeps working. They will be removed in 3.0.
+The 1.x names `apikey`, `privatekey` and `agreement` are still accepted as deprecated aliases, so an
+existing gateway configuration keeps working. They will be removed in 3.0.
 
 ```php
 <?php

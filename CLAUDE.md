@@ -73,7 +73,7 @@ that, `api_key` exists as `''` and there is no way to tell the consumer only sup
 Unlike the misspelled `syncronized` that 2.0 dropped outright, these two are required and therefore set
 by every consumer, and Sylius stores the gateway config keyed by them, so a hard rename would break
 every existing shop. Other options (`payment_methods`, `auto_capture`,
-`order_prefix`, `language`, `synchronized`, `agreement` → link `agreementId`, `branding_id`) are
+`order_prefix`, `language`, `synchronized`, `agreement_id` → link `agreementId`, `branding_id`) are
 defaulted. The closure constructs the SDK `Client` from the api key **and the `synchronized` flag** (or
 accepts a prebuilt `Setono\Quickpay\Client\ClientInterface` via the optional `quickpay.client` option —
 used by tests). Because `synchronized` is a constructor-only default on the SDK client, an injected
@@ -82,7 +82,7 @@ rather than silently overriding it. `payment_methods` accepts a string **or** a 
 normalized to Quickpay's comma-separated form by `normalizePaymentMethods()` — a `(string)` cast of a
 list would have sent the literal `Array`, which reads as an allowlist of one unknown method and rejects
 every payment; anything that is neither shape throws rather than being coerced. Empty configuration
-normalizes to `null` — as `agreement` and `branding_id` already did — so the empty-string Payum default
+normalizes to `null` — as `agreement_id` and `branding_id` already did — so the empty-string Payum default
 never reaches `Api`, and `null` is what keeps the parameter off the request entirely.
 
 ### Actions (`src/Action/`)
