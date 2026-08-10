@@ -339,9 +339,22 @@ class QuickpayGatewayFactoryTest extends TestCase
         $config = $factory->createConfig();
         self::assertIsArray($config);
         self::assertArrayHasKey('payum.factory_name', $config);
-        self::assertEquals('quickpay', $config['payum.factory_name']);
+        self::assertSame(QuickpayGatewayFactory::NAME, $config['payum.factory_name']);
         self::assertArrayHasKey('payum.factory_title', $config);
         self::assertEquals('Quickpay', $config['payum.factory_title']);
+    }
+
+    /**
+     * The literal is asserted here rather than only through the constant, because the value — not the
+     * symbol — is the contract: consumers store it as `factoryName` on their gateway configurations, so
+     * changing it would orphan every one of them. This test is what makes that a deliberate decision
+     * instead of a rename nobody noticed.
+     *
+     * @test
+     */
+    public function shouldExposeTheFactoryNameAsAConstant(): void
+    {
+        self::assertSame('quickpay', QuickpayGatewayFactory::NAME);
     }
 
     /**

@@ -49,6 +49,15 @@ Integration — used to verify callback signatures). Other options are optional:
 The 1.x names `apikey`, `privatekey` and `agreement` are still accepted as deprecated aliases, so an
 existing gateway configuration keeps working. They will be removed in 3.0.
 
+The factory name is exposed as a constant, so consumers looking gateways up by `factoryName`, tagging
+services, or guarding "is this a Quickpay payment?" need not repeat the literal:
+
+```php
+use Setono\Payum\Quickpay\QuickpayGatewayFactory;
+
+QuickpayGatewayFactory::NAME;   // 'quickpay'
+```
+
 ```php
 <?php
 

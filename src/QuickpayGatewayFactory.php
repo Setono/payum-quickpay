@@ -21,10 +21,22 @@ use Setono\Quickpay\Client\ClientInterface;
 
 class QuickpayGatewayFactory extends GatewayFactory
 {
+    /**
+     * The Payum factory name this gateway registers under.
+     *
+     * This package sets `payum.factory_name`, so it is the authority on the value — consumers that need
+     * it (to look gateways up by `factoryName`, to tag services, or to guard "is this a Quickpay
+     * payment?") should reference this constant instead of repeating the literal.
+     *
+     * The value is part of the public contract: changing it would orphan every stored gateway
+     * configuration that records the factory name.
+     */
+    public const NAME = 'quickpay';
+
     protected function populateConfig(ArrayObject $config): void
     {
         $config->defaults([
-            'payum.factory_name' => 'quickpay',
+            'payum.factory_name' => self::NAME,
             'payum.factory_title' => 'Quickpay',
             'payum.action.capture' => new CaptureAction(),
             'payum.action.authorize' => new AuthorizeAction(),
