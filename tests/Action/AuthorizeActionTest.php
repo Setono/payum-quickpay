@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\LogicException;
 use Payum\Core\Model\Token;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Authorize;
@@ -30,6 +31,39 @@ class AuthorizeActionTest extends ActionTestAbstract
         $rc = new ReflectionClass($this->actionClass);
 
         self::assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
+    }
+
+    /**
+     * A model without a quickpayPaymentId has no payment to create a link for. The guard throws
+     * before a notify token is minted and before any HTTP happens — without it, `(int) null = 0`
+     * would reach the API as `PUT /payments/0/link`.
+     *
+     * @test
+     */
+    public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
+    {
+        $details = new ArrayObject([
+            'amount' => 100,
+            'continue_url' => 'theContinueUrl',
+            'cancel_url' => 'theContinueUrl',
+            'callback_url' => 'theCallbackUrl',
+        ]);
+
+        /** @var Authorize $authorize */
+        $authorize = new $this->requestClass($details);
+
+        $action = new AuthorizeAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('quickpayPaymentId');
+
+        try {
+            $action->execute($authorize);
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'No API call may be made for a payment that does not exist yet');
+        }
     }
 
     /**

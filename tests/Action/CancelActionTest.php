@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Exception\LogicException;
 use Payum\Core\Request\Cancel;
 use Setono\Payum\Quickpay\Action\CancelAction;
 use Setono\Quickpay\Enum\OperationType;
@@ -43,6 +44,31 @@ class CancelActionTest extends ActionTestAbstract
         $this->assertRequest($requests[0], 'POST', '#/payments/1001/cancel$#');
         // Cancel takes no body.
         self::assertSame('', (string) $requests[0]->getBody());
+    }
+
+    /**
+     * A model without a quickpayPaymentId has no payment to cancel. The guard throws before any
+     * HTTP happens — without it, `(int) null = 0` would reach the API as `POST /payments/0/cancel`.
+     *
+     * @test
+     */
+    public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
+    {
+        /** @var Cancel $cancel */
+        $cancel = new $this->requestClass(new ArrayObject(['amount' => 100]));
+
+        $action = new CancelAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('quickpayPaymentId');
+
+        try {
+            $action->execute($cancel);
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'No API call may be made for a payment that does not exist yet');
+        }
     }
 
     /**

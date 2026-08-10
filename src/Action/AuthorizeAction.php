@@ -17,6 +17,7 @@ use Payum\Core\Request\Authorize;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Details;
 use Setono\Quickpay\Request\Payment\CreateLinkRequest;
 
 class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
@@ -34,6 +35,10 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
+        // Resolve the payment id first: minting a notify token or validating the urls is pointless
+        // for a payment that does not exist at Quickpay yet.
+        $paymentId = Details::paymentId($model);
+
         if (null !== $token = $request->getToken()) {
             // Build the server-to-server callback (notify) url.
             $model['callback_url'] = $this->tokenFactory
@@ -43,7 +48,7 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
 
         $model->validateNotEmpty(['continue_url', 'cancel_url', 'callback_url', 'amount']);
 
-        $link = $this->api->payments()->createLink((int) $model['quickpayPaymentId'], new CreateLinkRequest(
+        $link = $this->api->payments()->createLink($paymentId, new CreateLinkRequest(
             amount: (int) $model['amount'],
             agreementId: $this->api->getAgreementId(),
             language: $this->api->getLanguage(),

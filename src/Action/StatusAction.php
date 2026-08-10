@@ -13,6 +13,7 @@ use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\GetStatusInterface;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Details;
 use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
@@ -37,7 +38,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
             return;
         }
 
-        $payment = $this->api->payments()->getById((int) $model['quickpayPaymentId']);
+        $payment = $this->api->payments()->getById(Details::paymentId($model));
         $operations = $payment->operations;
 
         // The payment is already in hand, so persisting the balance costs nothing — and it is the
