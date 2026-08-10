@@ -51,7 +51,10 @@ All HTTP and (de)serialization is delegated to [`setono/quickpay-php-sdk`](https
 typed `payments()` endpoints, request/response DTOs, non-exhaustive `PaymentState`/`OperationType` enums,
 a `QuickpayException` hierarchy, and a timing-safe `CallbackValidator`. Basic auth, the mandatory
 `Accept-Version: v10` header and host pinning to `api.quickpay.net` all live in the SDK. The SDK is
-currently constrained to `^1.0@beta`, resolving to `1.0.0-beta.1`. The beta declares the API surface
+currently constrained to `^1.0@beta`, resolving to `1.0.0-beta.2` (and to `beta.1` under
+`--prefer-lowest`, which both CI and this package are compatible with — beta.2 only removed
+`CollectionRequestOptions::new()` and the `webmozart/assert` dependency, neither of which this package
+uses). The beta declares the API surface
 stable for 1.0 with no further BC breaks planned, so the constraint no longer has to chase individual
 releases the way it did through the alphas — `@beta` also excludes the alphas outright, which matters
 because the gateway cannot run on alpha.1 (no client-wide `synchronized`) and would break on alpha.1–2
