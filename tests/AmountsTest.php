@@ -73,10 +73,17 @@ class AmountsTest extends TestCase
      */
     public static function unusableAmountProvider(): iterable
     {
-        yield 'null' => [null, 'must carry a numeric'];
-        yield 'not a number' => ['abc', 'must carry a numeric'];
+        yield 'null' => [null, 'must carry an integer'];
+        yield 'not a number' => ['abc', 'must carry an integer'];
         yield 'zero' => [0, 'must be a positive number'];
         yield 'negative' => [-250, 'must be a positive number'];
+
+        // Amounts are minor units, so a fractional value is always a caller bug — 249.99 can only
+        // mean kroner were passed where øre were expected. It used to be silently truncated to 249.
+        yield 'float' => [249.99, 'must carry an integer'];
+        yield 'whole float' => [250.0, 'must carry an integer'];
+        yield 'decimal string' => ['249.99', 'must carry an integer'];
+        yield 'bool' => [true, 'must carry an integer'];
     }
 
     /**
