@@ -64,7 +64,12 @@ tagged; the README and `docs/UPGRADE-2.0.md` say so.
 
 `QuickpayGatewayFactory::populateConfig()` is the composition root. It registers every action under a
 `payum.action.*` key and defines `payum.api` — a factory closure that builds the `Api` value object.
-Required options are just `apikey` and `privatekey`; other options (`payment_methods`, `auto_capture`,
+Required options are just `api_key` and `private_key`. The 1.x spellings `apikey`/`privatekey` remain as
+deprecated aliases, mapped by `aliasDeprecatedOptions()` **before** the defaults are applied — after
+that, `api_key` exists as `''` and there is no way to tell the consumer only supplied the old name.
+Unlike the misspelled `syncronized` that 2.0 dropped outright, these two are required and therefore set
+by every consumer, and Sylius stores the gateway config keyed by them, so a hard rename would break
+every existing shop. Other options (`payment_methods`, `auto_capture`,
 `order_prefix`, `language`, `synchronized`, `agreement` → link `agreementId`, `branding_id`) are
 defaulted. The closure constructs the SDK `Client` from the api key **and the `synchronized` flag** (or
 accepts a prebuilt `Setono\Quickpay\Client\ClientInterface` via the optional `quickpay.client` option —

@@ -16,7 +16,11 @@ handling, and modernizes the test suite. This is a major release with breaking c
 
 - **`merchant` was removed.** Quickpay API v10 authenticates with the API key alone; the option was
   never used. Remove it from your gateway configuration (passing it is harmless — it is ignored).
-- **Only `apikey` and `privatekey` are now required.** `language` is defaulted to `en`.
+- **The credentials are now `api_key` and `private_key`** (snake_case, like every other multi-word
+  option). The 1.x spellings `apikey` and `private_key` still work as **deprecated aliases**, so an
+  existing gateway configuration — including one stored in a database, as Sylius does — keeps working
+  untouched. Prefer the new names; the aliases go in 3.0.
+- **Only the two credentials are required.** `language` is defaulted to `en`.
 - **`agreement` is now optional** and maps to the payment-window `agreement_id`.
 - **New options:** `synchronized` (run capture/refund/cancel synchronously instead of relying on the
   callback; default `false`, preserving 1.x behavior) and `branding_id` (payment-window branding).
@@ -41,10 +45,10 @@ If your code reads `$details['quickpayPayment']`, switch to fetching the payment
 ## Callbacks are now verified
 
 `NotifyAction` now verifies the `QuickPay-Checksum-Sha256` HMAC signature of every incoming callback
-against your `privatekey` before acting on it; an invalid or unsigned callback is rejected with a `400`
+against your `private_key` before acting on it; an invalid or unsigned callback is rejected with a `400`
 response. Ensure:
 
-- your gateway is configured with the correct `privatekey`, and
+- your gateway is configured with the correct `private_key`, and
 - your Payum HTTP-request bridge exposes request headers. The Symfony bridge
   (`Payum\Core\Bridge\Symfony\Action\GetHttpRequestAction`, used by Sylius/Symfony) does; the plain-PHP
   bridge does not, so a pure plain-PHP setup must supply a header-capable `GetHttpRequest` action.
@@ -166,7 +170,7 @@ These were internal implementation details; they are gone in 2.0:
 
 You can pass a preconfigured SDK client through the new `quickpay.client` option (a
 `Setono\Quickpay\Client\ClientInterface`) — useful for wiring a cached Valinor builder or a specific
-PSR-18 client. When omitted, the gateway builds one from `apikey` via discovery.
+PSR-18 client. When omitted, the gateway builds one from `api_key` via discovery.
 
 The `synchronized` option is carried by the SDK client itself (`Client::__construct(..., synchronized:
 true)`), and it can only be set there. An injected client must therefore be constructed with the same
