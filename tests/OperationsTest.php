@@ -94,12 +94,18 @@ class OperationsTest extends TestCase
         self::assertNull(Operations::latestOfType([], OperationType::Capture));
     }
 
+    /**
+     * "Approved" is the SDK's definition (Operation::isApproved(): not pending AND status 20000), and
+     * every helper here builds on it — a pending operation is never approved, whatever its code says.
+     */
     #[Test]
-    public function isApprovedReflectsTheStatusCode(): void
+    public function approvalIsTheSdksDefinition(): void
     {
-        self::assertTrue(Operations::isApproved($this->operation(1, OperationType::Capture, '20000')));
-        self::assertFalse(Operations::isApproved($this->operation(1, OperationType::Capture, '40000')));
-        self::assertFalse(Operations::isApproved($this->operation(1, OperationType::Capture, null)));
+        $pendingWithCode = new Operation(id: 1, type: OperationType::Capture->value, amount: 100, pending: true, qpStatusCode: '20000');
+
+        self::assertFalse(Operations::isApprovedOfType($pendingWithCode, OperationType::Capture));
+        self::assertFalse(Operations::hasApproved([$pendingWithCode], OperationType::Capture));
+        self::assertNull(Operations::latestApproved([$pendingWithCode]));
     }
 
     #[Test]

@@ -103,7 +103,8 @@ The gateway accepts either shape, so a list is fine where that reads better:
 Quickpay is an authorize/capture PSP behind a hosted payment window, and the gateway maps that onto
 Payum's requests the way Payum's own controllers — and Sylius — expect:
 
-1. **`Convert`** turns your Payum payment into the details array and creates the payment at Quickpay.
+1. **`Convert`** turns your Payum payment into the details array and creates the payment at Quickpay —
+   or picks up the one that already exists under the same order id, if nobody has paid it (see below).
 2. **`Capture`** or **`Authorize`** against the fresh payment creates the payment link and
    **redirects the customer to the Quickpay payment window** (Payum's `HttpRedirect` reply). Which
    one you execute is how you say what the window should do once the card is authorized:
@@ -151,6 +152,17 @@ $payum->getGateway('quickpay')->execute(new Capture($payment->getDetails()));
 The `auto_capture` gateway option is **deprecated** in favour of this: it made an `Authorize` flow
 capture on authorization too, which is exactly what executing `Capture` means. It still works for
 existing configurations and goes in 3.0.
+
+**Retrying a checkout.** Quickpay's `order_id` — `order_prefix` + the Payum payment number — must be
+unique per account, and under Sylius the payment number is the *order* number, so a customer who was
+declined, came back to the shop and pays again arrives with the same order id. `Convert` therefore
+looks the order id up first: a payment that already exists under it and **was never successfully paid**
+(the window was never completed, the attempt was declined) is picked up where it was left, and the
+customer is sent back to the window on it. A payment that *has* an approved operation — authorized,
+captured, refunded, cancelled — is never adopted silently: `Convert` throws a `LogicException` naming it,
+because it is either this order's earlier payment that really was paid (carry its `quickpayPaymentId`
+over) or another shop or environment sharing the account under a prefix that should not be shared
+(give each its own `order_prefix`). Either way that is your call, not a claim of money.
 
 ### Callbacks
 

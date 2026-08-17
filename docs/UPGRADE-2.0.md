@@ -13,7 +13,8 @@ handling, and modernizes the test suite. This is a major release with breaking c
 - The SDK is built on PSR-18 / PSR-17 and discovers them via `php-http/discovery`. Make sure your
   project provides a PSR-18 client and PSR-17 factories (e.g. `composer require kriswallsmith/buzz
   nyholm/psr7`, or any other implementation).
-- `setono/quickpay-php-sdk` is stable as of `1.0.0`, so **no `minimum-stability` change is needed**. If
+- `setono/quickpay-php-sdk` **`^1.1`** (stable since `1.0.0`, and 2.0 uses what 1.1 added), so **no
+  `minimum-stability` change is needed**. If
   you tracked the 2.0 alphas and added `"minimum-stability": "beta"` for the SDK's pre-releases, you can
   drop it again (assuming nothing else in your project needs it).
 
@@ -257,6 +258,31 @@ pre-operation balance. `GetStatus` used to answer `pending` for that; it now ans
 already been approved (`authorized` with a capture queued, `captured` with a refund queued) and says
 `pending` only when nothing has been approved yet.
 
+## `Convert` finds or creates — a retried checkout no longer fails on a duplicate order id
+
+> Changed after `2.0.0-beta.1`.
+
+Quickpay enforces `order_id` uniqueness per account: creating a second payment under an existing order
+id is a `400` "order_id already exists on another payment" (verified live). The gateway builds the order
+id from the Payum payment **number**, which under Sylius is the **order** number — so a customer who was
+declined, came back to the shop and pays again arrived at `Convert` with an order id Quickpay already
+had, and the retry died with a `ValidationException`. (The same on plain Payum whenever a number is
+reused for a new payment.)
+
+`ConvertPaymentAction` now looks the order id up first (`PaymentsEndpoint::findByOrderId()`, SDK ≥ 1.1):
+
+| Under that order id Quickpay has… | `Convert` |
+|---|---|
+| nothing | creates the payment, as before |
+| a payment nobody has paid — no approved operation: created but never completed, declined, an authorize still in flight — in the same currency | **adopts it**: `quickpayPaymentId`, `order_id`, `currency` come from it, and the checkout continues on it (a new link is created; the entry-point actions treat a declined attempt like a fresh payment) |
+| a payment with an approved operation (authorized / captured / refunded / cancelled) | throws a `LogicException` naming it — never adopts money silently: it is either this order's earlier payment that really was paid (carry its `quickpayPaymentId` over yourself) or another shop or environment sharing the account under a prefix that should not be shared (give each its own `order_prefix`) |
+| a payment in another currency | throws a `LogicException` — the payment is what Quickpay charges in |
+
+The lookup is one `GET /payments?order_id=…` per *creating* Convert; a model that already carries a
+`quickpayPaymentId` makes no request, as before. The create request now also carries Quickpay's
+`shopsystem` (`setono/payum-quickpay` + the installed version), so the manager shows what created a
+payment; a Convert action of your own may say something more specific.
+
 ## Order ids are now validated before they are sent
 
 `ConvertPaymentAction` builds `order_id` as `order_prefix` + the Payum payment number, and now enforces
@@ -286,8 +312,9 @@ These were internal implementation details; they are gone in 2.0:
 ## Injecting a custom SDK client
 
 You can pass a preconfigured SDK client through the new `quickpay.client` option (a
-`Setono\Quickpay\Client\ClientInterface`) — useful for wiring a cached Valinor builder or a specific
-PSR-18 client. When omitted, the gateway builds one from `api_key` via discovery.
+`Setono\Quickpay\Client\ClientInterface`) — useful for a specific PSR-18 client, or for the SDK's mapper
+cache in production (`new Client($apiKey, synchronized: …, cache: new FileSystemCache($dir))`, one
+argument since SDK 1.1). When omitted, the gateway builds one from `api_key` via discovery, uncached.
 
 The `synchronized` option is carried by the SDK client itself (`Client::__construct(..., synchronized:
 true)`), and it can only be set there. An injected client must therefore be constructed with the same

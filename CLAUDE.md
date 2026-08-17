@@ -58,13 +58,23 @@ All HTTP and (de)serialization is delegated to [`setono/quickpay-php-sdk`](https
 typed `payments()` endpoints, request/response DTOs, non-exhaustive `PaymentState`/`OperationType` enums,
 a `QuickpayException` hierarchy, and a timing-safe `CallbackValidator`. Basic auth, the mandatory
 `Accept-Version: v10` header and host pinning to `api.quickpay.net` all live in the SDK. The SDK went
-stable on 2026-08-10, so the constraint is a plain `^1.0` and **consumers need no `minimum-stability`
-setting at all** — that requirement, and the docs describing it, are gone.
+stable on 2026-08-10, so the constraint is a plain caret and **consumers need no `minimum-stability`
+setting at all** — that requirement, and the docs describing it, are gone. The constraint is **`^1.1`**
+(2026-08-17): 1.1 is additive but the gateway uses what it added — `Operation::isApproved()` (not
+pending AND `20000`; every `Operations` helper builds on it) and `isOfType()`, `Shopsystem` on the
+create request (`ConvertPaymentAction` identifies the integration as `setono/payum-quickpay` +
+installed version via Composer's runtime API), and `PaymentsEndpoint::findByOrderId()` for the
+find-or-create in `Convert`. Not used on purpose: the SDK's `Payment::latestOperation()` /
+`hasPendingOperation()` are type-agnostic and its amount helpers sum — the actions need the per-type,
+last-approved views `Operations` provides. `cache:` on the SDK `Client` is reachable through the
+`quickpay.client` option (build the client with it) rather than a gateway option of its own, so the
+package does not have to depend on Valinor's cache interface. Since 1.1 an empty body (cancel) is sent
+as `{}`, not as nothing.
 
 The pre-release history is worth remembering only because it explains why the constraint used to be so
 specific: the gateway cannot run on alpha.1 (no client-wide `synchronized`) and breaks on alpha.1–2
 (request fields only became required constructor params in alpha.3), so the constraint had to keep
-excluding them. `^1.0` excludes every pre-release outright, so that is no longer a concern.
+excluding them. A caret on a stable release excludes every pre-release outright, so that is no longer a concern.
 
 ### Wiring
 
@@ -109,8 +119,15 @@ the `quickpayPaymentId` (int) it carries is the single source of truth — actio
 `Api::payments()->getById()` rather than passing the model through as API params.
 
 Request → Action flow (amounts are integer minor units everywhere — no conversion):
-- **Convert** → `ConvertPaymentAction` — turns a Payum `PaymentInterface` into the details array; creates
-  the Quickpay payment (via `CreatePaymentRequest`) if absent and stores **only scalars** —
+- **Convert** → `ConvertPaymentAction` — turns a Payum `PaymentInterface` into the details array;
+  **finds or creates** the Quickpay payment if the details carry no id: `findByOrderId()` first — Quickpay
+  enforces `order_id` uniqueness per account (a second create is a 400 "already exists on another
+  payment", verified live 2026-08-17) and under Sylius the Payum payment number is the *order* number, so
+  a retry after a decline collides — and an existing payment is adopted only if nothing was ever
+  approved on it (`findReusablePayment()`: initial/declined/authorize-in-flight; the currency must
+  match). One with an approved operation is a `LogicException` naming it — never adopt money silently:
+  it is either this order's earlier paid payment or another environment's under a shared prefix. Otherwise
+  it creates the payment (via `CreatePaymentRequest`, with `Shopsystem` = this package + version) and stores **only scalars** —
   `quickpayPaymentId`, `amount`, `currency`, `order_id` — plus `continue_url` (the token's **target**
   url, so the customer's return re-executes the `Capture`/`Authorize` that sent them out — Payum's
   return-trip convention) and `cancel_url` (the token's after url). It never persists DTO/model objects. On the create path only it asserts its inputs:

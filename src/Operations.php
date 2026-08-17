@@ -8,19 +8,18 @@ use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Response\Payment\Operation;
 
 /**
- * Stateless helpers over a payment's list of {@see Operation}s.
+ * Stateless helpers over a payment's list of {@see Operation}s — the questions the actions ask that
+ * the SDK's own helpers do not answer as such.
  *
- * This replaces the behavior that used to live on the deleted `QuickpayPayment` /
- * `QuickpayPaymentOperation` models — the SDK response DTOs are readonly data holders without
- * behavior of their own.
+ * "Is this operation approved / of that type" is the SDK's ({@see Operation::isApproved()} — not
+ * pending AND status `20000` — and {@see Operation::isOfType()}), and everything here builds on those.
+ * What the SDK's {@see \Setono\Quickpay\Response\Payment\Payment} helpers offer is either the wrong
+ * shape for the actions (`latestOperation()` regardless of type, `hasPendingOperation()` regardless of
+ * type, summed amounts) or answers a question they do not ask; the per-type, last-approved views live
+ * here.
  */
 final class Operations
 {
-    /**
-     * Quickpay's status code for an approved operation.
-     */
-    public const APPROVED_STATUS_CODE = '20000';
-
     private function __construct()
     {
     }
@@ -38,7 +37,7 @@ final class Operations
     public static function latestApproved(array $operations): ?Operation
     {
         foreach (array_reverse($operations) as $operation) {
-            if (self::isApproved($operation)) {
+            if ($operation->isApproved()) {
                 return $operation;
             }
         }
@@ -57,17 +56,12 @@ final class Operations
     public static function latestOfType(array $operations, OperationType $type): ?Operation
     {
         foreach (array_reverse($operations) as $operation) {
-            if ($type === $operation->type()) {
+            if ($operation->isOfType($type)) {
                 return $operation;
             }
         }
 
         return null;
-    }
-
-    public static function isApproved(Operation $operation): bool
-    {
-        return self::APPROVED_STATUS_CODE === $operation->qpStatusCode;
     }
 
     /**
@@ -80,7 +74,7 @@ final class Operations
     public static function hasApproved(array $operations, OperationType $type): bool
     {
         foreach ($operations as $operation) {
-            if ($type === $operation->type() && self::isApproved($operation)) {
+            if ($operation->isOfType($type) && $operation->isApproved()) {
                 return true;
             }
         }
@@ -98,7 +92,7 @@ final class Operations
     public static function hasPending(array $operations, OperationType $type): bool
     {
         foreach ($operations as $operation) {
-            if ($type === $operation->type() && $operation->pending) {
+            if ($operation->isOfType($type) && $operation->pending) {
                 return true;
             }
         }
@@ -108,6 +102,6 @@ final class Operations
 
     public static function isApprovedOfType(?Operation $operation, OperationType $type): bool
     {
-        return null !== $operation && $type === $operation->type() && self::isApproved($operation);
+        return null !== $operation && $operation->isOfType($type) && $operation->isApproved();
     }
 }

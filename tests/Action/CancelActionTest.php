@@ -51,8 +51,9 @@ class CancelActionTest extends ActionTestAbstract
         self::assertCount(2, $requests);
         $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
         $this->assertRequest($requests[1], 'POST', '#/payments/1001/cancel$#');
-        // Cancel takes no body.
-        self::assertSame('', (string) $requests[1]->getBody());
+        // Cancel takes no body: the SDK (>= 1.1) sends an empty JSON object, which the API accepts
+        // where a literal empty array would be rejected.
+        self::assertSame('{}', (string) $requests[1]->getBody());
         self::assertSame(0, $details['balance']);
     }
 

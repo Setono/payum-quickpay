@@ -88,6 +88,7 @@ final class GatewayIntegrationTest extends TestCase
         $token->setAfterUrl('https://shop.example/after');
         $token->setGatewayName(QuickpayGatewayFactory::NAME);
 
+        $this->queueResponse('[]');
         $this->queuePayment(['id' => 2002, 'order_id' => 'it000000000001']);
 
         $convert = new Convert($payment, 'array', $token);
@@ -162,10 +163,11 @@ final class GatewayIntegrationTest extends TestCase
         // -- The wire log: exactly the calls the flow implies, in order, authenticated with the
         // integration credentials — and NOT ONE capture issued by the gateway itself.
         $requests = $this->httpClient->getRequests();
-        self::assertCount(6, $requests);
+        self::assertCount(7, $requests);
 
         $expected = [
-            ['POST', '#/payments$#'],           // Convert
+            ['GET', '#/payments$#'],            // Convert: is there a payment under this order id?
+            ['POST', '#/payments$#'],           // Convert: no — create it
             ['GET', '#/payments/2002$#'],       // Capture #1: where is the payment?
             ['PUT', '#/payments/2002/link$#'],  // Capture #1: the link
             ['GET', '#/payments/2002$#'],       // Notify → ConfirmPayment
@@ -183,7 +185,7 @@ final class GatewayIntegrationTest extends TestCase
             );
         }
 
-        $link = $this->decodeBody($requests[2]);
+        $link = $this->decodeBody($requests[3]);
         self::assertTrue($link['auto_capture'], 'Capture-driven: the link captures at authorization');
         self::assertSame('https://shop.example/notify?payum_token=stub-notify', $link['callback_url'], 'The minted notify token url is what Quickpay is given');
         self::assertSame('https://shop.example/capture?payum_token=cap', $link['continue_url']);
