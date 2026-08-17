@@ -93,17 +93,12 @@ final class HeaderAwareGetHttpRequestAction extends GetHttpRequestAction
      */
     public static function defaultHeaderSource(): array
     {
-        if (function_exists('getallheaders')) {
-            $headers = getallheaders();
+        // One decision, not two: "did the SAPI hand us headers?" A missing getallheaders() and one
+        // that answers with an empty list (some SAPIs define it but return nothing useful) are the
+        // same situation from here, and the $_SERVER reconstruction serves both.
+        $headers = function_exists('getallheaders') ? getallheaders() : [];
 
-            // An empty list falls through to the $_SERVER reconstruction: some SAPIs define the
-            // function but return nothing useful, and the fallback answers both cases the same way.
-            if ([] !== $headers) {
-                return $headers;
-            }
-        }
-
-        return self::headersFromServer();
+        return [] !== $headers ? $headers : self::headersFromServer();
     }
 
     /**

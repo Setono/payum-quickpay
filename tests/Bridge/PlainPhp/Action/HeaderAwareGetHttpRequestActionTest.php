@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\Quickpay\Tests\Bridge\PlainPhp\Action;
 
+use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\Request\GetHttpRequest;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction;
@@ -42,6 +43,16 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         self::assertTrue($action->supports(new GetHttpRequest()));
         self::assertFalse($action->supports(new stdClass()));
         self::assertFalse($action->supports('foo'));
+    }
+
+    /**
+     * @test
+     */
+    public function shouldThrowWhenExecutedWithAnUnsupportedRequest(): void
+    {
+        $this->expectException(RequestNotSupportedException::class);
+
+        (new HeaderAwareGetHttpRequestAction())->execute(new stdClass());
     }
 
     /**
@@ -134,6 +145,34 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         ]))->execute($request);
 
         self::assertSame(['QuickPay-Checksum-Sha256' => 'the-checksum', 'X-Int' => '42'], $request->headers);
+    }
+
+    /**
+     * The documented fall-through: getallheaders() exists but answers with an empty list — the shape
+     * some SAPIs (and a polyfill with nothing to read) produce — so the default source must go on to
+     * the `$_SERVER` reconstruction rather than stop at "no headers". Driven deterministically by
+     * clearing every HTTP_* entry, which empties the polyfill. Both providers read `$_SERVER`, so
+     * they necessarily agree once it is empty; what this pins is that the fall-through branch runs
+     * and returns the reconstruction's answer instead of the polyfill's empty list being final.
+     *
+     * @test
+     */
+    public function shouldFallThroughToTheReconstructionWhenGetallheadersIsEmpty(): void
+    {
+        foreach (array_keys($_SERVER) as $name) {
+            if (is_string($name) && str_starts_with($name, 'HTTP_')) {
+                unset($_SERVER[$name]);
+            }
+        }
+
+        // The polyfill (if any) now returns [], so defaultHeaderSource() reaches headersFromServer(),
+        // which — with the same empty $_SERVER — also returns []. The assertion is that the call
+        // completes and yields the reconstruction's answer, not that a header was found.
+        self::assertSame(
+            HeaderAwareGetHttpRequestAction::headersFromServer(),
+            HeaderAwareGetHttpRequestAction::defaultHeaderSource(),
+        );
+        self::assertSame([], HeaderAwareGetHttpRequestAction::defaultHeaderSource());
     }
 
     /**
