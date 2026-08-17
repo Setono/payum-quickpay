@@ -195,7 +195,8 @@ function e2e_payum(string $baseUrl): Payum
             'cancel' => 'cancel',
             'done' => 'done',
         ])
-        // Without this the callback verification can never pass outside Symfony — see the class docblock.
+        // The gateway factory swaps payum's plain-PHP GetHttpRequest action for this one by itself, so
+        // this is redundant — kept explicit as the reference for a consumer wiring its own.
         ->addCoreGatewayFactoryConfig([
             'payum.action.get_http_request' => new HeaderAwareGetHttpRequestAction(),
         ])

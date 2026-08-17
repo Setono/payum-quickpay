@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\Quickpay;
 
+use Payum\Core\Bridge\PlainPhp\Action\GetHttpRequestAction;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\GatewayFactory;
@@ -17,6 +18,7 @@ use Setono\Payum\Quickpay\Action\NotifyAction;
 use Setono\Payum\Quickpay\Action\RefundAction;
 use Setono\Payum\Quickpay\Action\StatusAction;
 use Setono\Payum\Quickpay\Action\SyncAction;
+use Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction;
 use Setono\Quickpay\Client\Client;
 use Setono\Quickpay\Client\ClientInterface;
 
@@ -36,6 +38,8 @@ class QuickpayGatewayFactory extends GatewayFactory
 
     protected function populateConfig(ArrayObject $config): void
     {
+        self::exposeHeadersToNotify($config);
+
         $config->defaults([
             'payum.factory_name' => self::NAME,
             'payum.factory_title' => 'Quickpay',
@@ -111,6 +115,31 @@ class QuickpayGatewayFactory extends GatewayFactory
                     brandingId: self::normalizeId('branding_id', $config['branding_id']),
                 );
             };
+        }
+    }
+
+    /**
+     * The callback verification in {@see NotifyAction} reads the `QuickPay-Checksum-Sha256` header off
+     * `GetHttpRequest::$headers`, and among payum/core's own bridges only the Symfony one sets that
+     * property. Payum's core config puts its plain-PHP `GetHttpRequestAction` in place before this
+     * factory runs, so a plain-PHP Payum that did not know to swap it in rejected EVERY callback as
+     * unsigned, with a `400`, silently — for every payment. The core action is replaced with the
+     * package's {@see HeaderAwareGetHttpRequestAction}, a subclass that adds the headers, so the
+     * default just works.
+     *
+     * Only payum's exact class is replaced: the Symfony bridge (a different class, wired by
+     * PayumBundle — Sylius) is left alone, and so is anything a consumer configured deliberately —
+     * a subclass of payum's action, another action, a service id. What is swapped is the one value
+     * nobody chose.
+     *
+     * @param ArrayObject<string, mixed> $config
+     */
+    private static function exposeHeadersToNotify(ArrayObject $config): void
+    {
+        if ($config->offsetExists('payum.action.get_http_request') &&
+            is_object($config['payum.action.get_http_request']) &&
+            GetHttpRequestAction::class === get_class($config['payum.action.get_http_request'])) {
+            $config['payum.action.get_http_request'] = new HeaderAwareGetHttpRequestAction();
         }
     }
 

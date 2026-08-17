@@ -115,15 +115,12 @@ response. Ensure:
 - your gateway is configured with the correct `private_key`, and
 - your Payum HTTP-request bridge exposes request headers. The Symfony bridge
   (`Payum\Core\Bridge\Symfony\Action\GetHttpRequestAction`, used by Sylius/Symfony) does; the plain-PHP
-  bridge does not, so a pure plain-PHP setup must register the
-  `Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction` this package ships:
-
-  ```php
-  (new PayumBuilder())
-      ->addCoreGatewayFactoryConfig([
-          'payum.action.get_http_request' => new HeaderAwareGetHttpRequestAction(),
-      ])
-  ```
+  bridge does not — so the gateway factory replaces payum's plain-PHP action, when that is what it
+  finds under `payum.action.get_http_request`, with the
+  `Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction` this package ships
+  (changed after `2.0.0-beta.1`: registering it yourself via `addCoreGatewayFactoryConfig()` still
+  works and is now simply redundant). A `GetHttpRequest` action of your own is left alone; make sure it
+  sets `headers`.
 
 ## Quickpay sends callbacks to two different places
 
