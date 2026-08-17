@@ -95,6 +95,10 @@ class ConvertPaymentActionTest extends TestCase
         self::assertSame('DKK', $body['currency']);
         self::assertArrayNotHasKey('card', $body);
         self::assertArrayNotHasKey('payment', $body);
+        // The integration identifies itself: Quickpay records `shopsystem` on the payment.
+        self::assertSame('setono/payum-quickpay', $body['shopsystem']['name']);
+        self::assertIsString($body['shopsystem']['version']);
+        self::assertNotSame('', $body['shopsystem']['version']);
     }
 
     #[Test]

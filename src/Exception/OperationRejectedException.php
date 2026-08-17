@@ -50,7 +50,8 @@ final class OperationRejectedException extends RuntimeException
     {
         $operation = Operations::latestOfType($payment->operations, $type);
 
-        if (null === $operation || $operation->pending || Operations::isApproved($operation)) {
+        // isApproved() is false for a pending operation too; the explicit check says why it passes.
+        if (null === $operation || $operation->pending || $operation->isApproved()) {
             return;
         }
 

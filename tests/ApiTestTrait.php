@@ -13,10 +13,10 @@ use Psr\Http\Message\RequestInterface;
 use Setono\Payum\Quickpay\Action\Api\ConfirmPaymentAction;
 use Setono\Payum\Quickpay\Action\Api\CreatePaymentLinkAction;
 use Setono\Payum\Quickpay\Api;
-use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Client\Client;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
+use Setono\Quickpay\Response\Payment\Operation;
 
 /**
  * Shared setup for tests exercising the actions and the {@see Api}. The SDK client is built around a
@@ -136,7 +136,7 @@ trait ApiTestTrait
      *
      * @return array<string, mixed>
      */
-    protected function operation(OperationType $type, ?string $statusCode = Operations::APPROVED_STATUS_CODE, int $amount = 100, bool $pending = false): array
+    protected function operation(OperationType $type, ?string $statusCode = Operation::QP_STATUS_APPROVED, int $amount = 100, bool $pending = false): array
     {
         return [
             'id' => 1,

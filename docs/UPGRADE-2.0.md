@@ -13,7 +13,8 @@ handling, and modernizes the test suite. This is a major release with breaking c
 - The SDK is built on PSR-18 / PSR-17 and discovers them via `php-http/discovery`. Make sure your
   project provides a PSR-18 client and PSR-17 factories (e.g. `composer require kriswallsmith/buzz
   nyholm/psr7`, or any other implementation).
-- `setono/quickpay-php-sdk` is stable as of `1.0.0`, so **no `minimum-stability` change is needed**. If
+- `setono/quickpay-php-sdk` **`^1.1`** (stable since `1.0.0`, and 2.0 uses what 1.1 added), so **no
+  `minimum-stability` change is needed**. If
   you tracked the 2.0 alphas and added `"minimum-stability": "beta"` for the SDK's pre-releases, you can
   drop it again (assuming nothing else in your project needs it).
 
@@ -286,8 +287,9 @@ These were internal implementation details; they are gone in 2.0:
 ## Injecting a custom SDK client
 
 You can pass a preconfigured SDK client through the new `quickpay.client` option (a
-`Setono\Quickpay\Client\ClientInterface`) — useful for wiring a cached Valinor builder or a specific
-PSR-18 client. When omitted, the gateway builds one from `api_key` via discovery.
+`Setono\Quickpay\Client\ClientInterface`) — useful for a specific PSR-18 client, or for the SDK's mapper
+cache in production (`new Client($apiKey, synchronized: …, cache: new FileSystemCache($dir))`, one
+argument since SDK 1.1). When omitted, the gateway builds one from `api_key` via discovery, uncached.
 
 The `synchronized` option is carried by the SDK client itself (`Client::__construct(..., synchronized:
 true)`), and it can only be set there. An injected client must therefore be constructed with the same

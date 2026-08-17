@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\Quickpay\Action;
 
+use Composer\InstalledVersions;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
@@ -15,11 +16,14 @@ use Payum\Core\Model\PaymentInterface;
 use Payum\Core\Request\Convert;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Quickpay\Request\Payment\CreatePaymentRequest;
+use Setono\Quickpay\Request\Payment\Shopsystem;
 
 class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
     use GatewayAwareTrait;
     use ApiAwareTrait;
+
+    private const PACKAGE = 'setono/payum-quickpay';
 
     /**
      * Quickpay's accepted `order_id` length, verified against the live API.
@@ -53,6 +57,10 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
             $payment = $this->api->payments()->create(new CreatePaymentRequest(
                 orderId: $orderId,
                 currency: $currency,
+                // Quickpay's "shopsystem" is what the payment was created with — it shows in the
+                // manager and tells Quickpay support which integration they are looking at. A shop's
+                // own Convert action (the Sylius plugin has one) can say something more specific.
+                shopsystem: new Shopsystem(name: self::PACKAGE, version: self::version()),
             ));
 
             $details['quickpayPaymentId'] = $payment->id;
@@ -141,6 +149,18 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         }
 
         $details['currency'] = $currency;
+    }
+
+    /**
+     * The installed version of this package, for the `shopsystem` Quickpay records on the payment.
+     * Composer's runtime API knows it wherever the package was installed by Composer; "unknown" covers
+     * a vendored copy.
+     */
+    private static function version(): string
+    {
+        return InstalledVersions::isInstalled(self::PACKAGE)
+            ? (InstalledVersions::getPrettyVersion(self::PACKAGE) ?? 'unknown')
+            : 'unknown';
     }
 
     /**

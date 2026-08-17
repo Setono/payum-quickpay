@@ -15,9 +15,10 @@
         "ext-filter": "*",
         "ext-hash": "*",
         "ext-json": "*",
+        "composer-runtime-api": "^2.0",
         "payum/core": "^1.7.5",
         "php-http/message-factory": "^1.0",
-        "setono/quickpay-php-sdk": "^1.0"
+        "setono/quickpay-php-sdk": "^1.1"
     },
     "require-dev": {
         "ergebnis/composer-normalize": "^2.52",
