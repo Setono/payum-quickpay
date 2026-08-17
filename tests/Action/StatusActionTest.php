@@ -28,6 +28,23 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isNew(), 'Request should be marked as new');
     }
 
+    /**
+     * A null id is "not created yet" — the value a consumer's own Convert or a storage round trip may
+     * leave behind, and what ConvertPaymentAction itself reads as absent. It must answer `new` (so a
+     * Sylius checkout goes on to Convert) rather than throw "execute Convert first" at the caller.
+     */
+    #[Test]
+    public function shouldMarkANullIdAsNew(): void
+    {
+        $request = new GetHumanStatus([]);
+        $request->setModel(new ArrayObject(['quickpayPaymentId' => null, 'amount' => 100]));
+
+        $this->executeStatus($request);
+
+        self::assertTrue($request->isNew(), 'Request should be marked as new');
+        self::assertCount(0, $this->getRequests());
+    }
+
     #[Test]
     public function shouldMarkInitialAsNew(): void
     {

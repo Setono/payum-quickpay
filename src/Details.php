@@ -24,6 +24,22 @@ final class Details
     }
 
     /**
+     * Whether the details carry a `quickpayPaymentId` at all — whether, as far as the details know, the
+     * payment exists at Quickpay. `null` counts as absent: it is what a consumer's own Convert action or
+     * a storage round trip may leave behind for "not created yet", and it is how
+     * {@see \Setono\Payum\Quickpay\Action\ConvertPaymentAction} reads it (`isset()`), so a `GetStatus` on
+     * such a model must answer `new` rather than throw. Payum's `ArrayObject::offsetExists()` alone is
+     * `true` for a null value, which is why this exists. Whether a present id is *usable* is
+     * {@see self::paymentId()}'s question, and it throws for one that is not.
+     *
+     * @param ArrayAccess<string, mixed> $details
+     */
+    public static function hasPaymentId(ArrayAccess $details): bool
+    {
+        return $details->offsetExists('quickpayPaymentId') && null !== $details['quickpayPaymentId'];
+    }
+
+    /**
      * @param ArrayAccess<string, mixed> $details
      *
      * @throws LogicException if the details carry no usable Quickpay payment id

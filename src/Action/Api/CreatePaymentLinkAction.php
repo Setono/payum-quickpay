@@ -15,6 +15,7 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
 use Payum\Core\Security\GenericTokenFactoryAwareTrait;
+use Setono\Payum\Quickpay\Amounts;
 use Setono\Payum\Quickpay\Details;
 use Setono\Payum\Quickpay\Request\Api\CreatePaymentLink;
 use Setono\Quickpay\Request\Payment\CreateLinkRequest;
@@ -53,10 +54,11 @@ class CreatePaymentLinkAction implements ActionInterface, ApiAwareInterface, Gat
                 ->getTargetUrl();
         }
 
-        $model->validateNotEmpty(['continue_url', 'cancel_url', 'callback_url', 'amount']);
+        $model->validateNotEmpty(['continue_url', 'cancel_url', 'callback_url']);
 
         $link = $this->api->payments()->createLink($paymentId, new CreateLinkRequest(
-            amount: (int) $model['amount'],
+            // Strict, like the capture and refund amounts: this is what Quickpay authorizes.
+            amount: Amounts::amount($model),
             agreementId: $this->api->getAgreementId(),
             language: $this->api->getLanguage(),
             continueUrl: (string) $model['continue_url'],

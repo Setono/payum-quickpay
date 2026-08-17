@@ -71,4 +71,25 @@ class SyncActionTest extends ActionTestAbstract
         self::assertCount(0, $this->getRequests());
         self::assertFalse($details->offsetExists('balance'));
     }
+
+    /**
+     * Same for a null id — "not created yet", the way ConvertPaymentAction reads it — not a throw.
+     */
+    #[Test]
+    public function shouldDoNothingWhenTheIdIsNull(): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => null, 'amount' => 1000]);
+
+        /** @var Sync $sync */
+        $sync = new static::$requestClass($details);
+
+        $action = new SyncAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $action->execute($sync);
+
+        self::assertCount(0, $this->getRequests());
+        self::assertFalse($details->offsetExists('balance'));
+    }
 }

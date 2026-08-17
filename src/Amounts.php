@@ -28,6 +28,25 @@ final class Amounts
     }
 
     /**
+     * The payment's own `amount` — what the payment link is created for, and what an operation falls
+     * back to without an override. Read with the same strictness as {@see self::forOperation()}: the
+     * link amount is what Quickpay authorizes, so a silently truncated `'249.99'` there is exactly as
+     * wrong as in a capture.
+     *
+     * @param ArrayAccess<string, mixed> $details
+     *
+     * @throws LogicException if `amount` is not a usable positive integer
+     */
+    public static function amount(ArrayAccess $details): int
+    {
+        return self::positiveInteger(
+            $details['amount'] ?? null,
+            'The payment details must carry an integer "amount" (minor units); got %s.',
+            'The "amount" must be a positive number of minor units, got %d.',
+        );
+    }
+
+    /**
      * Only integers (and integer strings, the shape a serialization round trip may produce) are
      * accepted. A fractional value is always a caller bug — amounts are minor units, so `249.99`
      * can only mean someone passed kroner where øre were expected — and the old `is_numeric()` +
@@ -40,27 +59,38 @@ final class Amounts
      */
     public static function forOperation(ArrayAccess $details, string $overrideKey): int
     {
-        $amount = $details->offsetExists($overrideKey) ? $details[$overrideKey] : ($details['amount'] ?? null);
+        return self::positiveInteger(
+            $details->offsetExists($overrideKey) ? $details[$overrideKey] : ($details['amount'] ?? null),
+            sprintf('The payment details must carry an integer "%s" or "amount" (minor units) to operate on; got %%s.', $overrideKey),
+            sprintf(
+                'The amount to operate on must be a positive number of minor units, got %%d. A partial '
+                . 'capture or refund is set with the "%s" details key.',
+                $overrideKey,
+            ),
+        );
+    }
 
+    /**
+     * @param string $notAnIntegerMessage sprintf template with one `%s` for the offending value
+     * @param string $notPositiveMessage sprintf template with one `%d` for the offending amount
+     *
+     * @throws LogicException
+     */
+    private static function positiveInteger(mixed $amount, string $notAnIntegerMessage, string $notPositiveMessage): int
+    {
         if (is_string($amount) && 1 === preg_match('/^-?\d+$/', $amount)) {
             $amount = (int) $amount;
         }
 
         if (!is_int($amount)) {
             throw new LogicException(sprintf(
-                'The payment details must carry an integer "%s" or "amount" (minor units) to operate on; got %s.',
-                $overrideKey,
+                $notAnIntegerMessage,
                 is_scalar($amount) ? var_export($amount, true) : get_debug_type($amount),
             ));
         }
 
         if ($amount <= 0) {
-            throw new LogicException(sprintf(
-                'The amount to operate on must be a positive number of minor units, got %d. A partial '
-                . 'capture or refund is set with the "%s" details key.',
-                $amount,
-                $overrideKey,
-            ));
+            throw new LogicException(sprintf($notPositiveMessage, $amount));
         }
 
         return $amount;
