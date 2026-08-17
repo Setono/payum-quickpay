@@ -99,9 +99,9 @@ The details array stored on a payment (the `ArrayObject` model) now contains **o
   `order_id`, `continue_url`, `cancel_url`, `callback_url`. The payment is re-fetched from Quickpay when
   needed.
 - Any action that already fetches the payment also writes **`balance`** (what is still captured, i.e.
-  captured minus refunded) back into the details: `GetStatus`, `Notify` and the new `Sync`. It costs no
-  extra API call and it is the one figure Payum's status marks cannot express. `Sync` additionally
-  writes `state`.
+  captured minus refunded) back into the details: `Capture`, `Authorize`, `GetStatus`, `Notify`, the
+  new `Sync`, and `Refund` on its default path. It costs no extra API call and it is the one figure
+  Payum's status marks cannot express. `Sync` and `Notify` additionally write `state`.
 
 If your code reads `$details['quickpayPayment']`, switch to fetching the payment via the SDK using
 `$details['quickpayPaymentId']`.

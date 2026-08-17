@@ -104,8 +104,9 @@ if ('POST' === $method && '/notify' === $path) {
     $payum = e2e_payum($base);
 
     // Two shapes of callback arrive here:
-    //  - the payment-window callback, sent to the per-payment notify token url AuthorizeAction built,
-    //    so it carries ?payum_token and Payum resolves the model from it;
+    //  - the payment-window callback, sent to the per-payment notify token url the gateway minted when
+    //    it created the link (CreatePaymentLinkAction, on behalf of Capture or Authorize), so it
+    //    carries ?payum_token and Payum resolves the model from it;
     //  - a callback sent to the account-wide url (Settings → Integration), which is one static url for
     //    every payment and therefore cannot carry a token — resolve those by the order_id in the body.
     // Either way NotifyAction verifies the HMAC itself; the subject only tells it which model to act on.
