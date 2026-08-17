@@ -15,7 +15,6 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Model\PaymentInterface;
 use Payum\Core\Request\Convert;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
-use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Request\Payment\CreatePaymentRequest;
 use Setono\Quickpay\Request\Payment\Shopsystem;
 use Setono\Quickpay\Response\Payment\Payment;
@@ -26,13 +25,6 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
     use ApiAwareTrait;
 
     private const PACKAGE = 'setono/payum-quickpay';
-
-    /**
-     * Quickpay's accepted `order_id` length, verified against the live API.
-     */
-    private const ORDER_ID_MIN_LENGTH = 4;
-
-    private const ORDER_ID_MAX_LENGTH = 20;
 
     /**
      * @param mixed|Convert $request
@@ -184,7 +176,7 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
             return null;
         }
 
-        $approved = Operations::latestApproved($existing->operations);
+        $approved = $existing->latestApprovedOperation();
         if (null !== $approved) {
             throw new LogicException(sprintf(
                 'A Quickpay payment with order id "%s" already exists (id %d, state %s) and has an approved %s. '
@@ -225,35 +217,26 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
     }
 
     /**
-     * Quickpay requires `order_id` to be 4–20 characters, and the gateway builds it by concatenating
-     * the `order_prefix` option with the Payum payment number. Checking the result here turns two
-     * failures into one clear exception at the call site:
+     * The gateway builds `order_id` by concatenating the `order_prefix` option with the Payum payment
+     * number, and Quickpay accepts 4–20 characters of letters, digits, space, `.`, `_` and `-` — the
+     * rule the SDK verified live and enforces in {@see CreatePaymentRequest::ORDER_ID_PATTERN}. It is
+     * checked here, before the lookup and with the SDK's own pattern, so that the exception names the
+     * two things the caller actually controls — the prefix and the number — rather than a field they
+     * never set directly. It also catches an empty number: the concatenation would degrade to the bare
+     * prefix, which, when the prefix alone is 4+ characters, is a *valid* order id, so every such
+     * payment would be created under the SAME order id with nothing complaining at all.
      *
-     * - too long, or too short, would otherwise come back as a `ValidationException` after a network
-     *   round trip, blaming a field the caller never set directly;
-     * - and if the number were ever empty, the concatenation would degrade to the bare prefix — which,
-     *   when the prefix is itself 4+ characters, is a *valid* order id, so every such payment would be
-     *   created under the SAME order id with nothing complaining at all.
-     *
-     * `strlen()` counts bytes rather than characters. Quickpay's order ids are ASCII in practice (a
-     * Payum payment number plus your prefix), and pulling in ext-mbstring for this would cost more than
-     * the check is worth.
-     *
-     * @throws LogicException if the resulting order id falls outside Quickpay's accepted length
+     * @throws LogicException if the resulting order id is not one Quickpay accepts
      */
     private static function assertOrderId(string $orderId): string
     {
-        $length = strlen($orderId);
-
-        if ($length < self::ORDER_ID_MIN_LENGTH || $length > self::ORDER_ID_MAX_LENGTH) {
+        if (1 !== preg_match(CreatePaymentRequest::ORDER_ID_PATTERN, $orderId)) {
             throw new LogicException(sprintf(
-                'The Quickpay order id "%s" is %d characters, but Quickpay requires between %d and %d. '
-                . 'It is built from the "order_prefix" gateway option and the Payum payment number — '
-                . 'adjust the prefix so the two together stay within that range.',
+                'The Quickpay order id "%s" (%d characters) is not one Quickpay accepts: 4–20 characters of '
+                . 'letters, digits, space, ".", "_" and "-". It is built from the "order_prefix" gateway '
+                . 'option and the Payum payment number — adjust the prefix so the two together fit.',
                 $orderId,
-                $length,
-                self::ORDER_ID_MIN_LENGTH,
-                self::ORDER_ID_MAX_LENGTH,
+                strlen($orderId),
             ));
         }
 

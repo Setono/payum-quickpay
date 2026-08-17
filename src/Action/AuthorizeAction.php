@@ -14,7 +14,6 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Authorize;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Details;
-use Setono\Payum\Quickpay\Operations;
 use Setono\Payum\Quickpay\Request\Api\CreatePaymentLink;
 use Setono\Quickpay\Enum\OperationType;
 
@@ -43,23 +42,22 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
         $payment = $this->api->payments()->getById(Details::paymentId($model));
-        $operations = $payment->operations;
 
         // The payment is in hand, so keep the balance fresh — same key every fetching action writes.
         $model['balance'] = $payment->balance;
 
         // Already authorized (the return trip, or a repeat call), or already past authorization —
         // a capture means the money was authorized and taken. Nothing left for Authorize to do.
-        if (Operations::hasApproved($operations, OperationType::Authorize) ||
-            Operations::hasApproved($operations, OperationType::Capture) ||
-            Operations::hasPending($operations, OperationType::Capture)) {
+        if ($payment->hasApprovedOperation(OperationType::Authorize) ||
+            $payment->hasApprovedOperation(OperationType::Capture) ||
+            $payment->hasPendingOperation(OperationType::Capture)) {
             return;
         }
 
         // An authorize is in flight (3-D Secure, an asynchronous acquirer). Creating a fresh link now
         // would race its outcome; the next call — after the callback, or the customer's return —
         // will see the result.
-        if (Operations::hasPending($operations, OperationType::Authorize)) {
+        if ($payment->hasPendingOperation(OperationType::Authorize)) {
             return;
         }
 

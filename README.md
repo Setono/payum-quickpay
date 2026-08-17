@@ -173,16 +173,18 @@ tampered callback is rejected with a `400`. Quickpay retries an undelivered or n
 your logs rather than as silence — and a callback your endpoint fails on will come back. Two things
 are easy to get wrong:
 
-**Quickpay sends callbacks to two different places.** The payment-window authorize goes to the
-per-payment callback url the gateway builds (a Payum notify token). But `capture`/`refund`/`cancel`
-issued through the API go to the **account-wide** callback url (Quickpay manager → Settings →
-Integration) — which is empty by default, so those callbacks are simply not delivered anywhere, and
-a shop waiting to hear that its capture settled waits forever. That url is one static url for every
-payment and cannot carry a `payum_token`, so an endpoint for it must resolve the payment from the
-callback body's `order_id` (`order_prefix` + the Payum payment number) and execute `Notify` against
-that model. See [`docs/UPGRADE-2.0.md`](docs/UPGRADE-2.0.md) for the full picture and
-`examples/e2e/listen.php` for a working endpoint. Alternatively, skip operation callbacks entirely:
-set `synchronized` to `true` so the operations block until settled, or poll with `Sync`/`GetStatus`.
+**Where callbacks go.** The payment window's callback goes to the per-payment `callback_url` on the
+link — the Payum notify token the gateway mints — and Payum routes it to your payment. Quickpay would
+send the callback of an *API-issued* `capture`/`refund`/`cancel` somewhere else: to the **account-wide**
+callback url (Quickpay manager → Settings → Integration), which is empty by default — so the gateway
+names the payment's own notify url on every capture, refund and cancel it issues (the
+`QuickPay-Callback-Url` header), and those callbacks arrive on the **same per-payment endpoint**,
+verified and routed like the payment window's. Nothing to configure. Only operations issued *outside*
+the gateway — in the Quickpay manager, or your own API calls — still go to the account-wide url; if you
+want to hear about those, set it and give it an endpoint that resolves the payment from the callback
+body's `order_id` (`order_prefix` + the Payum payment number) and executes `Notify` against that model
+(`examples/e2e/listen.php` does exactly this). Alternatively, `synchronized` makes the operations block
+until settled — a decline then throws (see above) — or poll with `Sync`/`GetStatus`.
 
 **A declined operation is not an HTTP error.** Quickpay answers `2xx` and puts the outcome on the
 operation, so the SDK does not throw for it. Asynchronously (the default) the response only says the
@@ -214,7 +216,7 @@ uses. `quickpayPaymentId` is the single source of truth — everything else is a
 | `order_id` | `Convert` | `order_prefix` + the Payum payment number. |
 | `continue_url` | `Convert` | The token's **target** url: the customer returns to it, and the `Capture`/`Authorize` that sent them out runs again to finish. |
 | `cancel_url` | `Convert` | The token's after url. |
-| `callback_url` | `Capture`, `Authorize` | The notify token url given to Quickpay. |
+| `callback_url` | `Capture`, `Authorize` | The payment's notify token url — on the link, and named on every capture/refund/cancel the gateway issues so their callbacks arrive there too. |
 | `balance` | every action that fetches the payment: `Capture`, `Authorize`, `GetStatus`, `Sync`, `Notify`, `Refund` (default path) | **What is still captured** — captured minus refunded. |
 | `state` | `Sync`, `Notify` | Quickpay's own payment state. |
 | `capture_amount`, `refund_amount` | *you* | Optional partial-operation amounts; see below. |
@@ -336,9 +338,10 @@ want to **authorize only** at checkout and capture later — when the order ship
 `use_authorize: true` in the gateway configuration so Sylius executes `Authorize` instead, and issue
 the `Capture` yourself when the time comes.
 
-The callback urls (see Callbacks above) apply unchanged: the payment-window callback routes itself
-via the notify token, and an account-wide callback endpoint — if you rely on operation
-confirmations — needs to resolve the payment by `order_id` and execute `Notify` on it.
+The callbacks (see above) route themselves via the notify token — the payment window's and the ones
+for captures, refunds and cancels the gateway issues alike. An account-wide callback endpoint that
+resolves the payment by `order_id` (the plugin ships one) is only needed for operations made outside
+the gateway, e.g. in the Quickpay manager.
 
 ## What this package does not do
 

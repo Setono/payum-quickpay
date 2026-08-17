@@ -59,17 +59,21 @@ typed `payments()` endpoints, request/response DTOs, non-exhaustive `PaymentStat
 a `QuickpayException` hierarchy, and a timing-safe `CallbackValidator`. Basic auth, the mandatory
 `Accept-Version: v10` header and host pinning to `api.quickpay.net` all live in the SDK. The SDK went
 stable on 2026-08-10, so the constraint is a plain caret and **consumers need no `minimum-stability`
-setting at all** — that requirement, and the docs describing it, are gone. The constraint is **`^1.1`**
-(2026-08-17): 1.1 is additive but the gateway uses what it added — `Operation::isApproved()` (not
-pending AND `20000`; every `Operations` helper builds on it) and `isOfType()`, `Shopsystem` on the
-create request (`ConvertPaymentAction` identifies the integration as `setono/payum-quickpay` +
-installed version via Composer's runtime API), and `PaymentsEndpoint::findByOrderId()` for the
-find-or-create in `Convert`. Not used on purpose: the SDK's `Payment::latestOperation()` /
-`hasPendingOperation()` are type-agnostic and its amount helpers sum — the actions need the per-type,
-last-approved views `Operations` provides. `cache:` on the SDK `Client` is reachable through the
-`quickpay.client` option (build the client with it) rather than a gateway option of its own, so the
-package does not have to depend on Valinor's cache interface. Since 1.1 an empty body (cancel) is sent
-as `{}`, not as nothing.
+setting at all** — that requirement, and the docs describing it, are gone. The constraint is **`^1.2`**
+(2026-08-17): 1.1/1.2 are additive but the gateway uses what they added, and both were shaped by this
+gateway's review (quickpay-php-sdk#22, #25) — `Operation::isApproved()` (not pending AND `20000`),
+`isOfType()`, `hasOutcome()`/`isDeclined()`; the `Payment` views `latestOperationOfType()`,
+`latestApprovedOperation()`, `hasApprovedOperation(?type)`, `hasPendingOperation(?type)` ("latest" =
+highest operation id — the test fixtures number operations for that reason); `Link::$autoCapture`;
+`callbackUrl:` on `capture()/refund()/cancel()` (the `QuickPay-Callback-Url` header); `Shopsystem` on
+the create request (`ConvertPaymentAction` identifies the integration as `setono/payum-quickpay` +
+installed version via Composer's runtime API); `PaymentsEndpoint::findByOrderId()` for the
+find-or-create in `Convert`; and `CreatePaymentRequest::ORDER_ID_PATTERN` (4–20 of `[A-Za-z0-9 ._-]`,
+which `Convert` checks first with a message naming the prefix and number). The package's own
+`Operations` helper is gone — everything reads off the DTOs. `cache:` on the SDK `Client` is reachable
+through the `quickpay.client` option (build the client with it) rather than a gateway option of its
+own, so the package does not have to depend on Valinor's cache interface. Since 1.1 an empty body
+(cancel) is sent as `{}`, not as nothing.
 
 The pre-release history is worth remembering only because it explains why the constraint used to be so
 specific: the gateway cannot run on alpha.1 (no client-wide `synchronized`) and breaks on alpha.1–2
@@ -149,8 +153,8 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   gateway option (an `Authorize` that behaves as a sale — prefer executing `Capture`). A pending
   authorize (3-D Secure, async acquirer) is a no-op for both. `AuthorizeAction` on an approved
   authorize (or any capture) is a no-op — the return trip. **`CaptureAction` on an approved authorize
-  never captures when the payment's link carries `auto_capture`** (`raw['link']['auto_capture']` — the
-  SDK's `Link` DTO does not model it): Quickpay is taking that money, and a capture from here could only
+  never captures when the payment's link carries `auto_capture`** (`$payment->link?->autoCapture`, typed
+  since SDK 1.2): Quickpay is taking that money, and a capture from here could only
   double up — **except when Quickpay's own capture was declined** (`quickpayGaveUpCapturing()`: no
   capture approved or pending, the newest capture a completed decline; Quickpay attempts it once and
   does not retry). Then a *token-less* `Capture` (the merchant settling — the shop's code, a
@@ -173,16 +177,19 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   "Transaction in wrong state for this operation" to "Validation error: Payment is not in a valid state
   for cancel", so the guard silently never fired) and wrong in substance: reporting success for a
   payment whose money is still held. A caller wanting a no-op can catch the typed exception itself.
-- **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. **Quickpay routes
-  callbacks to two different urls** (verified live, 2026-08): the payment-window authorize goes to the
-  per-payment `callback_url` on the link — the notify token `CreatePaymentLinkAction` mints on behalf of
-  `Capture`/`Authorize` — while API-initiated
-  `capture`/`refund`/`cancel` go to the **account-wide** url (manager → Settings → Integration), which is
-  empty by default, so those callbacks are simply not delivered. That url is static for every payment and
-  cannot carry a `payum_token`, so Payum's token routing cannot serve it; an endpoint for it must resolve
-  the payment from the body's `order_id` (`order_prefix` + payum number) and execute `Notify` against
-  that model — `NotifyAction` needs only the model. See `examples/e2e/listen.php` and
-  `docs/UPGRADE-2.0.md`. It fetches the raw
+- **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. **Where callbacks
+  go** (verified live, 2026-08): the payment window's goes to the per-payment `callback_url` on the link
+  — the notify token `CreatePaymentLinkAction` mints on behalf of `Capture`/`Authorize`; an API-issued
+  `capture`/`refund`/`cancel` would go to the **account-wide** url (manager → Settings → Integration,
+  empty by default) — so `CaptureAction`/`RefundAction`/`CancelAction` name the payment's own notify url
+  (`Details::callbackUrl()`, i.e. the details' `callback_url`) on every operation via the SDK's
+  `callbackUrl:` (`QuickPay-Callback-Url` header), and those callbacks arrive on the same token endpoint
+  (verified live: delivered within a second, `callback_success: true` on the operation). Only operations
+  made outside the gateway (manager, raw API) still hit the account-wide url; that url is static for
+  every payment and cannot carry a `payum_token`, so an endpoint for it must resolve the payment from
+  the body's `order_id` (`order_prefix` + payum number) and execute `Notify` against that model —
+  `NotifyAction` needs only the model. See `examples/e2e/listen.php` and `docs/UPGRADE-2.0.md`. It
+  fetches the raw
   body + `QuickPay-Checksum-Sha256` header (via Payum's `GetHttpRequest`), **verifies the HMAC signature**
   with the SDK `CallbackValidator`, and rejects an invalid/unsigned callback with a 400 `HttpResponse`
   before delegating to the internal `ConfirmPayment` request.
@@ -246,17 +253,17 @@ actions need (`getOrderPrefix()`, `getPaymentMethods()`, `getLanguage()`, `isAut
 `isSynchronized()` is not a state of its own — it reads through to the wrapped client, so there is one
 source of truth for the flag.
 
-### Operations helper (`src/Operations.php`)
+### Reading a payment (no helper class of our own)
 
 The custom `src/Model/*` classes are gone — responses are the SDK's readonly DTOs (`Response\Payment\
-{Payment,Operation,Link}`) plus the `PaymentState`/`OperationType` enums. The behavior that used to live
-on those models now lives in the stateless `Operations` helper over a `list<Operation>`:
-`isApproved()` (status code `20000`), `isApprovedOfType()`, `latestApproved()`, `latestOfType()`,
-`hasApproved()`, `hasPending()`. `StatusAction` (last *approved* operation, so a trailing
-rejected/pending attempt does not mask what happened), the `Authorize`/`Capture` entry-point decisions
-and the declined-operation check are driven by these helpers plus the SDK enums. Every helper has a
-caller in `src/`; the ones that lost theirs along the way (`latest()`, `isLatestApproved()`,
-`authorizedAmount()`) were dropped before 2.0 rather than kept as accidental public API.
+{Payment,Operation,Link}`) plus the `PaymentState`/`OperationType` enums — and so is the package's
+interim `Operations` helper: since SDK 1.2 the DTOs answer the questions the actions ask.
+`StatusAction` decides from `Payment::latestApprovedOperation()` (so a trailing rejected/pending
+attempt does not mask what happened to the money), the `Authorize`/`Capture` entry points from
+`hasApprovedOperation(type)`/`hasPendingOperation(type)`, the declined-operation check from
+`latestOperationOfType(type)?->isDeclined()`, and `Convert`'s adopt-or-refuse from
+`latestApprovedOperation()`. "Latest" is the highest operation id (Quickpay numbers them per payment
+from 1); the test fixtures number their operations for exactly that reason.
 
 ## End-to-end harness (`examples/e2e/`)
 
@@ -273,10 +280,11 @@ Two things it encodes that are easy to get wrong:
   `addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])` — payum/core's plain-PHP
   bridge does **not** populate `GetHttpRequest::$headers`, so outside Symfony every callback would be
   rejected as unsigned. The harness is the reference for that wiring.
-- `listen.php` handles **both** callback shapes: the payment-window one carries a `payum_token`, while a
-  callback sent to the account-wide url cannot, so it resolves the payment from the body's `order_id`
-  instead. The log tags each `via=token` or `via=order_id`, which is how the two-url routing above was
-  established in the first place.
+- `listen.php` handles **both** callback shapes: everything the gateway is party to — the payment
+  window's callback and, since the operations name the notify url, the capture/refund/cancel ones —
+  carries a `payum_token`; a callback sent to the account-wide url (an operation made in the manager)
+  cannot, so it resolves the payment from the body's `order_id` instead. The log tags each `via=token` or
+  `via=order_id`, which is how the two-url routing was established in the first place.
 
 `e2e:operate` takes an optional amount on `capture` and `refund`, setting the `capture_amount` /
 `refund_amount` details keys.

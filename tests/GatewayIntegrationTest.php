@@ -241,6 +241,7 @@ final class GatewayIntegrationTest extends TestCase
         self::assertSame('POST', $requests[4]->getMethod());
         self::assertMatchesRegularExpression('#/payments/2002/capture$#', $requests[4]->getUri()->getPath());
         self::assertSame(100, $this->decodeBody($requests[4])['amount']);
+        self::assertSame('https://shop.example/notify', $requests[4]->getHeaderLine('QuickPay-Callback-Url'), 'The capture reports back to the payment\'s own notify url');
     }
 
     /**
@@ -277,13 +278,13 @@ final class GatewayIntegrationTest extends TestCase
         ], $overrides), \JSON_THROW_ON_ERROR));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
+    /** @return array<string, mixed> */
+    private int $nextOperationId = 1;
+
     private function operation(OperationType $type, int $amount): array
     {
         return [
-            'id' => 1,
+            'id' => $this->nextOperationId++,
             'type' => $type->value,
             'amount' => $amount,
             'pending' => false,

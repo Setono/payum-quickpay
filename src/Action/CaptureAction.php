@@ -17,11 +17,9 @@ use Setono\Payum\Quickpay\Amounts;
 use Setono\Payum\Quickpay\Details;
 use Setono\Payum\Quickpay\Exception\OperationPendingException;
 use Setono\Payum\Quickpay\Exception\OperationRejectedException;
-use Setono\Payum\Quickpay\Operations;
 use Setono\Payum\Quickpay\Request\Api\CreatePaymentLink;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Request\Payment\CaptureRequest;
-use Setono\Quickpay\Response\Payment\Operation;
 use Setono\Quickpay\Response\Payment\Payment;
 
 /**
@@ -61,16 +59,15 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
 
         $paymentId = Details::paymentId($model);
         $payment = $this->api->payments()->getById($paymentId);
-        $operations = $payment->operations;
 
         // The payment is in hand, so keep the balance fresh — same key every fetching action writes.
         $model['balance'] = $payment->balance;
 
-        if (Operations::hasApproved($operations, OperationType::Authorize)) {
+        if ($payment->hasApprovedOperation(OperationType::Authorize)) {
             // Authorized through a link that captures by itself: Quickpay is taking the money, and
             // there is no way to issue a capture from here that could not double up on it — unless
             // Quickpay's own capture has failed for good.
-            if (self::linkAutoCaptures($payment) && !self::quickpayGaveUpCapturing($operations, $request)) {
+            if (true === $payment->link?->autoCapture && !self::quickpayGaveUpCapturing($payment, $request)) {
                 return;
             }
 
@@ -82,6 +79,10 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
             $captured = $this->api->payments()->capture(
                 $paymentId,
                 new CaptureRequest(amount: Amounts::forOperation($model, 'capture_amount')),
+                // Quickpay would report this capture to the account-wide callback url (empty by
+                // default). Naming the payment's own notify url — the one its link already carries —
+                // routes the callback to the same per-payment endpoint as the payment window's.
+                callbackUrl: Details::callbackUrl($model),
             );
 
             // Asynchronously the returned payment is a snapshot with the capture still pending and
@@ -97,7 +98,7 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
         // An authorize is in flight (3-D Secure, an asynchronous acquirer). A fresh link now would
         // race its outcome; the next call — after the callback, or the customer's return — will see
         // the result.
-        if (Operations::hasPending($operations, OperationType::Authorize)) {
+        if ($payment->hasPendingOperation(OperationType::Authorize)) {
             return;
         }
 
@@ -133,32 +134,15 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
      * and the shop sees `authorized`, which is the truth. Settling is the merchant's call: a
      * programmatic `Capture` (no token — the shop's own code, or a state-machine hook), and that one
      * captures.
-     *
-     * @param list<Operation> $operations
      */
-    private static function quickpayGaveUpCapturing(array $operations, Capture $request): bool
+    private static function quickpayGaveUpCapturing(Payment $payment, Capture $request): bool
     {
-        if (Operations::hasApproved($operations, OperationType::Capture) ||
-            Operations::hasPending($operations, OperationType::Capture)) {
-            return false;
-        }
-
-        $capture = Operations::latestOfType($operations, OperationType::Capture);
-        if (null === $capture) {
+        if ($payment->hasApprovedOperation(OperationType::Capture) ||
+            $payment->hasPendingOperation(OperationType::Capture) ||
+            null === $payment->latestOperationOfType(OperationType::Capture)) {
             return false;
         }
 
         return null === $request->getToken();
-    }
-
-    /**
-     * Whether the payment's link was created with `auto_capture`. The SDK's {@see \Setono\Quickpay\Response\Payment\Link}
-     * DTO does not model the flag, so it is read off the raw payload the payment is stamped with.
-     */
-    private static function linkAutoCaptures(Payment $payment): bool
-    {
-        $link = $payment->raw['link'] ?? null;
-
-        return is_array($link) && true === ($link['auto_capture'] ?? null);
     }
 }

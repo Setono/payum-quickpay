@@ -46,7 +46,8 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         // cancelled payment with a `ValidationException`, and that surfaces to the caller: it is a real
         // state conflict, and swallowing it would tell a shop it had cancelled a payment whose money is
         // still held. A caller that genuinely wants a no-op can catch the typed exception itself.
-        $cancelled = $this->api->payments()->cancel($paymentId);
+        // The callback is routed to the payment's own notify url — see Details::callbackUrl().
+        $cancelled = $this->api->payments()->cancel($paymentId, callbackUrl: Details::callbackUrl($model));
 
         // Asynchronously the returned payment is a snapshot with the cancel still pending and nothing
         // to read; synchronized, it carries the outcome — and a decline is a 2xx.

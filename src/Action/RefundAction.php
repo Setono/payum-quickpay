@@ -50,6 +50,8 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         $refunded = $this->api->payments()->refund(
             $paymentId,
             new RefundRequest(amount: self::resolveAmount($model, $paymentId, $payment)),
+            // Route the callback to the payment's own notify url — see Details::callbackUrl().
+            callbackUrl: Details::callbackUrl($model),
         );
 
         // Asynchronously the returned payment is a snapshot with the refund still pending and nothing
