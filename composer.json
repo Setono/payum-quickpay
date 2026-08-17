@@ -15,7 +15,7 @@
         "ext-filter": "*",
         "ext-hash": "*",
         "ext-json": "*",
-        "payum/core": "^1.6",
+        "payum/core": "^1.7.5",
         "php-http/message-factory": "^1.0",
         "setono/quickpay-php-sdk": "^1.0"
     },

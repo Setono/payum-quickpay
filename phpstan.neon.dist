@@ -3,8 +3,9 @@ parameters:
     paths:
         - src
 
-    # payum/core marks GetHttpRequest #[AllowDynamicProperties]: `headers` is a dynamic property only
-    # some bridges set (the Symfony one, and our HeaderAwareGetHttpRequestAction). This is PHPStan's
-    # documented way to say "dynamic properties are part of this class's contract".
+    # payum/core marks GetHttpRequest #[AllowDynamicProperties] (since 1.7.5, hence the constraint in
+    # composer.json): `headers` is a dynamic property only some bridges set (the Symfony one, and our
+    # HeaderAwareGetHttpRequestAction). This is PHPStan's documented way to say "dynamic properties are
+    # part of this class's contract".
     universalObjectCratesClasses:
         - Payum\Core\Request\GetHttpRequest

@@ -6,6 +6,10 @@ handling, and modernizes the test suite. This is a major release with breaking c
 
 ## Requirements
 
+- `payum/core` **1.7.5 or newer** (`^1.7.5`, was `^1.6`). That is the release that marks
+  `GetHttpRequest` `#[\AllowDynamicProperties]`; the `headers` property the callback verification reads
+  is a dynamic one, and on older payum/core every callback would raise a "creation of dynamic property"
+  deprecation on PHP 8.2+ (an error on PHP 9).
 - The SDK is built on PSR-18 / PSR-17 and discovers them via `php-http/discovery`. Make sure your
   project provides a PSR-18 client and PSR-17 factories (e.g. `composer require kriswallsmith/buzz
   nyholm/psr7`, or any other implementation).
