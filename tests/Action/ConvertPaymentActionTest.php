@@ -16,6 +16,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Action\ConvertPaymentAction;
 use Setono\Payum\Quickpay\Tests\ApiTestTrait;
+use Setono\Quickpay\Enum\PaymentState;
 use stdClass;
 
 /**
@@ -59,6 +60,8 @@ class ConvertPaymentActionTest extends TestCase
 
         $convert = new Convert($payment, 'array', $token);
 
+        // The lookup (nothing under that order id yet), then the create.
+        $this->queueResponse('[]');
         $this->queuePayment(['id' => 1001, 'order_id' => 'ut000000000001']);
 
         $action = new ConvertPaymentAction();
@@ -86,11 +89,14 @@ class ConvertPaymentActionTest extends TestCase
             self::assertIsNotObject($value, 'Details must not contain objects');
         }
 
-        // The create request carries only order_id + currency.
+        // Find-or-create: an exact order_id lookup first, then the create — which carries only
+        // order_id + currency (+ the shopsystem).
         $requests = $this->getRequests();
-        self::assertCount(1, $requests);
-        $this->assertRequest($requests[0], 'POST', '#/payments$#');
-        $body = $this->decodeBody($requests[0]);
+        self::assertCount(2, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments$#');
+        self::assertSame('order_id=ut000000000001&page=1&page_size=1', urldecode($requests[0]->getUri()->getQuery()));
+        $this->assertRequest($requests[1], 'POST', '#/payments$#');
+        $body = $this->decodeBody($requests[1]);
         self::assertSame('ut000000000001', $body['order_id']);
         self::assertSame('DKK', $body['currency']);
         self::assertArrayNotHasKey('card', $body);
@@ -203,12 +209,130 @@ class ConvertPaymentActionTest extends TestCase
             $action->setGateway($this->gateway);
             $action->setApi($this->api);
 
+            $this->queueResponse('[]');
             $this->queuePayment(['id' => 1001, 'order_id' => $expectedOrderId]);
 
             $action->execute($convert);
 
             $requests = $this->getRequests();
             self::assertSame($expectedOrderId, $this->decodeBody($requests[array_key_last($requests)])['order_id']);
+        }
+    }
+
+    // -- Find-or-create ----------------------------------------------------------------------
+
+    /**
+     * Quickpay enforces order_id uniqueness per account (a second create is a 400 "order_id already
+     * exists on another payment" — verified live), and under Sylius the Payum payment number is the
+     * ORDER number, so a customer who was declined and pays again carries the same order id. A payment
+     * that already exists under it and was never successfully paid — the window never completed, or the
+     * attempt was declined — is picked up where it was left instead of the create failing.
+     *
+     * @param array<string, mixed> $existing
+     */
+    #[Test]
+    #[DataProvider('reusablePaymentProvider')]
+    public function shouldPickUpAnExistingPaymentNobodyHasPaid(array $existing): void
+    {
+        $payment = $this->createPayment();
+        $convert = new Convert($payment, 'array');
+
+        $this->queueResponse('[' . $this->paymentJson(array_replace(['id' => 4242, 'order_id' => 'ut000000000001'], $existing)) . ']');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+        $action->execute($convert);
+
+        /** @var array<string, mixed> $result */
+        $result = $convert->getResult();
+
+        self::assertSame(4242, $result['quickpayPaymentId']);
+        self::assertSame('ut000000000001', $result['order_id']);
+        self::assertSame('DKK', $result['currency']);
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests, 'Only the lookup — nothing is created');
+        $this->assertRequest($requests[0], 'GET', '#/payments$#');
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function reusablePaymentProvider(): iterable
+    {
+        yield 'created, window never completed' => [['state' => PaymentState::Initial->value, 'operations' => []]];
+        yield 'declined attempt' => [['state' => PaymentState::Rejected->value, 'operations' => [
+            ['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => false, 'qp_status_code' => '40000'],
+        ]]];
+        yield 'authorize still in flight (3-D Secure in another tab)' => [['state' => PaymentState::Pending->value, 'operations' => [
+            ['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => true, 'qp_status_code' => null],
+        ]]];
+    }
+
+    /**
+     * A payment that HAS an approved operation is never adopted silently: it may be this order's
+     * earlier payment that really was paid, or another environment's payment under a prefix that
+     * should not be shared. Either way that is the shop's call, so it is a clear exception — never a
+     * claim of money.
+     *
+     * @param list<array<string, mixed>> $operations
+     */
+    #[Test]
+    #[DataProvider('paidPaymentProvider')]
+    public function shouldRefuseToAdoptAnExistingPaymentThatWasPaid(string $state, array $operations, string $expectedType): void
+    {
+        $convert = new Convert($this->createPayment(), 'array');
+
+        $this->queueResponse('[' . $this->paymentJson(['id' => 4242, 'order_id' => 'ut000000000001', 'state' => $state, 'operations' => $operations]) . ']');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage(sprintf('already exists (id 4242, state %s) and has an approved %s', $state, $expectedType));
+
+        try {
+            $action->execute($convert);
+        } finally {
+            self::assertCount(1, $this->getRequests(), 'Only the lookup — nothing is created');
+        }
+    }
+
+    /**
+     * @return iterable<string, array{string, list<array<string, mixed>>, string}>
+     */
+    public static function paidPaymentProvider(): iterable
+    {
+        $authorize = ['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => false, 'qp_status_code' => '20000'];
+
+        yield 'authorized' => [PaymentState::New->value, [$authorize], 'authorize'];
+        yield 'captured' => [PaymentState::Processed->value, [$authorize, ['id' => 2, 'type' => 'capture', 'amount' => 100, 'pending' => false, 'qp_status_code' => '20000']], 'capture'];
+        yield 'cancelled' => [PaymentState::Processed->value, [$authorize, ['id' => 2, 'type' => 'cancel', 'amount' => 100, 'pending' => false, 'qp_status_code' => '20000']], 'cancel'];
+    }
+
+    /**
+     * The existing payment is what Quickpay charges in; a retry in another currency cannot reuse it.
+     */
+    #[Test]
+    public function shouldRefuseToAdoptAnExistingPaymentInAnotherCurrency(): void
+    {
+        $convert = new Convert($this->createPayment(), 'array');
+
+        $this->queueResponse('[' . $this->paymentJson(['id' => 4242, 'order_id' => 'ut000000000001', 'currency' => 'EUR', 'state' => PaymentState::Initial->value]) . ']');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('already exists (id 4242) in EUR, but this payment is in DKK');
+
+        try {
+            $action->execute($convert);
+        } finally {
+            self::assertCount(1, $this->getRequests());
         }
     }
 

@@ -119,8 +119,15 @@ the `quickpayPaymentId` (int) it carries is the single source of truth — actio
 `Api::payments()->getById()` rather than passing the model through as API params.
 
 Request → Action flow (amounts are integer minor units everywhere — no conversion):
-- **Convert** → `ConvertPaymentAction` — turns a Payum `PaymentInterface` into the details array; creates
-  the Quickpay payment (via `CreatePaymentRequest`) if absent and stores **only scalars** —
+- **Convert** → `ConvertPaymentAction` — turns a Payum `PaymentInterface` into the details array;
+  **finds or creates** the Quickpay payment if the details carry no id: `findByOrderId()` first — Quickpay
+  enforces `order_id` uniqueness per account (a second create is a 400 "already exists on another
+  payment", verified live 2026-08-17) and under Sylius the Payum payment number is the *order* number, so
+  a retry after a decline collides — and an existing payment is adopted only if nothing was ever
+  approved on it (`findReusablePayment()`: initial/declined/authorize-in-flight; the currency must
+  match). One with an approved operation is a `LogicException` naming it — never adopt money silently:
+  it is either this order's earlier paid payment or another environment's under a shared prefix. Otherwise
+  it creates the payment (via `CreatePaymentRequest`, with `Shopsystem` = this package + version) and stores **only scalars** —
   `quickpayPaymentId`, `amount`, `currency`, `order_id` — plus `continue_url` (the token's **target**
   url, so the customer's return re-executes the `Capture`/`Authorize` that sent them out — Payum's
   return-trip convention) and `cancel_url` (the token's after url). It never persists DTO/model objects. On the create path only it asserts its inputs:

@@ -15,8 +15,10 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Model\PaymentInterface;
 use Payum\Core\Request\Convert;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Request\Payment\CreatePaymentRequest;
 use Setono\Quickpay\Request\Payment\Shopsystem;
+use Setono\Quickpay\Response\Payment\Payment;
 
 class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -54,14 +56,16 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
             $currency = self::assertNotEmptyString($paymentModel->getCurrencyCode(), 'currency code', $number);
             $orderId = self::assertOrderId($this->api->getOrderPrefix() . $number);
 
-            $payment = $this->api->payments()->create(new CreatePaymentRequest(
-                orderId: $orderId,
-                currency: $currency,
-                // Quickpay's "shopsystem" is what the payment was created with — it shows in the
-                // manager and tells Quickpay support which integration they are looking at. A shop's
-                // own Convert action (the Sylius plugin has one) can say something more specific.
-                shopsystem: new Shopsystem(name: self::PACKAGE, version: self::version()),
-            ));
+            $payment = $this->findReusablePayment($orderId, $currency)
+                ?? $this->api->payments()->create(new CreatePaymentRequest(
+                    orderId: $orderId,
+                    currency: $currency,
+                    // Quickpay's "shopsystem" is what the payment was created with — it shows in the
+                    // manager and tells Quickpay support which integration they are looking at. A
+                    // shop's own Convert action (the Sylius plugin has one) can say something more
+                    // specific.
+                    shopsystem: new Shopsystem(name: self::PACKAGE, version: self::version()),
+                ));
 
             $details['quickpayPaymentId'] = $payment->id;
             $details['order_id'] = $payment->orderId;
@@ -149,6 +153,63 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         }
 
         $details['currency'] = $currency;
+    }
+
+    /**
+     * Find-or-create, the safe half: the Quickpay payment that already carries this order id, if it
+     * can be picked up where it was left — or null, meaning "create one".
+     *
+     * Quickpay enforces `order_id` uniqueness per account (a second create is a 400 "order_id already
+     * exists on another payment" — verified live), and the order id is built from the Payum payment
+     * NUMBER, which under Sylius is the ORDER number: every retry payment for an order — the customer
+     * was declined, came back to the shop and pays again — carries the same number. Without this,
+     * that retry died at Convert with a validation error, for the most ordinary of reasons.
+     *
+     * A payment is picked up only if nothing was ever approved on it — the window was never completed,
+     * or the attempt was declined. That is exactly the retry case, and it can never make anything look
+     * paid that is not: the entry-point actions treat such a payment like a fresh one and send the
+     * customer back to the window. A payment that HAS an approved operation — authorized, captured,
+     * refunded, cancelled — is never adopted silently: it may be this order's earlier payment that
+     * really was paid, or another environment's payment under a prefix that should not be shared, and
+     * either way it is for the shop to decide, so it is a clear exception rather than a claim of money.
+     * The currency has to match too — the payment is what Quickpay charges in.
+     *
+     * @throws LogicException if a payment with this order id exists but cannot be adopted
+     */
+    private function findReusablePayment(string $orderId, string $currency): ?Payment
+    {
+        $existing = $this->api->payments()->findByOrderId($orderId);
+
+        if (null === $existing) {
+            return null;
+        }
+
+        $approved = Operations::latestApproved($existing->operations);
+        if (null !== $approved) {
+            throw new LogicException(sprintf(
+                'A Quickpay payment with order id "%s" already exists (id %d, state %s) and has an approved %s. '
+                . 'The gateway will not adopt it: if it is this order\'s earlier payment, carry its '
+                . 'quickpayPaymentId over; if another shop or environment shares this Quickpay account, '
+                . 'give each its own "order_prefix".',
+                $orderId,
+                $existing->id,
+                $existing->state,
+                $approved->type,
+            ));
+        }
+
+        if ($existing->currency !== $currency) {
+            throw new LogicException(sprintf(
+                'A Quickpay payment with order id "%s" already exists (id %d) in %s, but this payment is in %s. '
+                . 'A Quickpay payment cannot change currency; give the retry a different order id.',
+                $orderId,
+                $existing->id,
+                $existing->currency,
+                $currency,
+            ));
+        }
+
+        return $existing;
     }
 
     /**
