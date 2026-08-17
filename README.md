@@ -58,20 +58,27 @@ QuickpayGatewayFactory::NAME;   // 'quickpay'
 ```php
 <?php
 
-use Payum\Core\PayumBuilder;
 use Payum\Core\GatewayFactoryInterface;
+use Payum\Core\PayumBuilder;
+use Setono\Payum\Quickpay\QuickpayGatewayFactory;
 
-$defaultConfig = [];
-
-$payum = (new PayumBuilder)
-    ->addGatewayFactory('quickpay', function(array $config, GatewayFactoryInterface $coreGatewayFactory) {
-        return new \Setono\Payum\Quickpay\QuickpayGatewayFactory($config, $coreGatewayFactory);
+$payum = (new PayumBuilder())
+    ->addDefaultStorages() // or your own token/payment storages
+    ->addGatewayFactory(QuickpayGatewayFactory::NAME, static function (array $config, GatewayFactoryInterface $coreGatewayFactory): QuickpayGatewayFactory {
+        return new QuickpayGatewayFactory($config, $coreGatewayFactory);
     })
     ->addGateway('quickpay', [
-        'factory' => 'quickpay'
+        'factory' => QuickpayGatewayFactory::NAME,
+        'api_key' => 'your-api-key',
+        'private_key' => 'your-private-key',
+        // any of the options above, e.g.
+        'order_prefix' => 'shop-',
     ])
     ->getPayum();
 ```
+
+Both credentials are validated when the gateway is built, so `getGateway('quickpay')` throws with a
+message naming the missing option rather than the first payment failing with a `401`.
 
 ### `payment_methods`
 
@@ -141,7 +148,10 @@ existing configurations and goes in 3.0.
 
 Quickpay confirms operations with a signed server-to-server callback. `NotifyAction` verifies the
 `QuickPay-Checksum-Sha256` HMAC against your `private_key` before acting on one; an unsigned or
-tampered callback is rejected with a `400`. Two things are easy to get wrong:
+tampered callback is rejected with a `400`. Quickpay retries an undelivered or non-2xx callback up to
+24 times with growing delays, so a wrong `private_key` shows up as a stream of rejected callbacks in
+your logs rather than as silence — and a callback your endpoint fails on will come back. Two things
+are easy to get wrong:
 
 **Quickpay sends callbacks to two different places.** The payment-window authorize goes to the
 per-payment callback url the gateway builds (a Payum notify token). But `capture`/`refund`/`cancel`
@@ -182,8 +192,8 @@ uses. `quickpayPaymentId` is the single source of truth — everything else is a
 | `continue_url` | `Convert` | The token's **target** url: the customer returns to it, and the `Capture`/`Authorize` that sent them out runs again to finish. |
 | `cancel_url` | `Convert` | The token's after url. |
 | `callback_url` | `Capture`, `Authorize` | The notify token url given to Quickpay. |
-| `balance` | `GetStatus`, `Sync`, `Notify`, `Refund` | **What is still captured** — captured minus refunded. |
-| `state` | `Sync` | Quickpay's own payment state. |
+| `balance` | every action that fetches the payment: `Capture`, `Authorize`, `GetStatus`, `Sync`, `Notify`, `Refund` (default path) | **What is still captured** — captured minus refunded. |
+| `state` | `Sync`, `Notify` | Quickpay's own payment state. |
 | `capture_amount`, `refund_amount` | *you* | Optional partial-operation amounts; see below. |
 
 `quickpayPaymentId` is camelCase while everything else is snake_case. That is deliberate and it stays
@@ -250,6 +260,14 @@ So `captured` means "something is held", never how much — Payum has no "partia
 the `balance` details key for the actual figure rather than inferring it from the mark.
 
 ## Sylius
+
+The supported way to use this gateway in a Sylius shop is
+[`setono/sylius-quickpay-plugin`](https://github.com/Setono/SyliusQuickpayPlugin), which registers the
+factory, adds the admin form for the options in the table above (its *capture mode* is Sylius core's
+`use_authorize` option: *immediately* runs the checkout through `Capture`, *on completion* through
+`Authorize` and captures when the payment is completed), provides the callback endpoint — including
+the account-wide one that resolves the payment by `order_id` — and hooks capture/refund/cancel into the
+payment state machine. What follows is the bare wiring, for a shop that does not use the plugin.
 
 Register the gateway factory with PayumBundle under the name `quickpay`:
 

@@ -143,7 +143,8 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   payment whose money is still held. A caller wanting a no-op can catch the typed exception itself.
 - **Notify** → `NotifyAction` — entry point for Quickpay's server-to-server callback. **Quickpay routes
   callbacks to two different urls** (verified live, 2026-08): the payment-window authorize goes to the
-  per-payment `callback_url` on the link — the notify token `AuthorizeAction` mints — while API-initiated
+  per-payment `callback_url` on the link — the notify token `CreatePaymentLinkAction` mints on behalf of
+  `Capture`/`Authorize` — while API-initiated
   `capture`/`refund`/`cancel` go to the **account-wide** url (manager → Settings → Integration), which is
   empty by default, so those callbacks are simply not delivered. That url is static for every payment and
   cannot carry a `payum_token`, so Payum's token routing cannot serve it; an endpoint for it must resolve
@@ -225,9 +226,10 @@ create + link + status), `e2e:listen` (built-in server serving the Payum token u
 (full flow, prints the payment-window url), `e2e:operate` (`status|capture|refund|cancel`).
 
 Two things it encodes that are easy to get wrong:
-- `HeaderAwareGetHttpRequestAction` — payum/core's plain-PHP bridge does **not** populate
-  `GetHttpRequest::$headers`, so outside Symfony every callback would be rejected as unsigned. It is
-  registered via `addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])`.
+- It registers the package's `Bridge/PlainPhp/Action/HeaderAwareGetHttpRequestAction` via
+  `addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])` — payum/core's plain-PHP
+  bridge does **not** populate `GetHttpRequest::$headers`, so outside Symfony every callback would be
+  rejected as unsigned. The harness is the reference for that wiring.
 - `listen.php` handles **both** callback shapes: the payment-window one carries a `payum_token`, while a
   callback sent to the account-wide url cannot, so it resolves the payment from the body's `order_id`
   instead. The log tags each `via=token` or `via=order_id`, which is how the two-url routing above was
