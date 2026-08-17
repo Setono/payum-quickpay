@@ -11,6 +11,7 @@ use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayInterface;
 use Payum\Core\Request\Generic;
 use Payum\Core\Security\TokenInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Prophecy\PhpUnit\ProphecyTrait;
 use ReflectionClass;
@@ -27,33 +28,39 @@ abstract class GenericActionTestCase extends TestCase
 {
     use ProphecyTrait;
 
-    /** @var Generic */
-    protected $requestClass;
+    /**
+     * The Payum request class the action under test handles. Static — and redeclared per subclass —
+     * because the data providers below read it, and PHPUnit calls data providers statically, before
+     * the test case is instantiated (a non-static provider is deprecated in PHPUnit 10, an error in
+     * 11). Late static binding resolves it to the subclass's value.
+     *
+     * @var class-string<Generic>
+     */
+    protected static string $requestClass;
 
-    /** @var string */
-    protected $actionClass;
+    /** @var class-string<ActionInterface> */
+    protected static string $actionClass;
 
-    /** @var ActionInterface */
-    protected $action;
+    protected ActionInterface $action;
 
     protected function setUp(): void
     {
-        $this->action = new $this->actionClass();
+        $this->action = new static::$actionClass();
     }
 
-    public function provideSupportedRequests(): Iterator
+    public static function provideSupportedRequests(): Iterator
     {
-        yield [new $this->requestClass([])];
-        yield [new $this->requestClass(new ArrayObject())];
+        yield [new static::$requestClass([])];
+        yield [new static::$requestClass(new ArrayObject())];
     }
 
-    public function provideNotSupportedRequests(): Iterator
+    public static function provideNotSupportedRequests(): Iterator
     {
         yield ['foo'];
         yield [['foo']];
         yield [new stdClass()];
-        yield [new $this->requestClass('foo')];
-        yield [new $this->requestClass(new stdClass())];
+        yield [new static::$requestClass('foo')];
+        yield [new static::$requestClass(new stdClass())];
 
         // A bare Generic request that is not the action's specific request type. Generic is
         // abstract but declares no abstract methods, so an anonymous subclass stands in for it
@@ -64,36 +71,33 @@ abstract class GenericActionTestCase extends TestCase
 
     public function testShouldImplementActionInterface(): void
     {
-        $rc = new ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass(static::$actionClass);
 
         self::assertTrue($rc->implementsInterface(ActionInterface::class));
     }
 
     /**
-     * @dataProvider provideSupportedRequests
-     *
      * @param mixed $request
      */
+    #[DataProvider('provideSupportedRequests')]
     public function testShouldSupportRequest($request): void
     {
         self::assertTrue($this->action->supports($request));
     }
 
     /**
-     * @dataProvider provideNotSupportedRequests
-     *
      * @param mixed $request
      */
+    #[DataProvider('provideNotSupportedRequests')]
     public function testShouldNotSupportRequest($request): void
     {
         self::assertFalse($this->action->supports($request));
     }
 
     /**
-     * @dataProvider provideNotSupportedRequests
-     *
      * @param mixed $request
      */
+    #[DataProvider('provideNotSupportedRequests')]
     public function testThrowIfNotSupportedRequestGivenAsArgumentForExecute($request): void
     {
         $this->expectException(RequestNotSupportedException::class);

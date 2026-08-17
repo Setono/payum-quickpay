@@ -10,6 +10,8 @@ use Payum\Core\Exception\LogicException;
 use Payum\Core\Extension\ExtensionCollection;
 use Payum\Core\Gateway;
 use Payum\Core\GatewayFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionException;
@@ -22,37 +24,30 @@ use stdClass;
 class QuickpayGatewayFactoryTest extends TestCase
 {
     /**
-     * @test
-     *
      * @throws ReflectionException
      */
+    #[Test]
     public function shouldSubClassGatewayFactory(): void
     {
         $rc = new ReflectionClass(QuickpayGatewayFactory::class);
         self::assertTrue($rc->isSubclassOf(GatewayFactory::class));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function couldBeConstructedWithoutAnyArguments(): void
     {
         $factory = new QuickpayGatewayFactory();
         self::assertInstanceOf(QuickpayGatewayFactory::class, $factory);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldCreateCoreGatewayFactoryIfNotPassed(): void
     {
         $factory = new QuickpayGatewayFactory();
         self::assertInstanceOf(CoreGatewayFactory::class, self::readProperty($factory, 'coreGatewayFactory'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldAllowCreateGateway(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -69,9 +64,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         self::assertNotEmpty(self::readProperty($extensions, 'extensions'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldBuildApiWithInjectedClient(): void
     {
         $client = new Client('injected-key');
@@ -94,9 +87,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         self::assertSame('sylius-', $api->getOrderPrefix());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldBuildClientWithTheConfiguredSynchronizedFlag(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -105,9 +96,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         self::assertTrue(self::createApi($factory, ['synchronized' => true])->isSynchronized());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenInjectedClientDisagreesOnSynchronized(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -121,9 +110,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         ]);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldAcceptPaymentMethodsAsAStringOrAList(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -141,11 +128,9 @@ class QuickpayGatewayFactoryTest extends TestCase
     /**
      * Empty configuration must reach the Api as null, not as the empty string it is written as in the
      * gateway options — null is what keeps `payment_methods` off the request entirely.
-     *
-     * @test
-     *
-     * @dataProvider emptyPaymentMethodsProvider
      */
+    #[Test]
+    #[DataProvider('emptyPaymentMethodsProvider')]
     public function shouldNormalizeEmptyPaymentMethodsToNull(mixed $paymentMethods): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -164,19 +149,14 @@ class QuickpayGatewayFactoryTest extends TestCase
         yield 'a list of blanks' => [['', ' ']];
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldDefaultPaymentMethodsToNull(): void
     {
         self::assertNull(self::createApi(new QuickpayGatewayFactory(), [])->getPaymentMethods());
     }
 
-    /**
-     * @test
-     *
-     * @dataProvider invalidPaymentMethodsProvider
-     */
+    #[Test]
+    #[DataProvider('invalidPaymentMethodsProvider')]
     public function shouldThrowWhenPaymentMethodsIsNeitherStringNorListOfStrings(mixed $paymentMethods): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -202,11 +182,9 @@ class QuickpayGatewayFactoryTest extends TestCase
      * A stored or YAML-sourced gateway config easily stringifies booleans, and the old casts read
      * the string "true" as FALSE ((int) "true" is 0) and "false" as TRUE — an inverted setting with
      * nothing in the configuration that looks wrong. Pin every unambiguous spelling.
-     *
-     * @test
-     *
-     * @dataProvider booleanOptionProvider
      */
+    #[Test]
+    #[DataProvider('booleanOptionProvider')]
     public function shouldNormalizeTheBooleanOptions(mixed $value, bool $expected): void
     {
         $api = self::createApi(new QuickpayGatewayFactory(), [
@@ -235,11 +213,8 @@ class QuickpayGatewayFactoryTest extends TestCase
         yield 'null' => [null, false];
     }
 
-    /**
-     * @test
-     *
-     * @dataProvider ambiguousBooleanProvider
-     */
+    #[Test]
+    #[DataProvider('ambiguousBooleanProvider')]
     public function shouldThrowWhenABooleanOptionIsAmbiguous(mixed $value): void
     {
         $this->expectException(LogicException::class);
@@ -259,11 +234,8 @@ class QuickpayGatewayFactoryTest extends TestCase
         yield 'object' => [new stdClass()];
     }
 
-    /**
-     * @test
-     *
-     * @dataProvider idOptionProvider
-     */
+    #[Test]
+    #[DataProvider('idOptionProvider')]
     public function shouldNormalizeTheIdOptions(mixed $value, ?int $expected): void
     {
         $api = self::createApi(new QuickpayGatewayFactory(), [
@@ -290,11 +262,9 @@ class QuickpayGatewayFactoryTest extends TestCase
 
     /**
      * The old `(int)` cast turned a typo like "abc" into agreement id 0 and sent that to Quickpay.
-     *
-     * @test
-     *
-     * @dataProvider invalidIdProvider
      */
+    #[Test]
+    #[DataProvider('invalidIdProvider')]
     public function shouldThrowWhenAnIdOptionIsInvalid(mixed $value): void
     {
         $this->expectException(LogicException::class);
@@ -315,9 +285,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         yield 'array' => [[266017]];
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenInjectedClientIsInvalid(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -336,9 +304,8 @@ class QuickpayGatewayFactoryTest extends TestCase
      * The credentials were `apikey` / `privatekey` in 1.x. They are required, so every consumer sets
      * them — and Sylius stores the gateway configuration keyed by exactly these names, so dropping the
      * old spellings would break every existing shop until its stored config was migrated.
-     *
-     * @test
      */
+    #[Test]
     public function shouldAcceptTheDeprecatedCredentialOptionNames(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -360,9 +327,8 @@ class QuickpayGatewayFactoryTest extends TestCase
      * `agreement` is optional, so a name that silently stopped being read would not throw — the payment
      * link would just be created without an agreement id, falling back to the account default. Pin both
      * directions.
-     *
-     * @test
      */
+    #[Test]
     public function shouldReadTheAgreementIdUnderEitherName(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -377,9 +343,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         );
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldPreferTheCurrentNamesWhenBothAreGiven(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -399,9 +363,8 @@ class QuickpayGatewayFactoryTest extends TestCase
     /**
      * The deprecated names must satisfy the required-options validation too — otherwise a 1.x config
      * would fail before ever reaching the alias.
-     *
-     * @test
      */
+    #[Test]
     public function shouldStillRequireCredentialsUnderEitherSpelling(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -414,9 +377,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         $config['payum.api'](ArrayObject::ensureArrayObject($config));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldRegisterAnActionForEveryRequestTheGatewaySupports(): void
     {
         $config = (new QuickpayGatewayFactory())->createConfig();
@@ -437,9 +398,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldAllowCreateGatewayConfig(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -448,9 +407,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         self::assertNotEmpty($config);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldConfigContainFactoryNameAndTitle(): void
     {
         $factory = new QuickpayGatewayFactory();
@@ -467,9 +424,8 @@ class QuickpayGatewayFactoryTest extends TestCase
      * symbol — is the contract: consumers store it as `factoryName` on their gateway configurations, so
      * changing it would orphan every one of them. This test is what makes that a deliberate decision
      * instead of a rename nobody noticed.
-     *
-     * @test
      */
+    #[Test]
     public function shouldExposeTheFactoryNameAsAConstant(): void
     {
         self::assertSame('quickpay', QuickpayGatewayFactory::NAME);

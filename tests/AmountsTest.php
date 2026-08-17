@@ -6,14 +6,14 @@ namespace Setono\Payum\Quickpay\Tests;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Amounts;
 
 class AmountsTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldFallBackToTheFullAmountWithoutAnOverride(): void
     {
         $details = new ArrayObject(['amount' => 1000]);
@@ -21,9 +21,7 @@ class AmountsTest extends TestCase
         self::assertSame(1000, Amounts::forOperation($details, 'refund_amount'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldPreferTheOverrideWhenPresent(): void
     {
         $details = new ArrayObject(['amount' => 1000, 'refund_amount' => 250]);
@@ -33,9 +31,8 @@ class AmountsTest extends TestCase
 
     /**
      * The override is per operation, so a refund override must not bleed into a capture.
-     *
-     * @test
      */
+    #[Test]
     public function shouldOnlyReadItsOwnOverrideKey(): void
     {
         $details = new ArrayObject(['amount' => 1000, 'refund_amount' => 250]);
@@ -43,9 +40,7 @@ class AmountsTest extends TestCase
         self::assertSame(1000, Amounts::forOperation($details, 'capture_amount'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldAcceptNumericStrings(): void
     {
         $details = new ArrayObject(['amount' => '1000']);
@@ -53,11 +48,8 @@ class AmountsTest extends TestCase
         self::assertSame(1000, Amounts::forOperation($details, 'refund_amount'));
     }
 
-    /**
-     * @test
-     *
-     * @dataProvider unusableAmountProvider
-     */
+    #[Test]
+    #[DataProvider('unusableAmountProvider')]
     public function shouldThrowOnAnUnusableAmount(mixed $amount, string $expectedMessage): void
     {
         $details = new ArrayObject(['amount' => $amount]);
@@ -86,9 +78,7 @@ class AmountsTest extends TestCase
         yield 'bool' => [true, 'must carry an integer'];
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldConsumeTheOverrideAndLeaveTheFullAmount(): void
     {
         $details = new ArrayObject(['amount' => 1000, 'refund_amount' => 250]);
@@ -100,9 +90,7 @@ class AmountsTest extends TestCase
         self::assertSame(1000, Amounts::forOperation($details, 'refund_amount'), 'The next operation falls back to the full amount');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldConsumeNothingWhenNoOverrideWasSet(): void
     {
         $details = new ArrayObject(['amount' => 1000]);
@@ -112,9 +100,7 @@ class AmountsTest extends TestCase
         self::assertSame(1000, $details['amount']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenNeitherKeyIsPresent(): void
     {
         $this->expectException(LogicException::class);

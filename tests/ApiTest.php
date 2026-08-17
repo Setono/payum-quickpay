@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\Quickpay\Tests;
 
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Api;
 use Setono\Quickpay\Client\Endpoint\PaymentsEndpoint;
@@ -12,9 +13,7 @@ class ApiTest extends TestCase
 {
     use ApiTestTrait;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldExposeConfiguredOptions(): void
     {
         self::assertSame('test-privatekey', $this->api->getPrivateKey());
@@ -28,18 +27,14 @@ class ApiTest extends TestCase
         self::assertInstanceOf(PaymentsEndpoint::class, $this->api->payments());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldReportTheSynchronizedFlagOfTheClient(): void
     {
         self::assertFalse($this->createApi()->isSynchronized());
         self::assertTrue($this->createApi(synchronized: true)->isSynchronized());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldReturnNullPaymentMethodsWhenUnrestricted(): void
     {
         $api = new Api(client: $this->api->getClient(), privateKey: 'test-privatekey');
@@ -47,9 +42,7 @@ class ApiTest extends TestCase
         self::assertNull($api->getPaymentMethods());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldCreateCallbackValidatorBoundToThePrivateKey(): void
     {
         $validator = $this->api->createCallbackValidator();

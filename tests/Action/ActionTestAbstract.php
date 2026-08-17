@@ -7,6 +7,7 @@ namespace Setono\Payum\Quickpay\Tests\Action;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\GatewayAwareInterface;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use ReflectionException;
 use Setono\Payum\Quickpay\Tests\ApiTestTrait;
@@ -17,37 +18,34 @@ abstract class ActionTestAbstract extends GenericActionTestCase
     use ApiTestTrait;
 
     /**
-     * @test
-     *
      * @throws ReflectionException
      */
+    #[Test]
     public function shouldImplementActionInterface(): void
     {
-        $rc = new ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass(static::$actionClass);
 
         self::assertTrue($rc->implementsInterface(ActionInterface::class));
     }
 
     /**
-     * @test
-     *
      * @throws ReflectionException
      */
+    #[Test]
     public function shouldImplementApiAwareInterface(): void
     {
-        $rc = new ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass(static::$actionClass);
 
         self::assertTrue($rc->implementsInterface(ApiAwareInterface::class));
     }
 
     /**
-     * @test
-     *
      * @throws ReflectionException
      */
+    #[Test]
     public function shouldImplementGatewayAwareInterface(): void
     {
-        $rc = new ReflectionClass($this->actionClass);
+        $rc = new ReflectionClass(static::$actionClass);
 
         self::assertTrue($rc->implementsInterface(GatewayAwareInterface::class));
     }

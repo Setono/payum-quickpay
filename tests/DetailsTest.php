@@ -6,14 +6,14 @@ namespace Setono\Payum\Quickpay\Tests;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Details;
 
 class DetailsTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldReadTheId(): void
     {
         self::assertSame(1001, Details::paymentId(new ArrayObject(['quickpayPaymentId' => 1001])));
@@ -22,9 +22,8 @@ class DetailsTest extends TestCase
     /**
      * Details commonly survive a serialization round trip in the consumer's storage, which may well
      * stringify the id on the way.
-     *
-     * @test
      */
+    #[Test]
     public function shouldAcceptANumericString(): void
     {
         self::assertSame(1001, Details::paymentId(new ArrayObject(['quickpayPaymentId' => '1001'])));
@@ -35,12 +34,10 @@ class DetailsTest extends TestCase
      * to `GET /payments/0` and a NotFoundException blaming an id nobody ever set. This is the clear
      * exception that replaces it.
      *
-     * @test
-     *
-     * @dataProvider unusableIdProvider
-     *
      * @param array<string, mixed> $details
      */
+    #[Test]
+    #[DataProvider('unusableIdProvider')]
     public function shouldThrowOnAnUnusableId(array $details): void
     {
         $this->expectException(LogicException::class);

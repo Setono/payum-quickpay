@@ -10,6 +10,8 @@ use Payum\Core\Model\Token;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Capture;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use ReflectionException;
 use Setono\Payum\Quickpay\Action\CaptureAction;
@@ -19,21 +21,20 @@ use Setono\Quickpay\Exception\ValidationException;
 
 class CaptureActionTest extends ActionTestAbstract
 {
-    protected $requestClass = Capture::class;
+    protected static string $requestClass = Capture::class;
 
-    protected $actionClass = CaptureAction::class;
+    protected static string $actionClass = CaptureAction::class;
 
     /**
      * Only the internal CreatePaymentLinkAction mints a token; the public actions delegate to it
      * rather than dragging payum/core's deprecated GenericTokenFactoryInterface in themselves (#3).
      *
-     * @test
-     *
      * @throws ReflectionException
      */
+    #[Test]
     public function shouldNotDependOnTheTokenFactory(): void
     {
-        self::assertFalse((new ReflectionClass($this->actionClass))->implementsInterface(GenericTokenFactoryAwareInterface::class));
+        self::assertFalse((new ReflectionClass(static::$actionClass))->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
 
     // -- The interactive entry point: a payment nobody has paid yet -----------------------------
@@ -43,9 +44,8 @@ class CaptureActionTest extends ActionTestAbstract
      * executing Capture against a fresh payment drives the whole flow. The link is created WITH
      * auto_capture — "capture" for a payment nobody has paid yet means "have Quickpay take the money
      * the moment the card is authorized" — and the customer is redirected to the window.
-     *
-     * @test
      */
+    #[Test]
     public function shouldSendAFreshPaymentToThePaymentWindowWithAutoCapture(): void
     {
         $token = new Token();
@@ -60,7 +60,7 @@ class CaptureActionTest extends ActionTestAbstract
         $token->setDetails($details);
 
         /** @var Capture $capture */
-        $capture = new $this->requestClass($token);
+        $capture = new static::$requestClass($token);
         $capture->setModel($details);
 
         $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
@@ -88,9 +88,8 @@ class CaptureActionTest extends ActionTestAbstract
     /**
      * Whatever the gateway's (deprecated) auto_capture option says, Capture captures. The option
      * only ever meant something for Authorize.
-     *
-     * @test
      */
+    #[Test]
     public function shouldCaptureAtAuthorizationRegardlessOfTheAutoCaptureOption(): void
     {
         $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
@@ -104,9 +103,7 @@ class CaptureActionTest extends ActionTestAbstract
         self::assertTrue($this->decodeBody($this->getRequests()[1])['auto_capture']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldSendTheCustomerBackToTheWindowAfterADeclinedAttempt(): void
     {
         $this->queuePayment([
@@ -124,9 +121,7 @@ class CaptureActionTest extends ActionTestAbstract
         self::assertCount(2, $this->getRequests());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldDoNothingWhileAnAuthorizeIsPending(): void
     {
         $this->queuePayment([
@@ -146,12 +141,10 @@ class CaptureActionTest extends ActionTestAbstract
      * authorized through a link with auto_capture. Quickpay is capturing (or has); a capture from
      * here could only ever double up on it. This is the one rule that must never break.
      *
-     * @test
-     *
-     * @dataProvider linkAutoCapturesProvider
-     *
      * @param list<array<string, mixed>> $operations
      */
+    #[Test]
+    #[DataProvider('linkAutoCapturesProvider')]
     public function shouldNeverCaptureWhenTheLinkCapturesByItself(string $state, array $operations, ?int $balance): void
     {
         $details = $this->details();
@@ -195,9 +188,7 @@ class CaptureActionTest extends ActionTestAbstract
 
     // -- Settling an Authorize flow later: capture through the API ------------------------------
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldCapturePayment(): void
     {
         $details = $this->details();
@@ -221,11 +212,9 @@ class CaptureActionTest extends ActionTestAbstract
     /**
      * A link created WITHOUT auto_capture (an Authorize flow, or a payment where the flag is
      * absent altogether) means the shop settles itself — so it captures.
-     *
-     * @test
-     *
-     * @dataProvider plainLinkProvider
      */
+    #[Test]
+    #[DataProvider('plainLinkProvider')]
     public function shouldCaptureWhenTheLinkDoesNotCaptureByItself(mixed $link): void
     {
         $overrides = [
@@ -254,9 +243,7 @@ class CaptureActionTest extends ActionTestAbstract
         yield 'link without the flag' => [['url' => 'https://payment.quickpay.net/payments/1001/window']];
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldCaptureThePartialAmountWhenTheDetailsCarryAnOverride(): void
     {
         $details = $this->details(['amount' => 1000, 'capture_amount' => 250]);
@@ -283,9 +270,8 @@ class CaptureActionTest extends ActionTestAbstract
      * Instalments: Quickpay accepts repeated captures against one authorization (verified live,
      * 2026-08), so a payment that already has a capture is captured AGAIN when asked — as long as
      * the link is not the one doing the capturing.
-     *
-     * @test
      */
+    #[Test]
     public function shouldCaptureAgainForAnInstalment(): void
     {
         $details = $this->details(['amount' => 1000, 'capture_amount' => 250]);
@@ -307,9 +293,7 @@ class CaptureActionTest extends ActionTestAbstract
         self::assertSame(250, $this->decodeBody($this->getRequests()[1])['amount']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldCaptureSynchronouslyWhenTheApiIsSynchronized(): void
     {
         $action = new CaptureAction();
@@ -329,9 +313,8 @@ class CaptureActionTest extends ActionTestAbstract
 
     /**
      * A failed capture surfaces, and the instruction survives for a retry.
-     *
-     * @test
      */
+    #[Test]
     public function shouldLetACaptureRejectionSurfaceAndKeepTheOverride(): void
     {
         $details = $this->details(['amount' => 1000, 'capture_amount' => 250]);
@@ -349,9 +332,7 @@ class CaptureActionTest extends ActionTestAbstract
 
     // -- Guards -------------------------------------------------------------------------------
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
     {
         $details = $this->details();
@@ -382,7 +363,7 @@ class CaptureActionTest extends ActionTestAbstract
     private function capture(?ArrayObject $details = null): Capture
     {
         /** @var Capture $capture */
-        $capture = new $this->requestClass($details ?? $this->details());
+        $capture = new static::$requestClass($details ?? $this->details());
 
         return $capture;
     }

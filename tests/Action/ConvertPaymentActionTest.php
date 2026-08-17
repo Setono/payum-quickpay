@@ -11,6 +11,8 @@ use Payum\Core\GatewayAwareInterface;
 use Payum\Core\Model\Payment;
 use Payum\Core\Model\Token;
 use Payum\Core\Request\Convert;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Action\ConvertPaymentAction;
 use Setono\Payum\Quickpay\Tests\ApiTestTrait;
@@ -24,9 +26,7 @@ class ConvertPaymentActionTest extends TestCase
 {
     use ApiTestTrait;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldImplementExpectedInterfaces(): void
     {
         $action = new ConvertPaymentAction();
@@ -36,9 +36,7 @@ class ConvertPaymentActionTest extends TestCase
         self::assertInstanceOf(GatewayAwareInterface::class, $action);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldSupportConvertingAPaymentToArray(): void
     {
         $action = new ConvertPaymentAction();
@@ -49,9 +47,7 @@ class ConvertPaymentActionTest extends TestCase
         self::assertFalse($action->supports('foo'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldCreatePaymentAndStoreOnlyScalarDetails(): void
     {
         $payment = $this->createPayment();
@@ -101,9 +97,7 @@ class ConvertPaymentActionTest extends TestCase
         self::assertArrayNotHasKey('payment', $body);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenCreatingAPaymentWithoutACurrency(): void
     {
         $payment = new Payment();
@@ -129,9 +123,8 @@ class ConvertPaymentActionTest extends TestCase
     /**
      * A missing number would not throw on its own — it is concatenated with the order prefix, so it
      * degrades silently into an order id that is nothing but the prefix.
-     *
-     * @test
      */
+    #[Test]
     public function shouldThrowWhenCreatingAPaymentWithoutANumber(): void
     {
         $payment = new Payment();
@@ -154,11 +147,8 @@ class ConvertPaymentActionTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     *
-     * @dataProvider outOfRangeOrderIdProvider
-     */
+    #[Test]
+    #[DataProvider('outOfRangeOrderIdProvider')]
     public function shouldThrowWhenTheOrderIdIsOutsideQuickpaysLength(string $number, string $expected): void
     {
         $payment = new Payment();
@@ -193,9 +183,7 @@ class ConvertPaymentActionTest extends TestCase
         yield 'one over the maximum' => [str_repeat('9', 19), 'is 21 characters'];
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldAcceptOrderIdsAtBothEndsOfTheRange(): void
     {
         // "ut" + 2 = 4 characters, the minimum; and "ut" + 18 = 20, the maximum.
@@ -224,9 +212,8 @@ class ConvertPaymentActionTest extends TestCase
      * A Quickpay payment's currency is fixed at creation — the authorize happens in that currency no
      * matter what the details say. Overwriting the stored currency, as the action used to, let the
      * shop believe one currency while Quickpay kept charging in the other.
-     *
-     * @test
      */
+    #[Test]
     public function shouldThrowWhenTheCurrencyChangedAfterCreation(): void
     {
         $payment = $this->createPayment();
@@ -253,9 +240,8 @@ class ConvertPaymentActionTest extends TestCase
      * Payum's model allows a null currency. That is nothing to compare against, so the stored value
      * — the one the Quickpay payment was actually created with — must survive instead of being
      * overwritten with null.
-     *
-     * @test
      */
+    #[Test]
     public function shouldKeepTheStoredCurrencyWhenTheModelCarriesNone(): void
     {
         $payment = new Payment();
@@ -277,9 +263,7 @@ class ConvertPaymentActionTest extends TestCase
         self::assertCount(0, $this->getRequests());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldNotCreateAgainWhenPaymentAlreadyExists(): void
     {
         $payment = $this->createPayment();

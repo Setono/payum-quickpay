@@ -6,6 +6,8 @@ namespace Setono\Payum\Quickpay\Tests\Action\Api;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Action\Api\ConfirmPaymentAction;
 use Setono\Payum\Quickpay\Request\Api\ConfirmPayment;
@@ -17,9 +19,7 @@ class ConfirmPaymentActionTest extends TestCase
 {
     use ApiTestTrait;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenPaymentHasNotBeenCreated(): void
     {
         $this->expectException(LogicException::class);
@@ -31,9 +31,8 @@ class ConfirmPaymentActionTest extends TestCase
     /**
      * The callback is the moment the payment changed, so the scalar snapshot is refreshed from it —
      * the same keys Sync writes.
-     *
-     * @test
      */
+    #[Test]
     public function shouldRefreshTheScalarSnapshot(): void
     {
         $this->queuePayment([
@@ -58,9 +57,8 @@ class ConfirmPaymentActionTest extends TestCase
      * A callback can arrive for a payment with no operations yet — Quickpay fires one when the
      * payment is merely created, visible as soon as an account-wide callback url is configured. It
      * must be a quiet no-op: throwing would 500 the notify endpoint and have Quickpay retry forever.
-     *
-     * @test
      */
+    #[Test]
     public function shouldCompleteQuietlyForAPaymentWithoutOperations(): void
     {
         $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
@@ -77,12 +75,10 @@ class ConfirmPaymentActionTest extends TestCase
      * auto_capture option on. Capturing on authorization is the payment LINK's job (its own
      * auto_capture flag, set by CaptureAction); a second capture from here would only race it.
      *
-     * @test
-     *
-     * @dataProvider authorizeCallbackProvider
-     *
      * @param array<string, mixed> $authorize
      */
+    #[Test]
+    #[DataProvider('authorizeCallbackProvider')]
     public function shouldNeverCaptureFromACallback(string $state, array $authorize): void
     {
         $this->queuePayment([
