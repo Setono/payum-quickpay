@@ -11,10 +11,4 @@ return (new Configuration())
     // php-http's MessageFactoryDiscovery, which needs the php-http/message-factory interface package.
     // Our own code never references it, but it must stay declared so a gateway can be constructed
     // standalone (the SDK itself uses PSR-17/PSR-18 and does not need it).
-    ->ignoreErrorsOnPackage('php-http/message-factory', [ErrorType::UNUSED_DEPENDENCY])
-    // HeaderAwareGetHttpRequestAction calls getallheaders(), which is a PHP-internal function on the
-    // Apache/FPM SAPIs and is guarded with function_exists() with a $_SERVER fallback for SAPIs that
-    // lack it. The analyser resolves the symbol to guzzle's dev-only polyfill (ralouphie/getallheaders)
-    // and reports it as a shadow dependency, but depending on the polyfill would be wrong: the code
-    // deliberately works with or without it.
-    ->ignoreErrorsOnPackage('ralouphie/getallheaders', [ErrorType::SHADOW_DEPENDENCY]);
+    ->ignoreErrorsOnPackage('php-http/message-factory', [ErrorType::UNUSED_DEPENDENCY]);
