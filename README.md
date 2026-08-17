@@ -197,7 +197,8 @@ uses. `quickpayPaymentId` is the single source of truth — everything else is a
 
 `quickpayPaymentId` is camelCase while everything else is snake_case. That is deliberate and it stays
 that way: the key is persisted with every payment your shop has ever taken, and its **absence** is
-meaningful — the actions read it as "this payment does not exist at Quickpay yet". Renaming it would
+meaningful — the actions read it (missing, or `null`) as "this payment does not exist at Quickpay yet",
+so `GetStatus` answers `new` and `Sync` does nothing. Renaming it would
 make historical payments report as `new` and could have a capture create a second payment at Quickpay,
 silently, for every row a migration missed. Not worth it for a naming preference.
 
@@ -239,6 +240,12 @@ key, so a retry still refunds what you asked for.
 
 Set the key freshly for each partial operation rather than relying on a previous one: re-executing a
 *successful* partial refund against a reloaded payment would fall back to the full `amount`.
+
+The keys apply to captures and refunds issued **through the API** only. The interactive `Capture` — a
+fresh payment sent through the window — creates the link for the full `amount` and Quickpay's own
+capture takes that; a `capture_amount` set at that point is ignored. All three amounts (`amount`,
+`capture_amount`, `refund_amount`) are read strictly: integers or integer strings, in minor units — a
+fractional value throws rather than being truncated.
 
 **Both can be repeated.** Quickpay accepts several captures against one authorization, so an order can
 be captured in instalments as it ships, and several refunds against what has been captured. Verified

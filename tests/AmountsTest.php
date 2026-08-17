@@ -78,6 +78,38 @@ class AmountsTest extends TestCase
         yield 'bool' => [true, 'must carry an integer'];
     }
 
+    /**
+     * The payment's own amount — what the link is created for — with the same strictness as an
+     * operation amount: the link amount is what Quickpay authorizes, so a silently truncated '249.99'
+     * would be exactly as wrong there.
+     */
+    #[Test]
+    public function shouldReadThePaymentAmountStrictly(): void
+    {
+        self::assertSame(1000, Amounts::amount(new ArrayObject(['amount' => 1000])));
+        self::assertSame(1000, Amounts::amount(new ArrayObject(['amount' => '1000'])));
+        self::assertSame(1000, Amounts::amount(new ArrayObject(['amount' => 1000, 'capture_amount' => 250])), 'Overrides are for operations, not the payment amount');
+    }
+
+    #[Test]
+    #[DataProvider('unusableAmountProvider')]
+    public function shouldThrowOnAnUnusablePaymentAmount(mixed $amount): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('"amount"');
+
+        Amounts::amount(new ArrayObject(['amount' => $amount]));
+    }
+
+    #[Test]
+    public function shouldThrowOnAMissingPaymentAmount(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('must carry an integer "amount"');
+
+        Amounts::amount(new ArrayObject([]));
+    }
+
     #[Test]
     public function shouldConsumeTheOverrideAndLeaveTheFullAmount(): void
     {

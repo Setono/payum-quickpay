@@ -165,6 +165,39 @@ class CreatePaymentLinkActionTest extends TestCase
         }
     }
 
+    /**
+     * The link amount is what Quickpay authorizes, and it is read as strictly as a capture or refund
+     * amount (#62): a fractional value can only mean kroner where øre were expected, and it used to be
+     * silently truncated by an `(int)` cast on the way to the link.
+     */
+    #[Test]
+    #[DataProvider('unusableAmountProvider')]
+    public function shouldThrowBeforeAnyRequestWhenTheAmountIsNotAPositiveInteger(mixed $amount): void
+    {
+        $details = $this->presetDetails();
+        $details['amount'] = $amount;
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('"amount"');
+
+        try {
+            $this->action()->execute(new CreatePaymentLink($details, autoCapture: false));
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'The link request must not be issued');
+        }
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function unusableAmountProvider(): iterable
+    {
+        yield 'fractional' => [249.99];
+        yield 'decimal string' => ['249.99'];
+        yield 'zero' => [0];
+        yield 'null' => [null];
+    }
+
     #[Test]
     public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
     {

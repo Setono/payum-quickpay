@@ -13,6 +13,21 @@ use Setono\Payum\Quickpay\Details;
 
 class DetailsTest extends TestCase
 {
+    /**
+     * "Is there a payment at Quickpay?" — null counts as absent, the way ConvertPaymentAction reads it
+     * (isset), because a consumer's own Convert or a storage round trip may leave `null` behind for
+     * "not created yet". Payum's ArrayObject::offsetExists() alone says true for that.
+     */
+    #[Test]
+    public function shouldTellWhetherAnIdIsPresent(): void
+    {
+        self::assertTrue(Details::hasPaymentId(new ArrayObject(['quickpayPaymentId' => 1001])));
+        self::assertTrue(Details::hasPaymentId(new ArrayObject(['quickpayPaymentId' => '1001'])));
+        self::assertTrue(Details::hasPaymentId(new ArrayObject(['quickpayPaymentId' => 'abc'])), 'Present but unusable is still present — paymentId() is what complains');
+        self::assertFalse(Details::hasPaymentId(new ArrayObject(['quickpayPaymentId' => null])));
+        self::assertFalse(Details::hasPaymentId(new ArrayObject([])));
+    }
+
     #[Test]
     public function shouldReadTheId(): void
     {

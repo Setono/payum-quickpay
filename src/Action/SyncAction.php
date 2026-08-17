@@ -41,7 +41,7 @@ class SyncAction implements ActionInterface, ApiAwareInterface, GatewayAwareInte
 
         // Nothing to sync before the payment exists at Quickpay. That is a normal state for a model
         // that has not been converted yet, not an error, so this is a no-op rather than a throw.
-        if (!$model->offsetExists('quickpayPaymentId')) {
+        if (!Details::hasPaymentId($model)) {
             return;
         }
 
