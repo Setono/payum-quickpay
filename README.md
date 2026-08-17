@@ -124,6 +124,14 @@ Quickpay, so re-running either (the return trip, a refresh, a retry) never creat
 and — the rule that matters — a `Capture` on a payment whose link captures by itself never issues a
 capture of its own. Only Quickpay moves that money, so it cannot be moved twice.
 
+The one exception: Quickpay's **own capture can be declined** by the acquirer (an authorization
+approved, the capture a moment later not — Quickpay tries once and does not retry). The payment then
+reports `authorized`, and only a capture issued through the API can still settle it. The return trip
+still moves no money — the customer lands on your after url with the payment `authorized`, which is
+the truth — but a **programmatic `Capture`** (your own code, a state-machine hook: no token) captures
+through the API exactly like on a plain link, `capture_amount` included. Without that, such a payment
+was stuck at Quickpay's manager and every `Capture` a silent no-op.
+
 ```php
 <?php
 

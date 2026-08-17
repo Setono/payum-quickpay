@@ -187,6 +187,83 @@ class CaptureActionTest extends ActionTestAbstract
         ];
     }
 
+    /**
+     * The one exception to the rule above: Quickpay's OWN capture was declined (an acquirer "do not
+     * honor" at capture time — test card 1000 0000 0000 0032). Quickpay attempts it once and does not
+     * retry, so the money is only held and nothing but a capture issued from here can still settle the
+     * payment. Without this the payment was stuck: `authorized` forever, every Capture a silent no-op.
+     * A programmatic Capture — no token: the merchant settling, a state-machine hook — captures through
+     * the API, and `capture_amount` applies like on a plain link.
+     */
+    #[Test]
+    public function shouldCaptureThroughTheApiWhenQuickpaysOwnCaptureWasDeclined(): void
+    {
+        $details = $this->details(['amount' => 1000, 'capture_amount' => 250]);
+
+        $this->queueAutoCaptureDeclined(amount: 1000);
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 250,
+            'operations' => [$this->operation(OperationType::Capture, amount: 250)],
+        ]);
+
+        $this->action()->execute($this->capture($details));
+
+        $requests = $this->getRequests();
+        self::assertCount(2, $requests);
+        $this->assertRequest($requests[1], 'POST', '#/payments/1001/capture$#');
+        self::assertSame(250, $this->decodeBody($requests[1])['amount']);
+        self::assertFalse($details->offsetExists('capture_amount'));
+    }
+
+    /**
+     * The return trip of the flow, though — the token-carrying Capture Payum's controller re-executes
+     * when the customer comes back — still moves no money even then: the customer has to land somewhere,
+     * and the shop sees `authorized`, which is the truth. Settling is the merchant's call.
+     */
+    #[Test]
+    public function shouldStayANoOpOnTheReturnTripWhenQuickpaysOwnCaptureWasDeclined(): void
+    {
+        $token = new Token();
+        $token->setGatewayName('quickpay');
+        $details = $this->details();
+        $token->setDetails($details);
+
+        /** @var Capture $capture */
+        $capture = new static::$requestClass($token);
+        $capture->setModel($details);
+
+        $this->queueAutoCaptureDeclined(amount: 100);
+
+        $this->action()->execute($capture);
+
+        self::assertCount(1, $this->getRequests(), 'Only the fetch — the return trip never captures');
+        self::assertSame(0, $details['balance']);
+    }
+
+    /**
+     * A declined capture AFTER an approved one (say, an over-capture attempted in the Quickpay manager)
+     * is not Quickpay giving up: the money was taken. Still a no-op.
+     */
+    #[Test]
+    public function shouldNotCaptureWhenAnEarlierCaptureWasApprovedEvenIfALaterOneWasDeclined(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 100,
+            'operations' => [
+                $this->operation(OperationType::Authorize, amount: 100),
+                ['id' => 2, 'type' => 'capture', 'amount' => 100, 'pending' => false, 'qp_status_code' => '20000'],
+                ['id' => 3, 'type' => 'capture', 'amount' => 100, 'pending' => false, 'qp_status_code' => '40000'],
+            ],
+            'link' => $this->link(autoCapture: true),
+        ]);
+
+        $this->action()->execute($this->capture());
+
+        self::assertCount(1, $this->getRequests());
+    }
+
     // -- Settling an Authorize flow later: capture through the API ------------------------------
 
     #[Test]
@@ -486,6 +563,23 @@ class CaptureActionTest extends ActionTestAbstract
             'cancel_url' => 'theCancelUrl',
             'callback_url' => 'thePresetCallbackUrl',
         ], $overrides));
+    }
+
+    /**
+     * An authorized payment whose link captures by itself, but Quickpay's own capture was declined —
+     * the shape of test card 1000 0000 0000 0032 after the customer paid.
+     */
+    private function queueAutoCaptureDeclined(int $amount): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'balance' => 0,
+            'operations' => [
+                $this->operation(OperationType::Authorize, amount: $amount),
+                ['id' => 2, 'type' => 'capture', 'amount' => $amount, 'pending' => false, 'qp_status_code' => '40000', 'qp_status_msg' => 'Rejected by acquirer'],
+            ],
+            'link' => $this->link(autoCapture: true),
+        ]);
     }
 
     /**
