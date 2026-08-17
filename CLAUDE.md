@@ -134,8 +134,12 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   authorize (or any capture) is a no-op — the return trip. **`CaptureAction` on an approved authorize
   never captures when the payment's link carries `auto_capture`** (`raw['link']['auto_capture']` — the
   SDK's `Link` DTO does not model it): Quickpay is taking that money, and a capture from here could only
-  double up. Otherwise (a plain link: an `Authorize` flow settling later) it captures through the API,
-  repeatedly if asked (`capture_amount` instalments).
+  double up — **except when Quickpay's own capture was declined** (`quickpayGaveUpCapturing()`: no
+  capture approved or pending, the newest capture a completed decline; Quickpay attempts it once and
+  does not retry). Then a *token-less* `Capture` (the merchant settling — the shop's code, a
+  state-machine hook) captures through the API so the payment is not stuck `authorized` forever, while
+  the token-carrying return trip still moves no money. Otherwise (a plain link: an `Authorize` flow
+  settling later) it captures through the API, repeatedly if asked (`capture_amount` instalments).
 - **Capture (authorized, plain link) / Refund / Cancel** → call `Api::payments()->capture/refund/cancel(...)`. Operations are
   asynchronous by default (final state arrives via the callback); the actions pass no per-call
   `synchronized` argument — the SDK client's client-wide default (from the `synchronized` option, default

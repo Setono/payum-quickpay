@@ -64,7 +64,10 @@ executes `Capture` — did not work until you found `use_authorize: true`.
 - **Both are idempotent.** They decide from the payment's operations at Quickpay, so re-executing
   either — the return trip, a refresh, a retry — never creates a second link. And a `Capture` on a
   payment whose link captures by itself never issues a capture of its own: only Quickpay moves that
-  money, so it cannot be moved twice.
+  money, so it cannot be moved twice. The one exception (changed after `2.0.0-beta.1`): when
+  Quickpay's own capture was **declined** by the acquirer — it tries once and does not retry — the
+  payment is only authorized, and a *programmatic* `Capture` (no token) captures through the API so the
+  payment is not stuck; the return trip still moves no money.
 - **`Capture` on an authorized payment** (an `Authorize` flow settling later, possibly in
   `capture_amount` instalments) captures through the API, as before.
 

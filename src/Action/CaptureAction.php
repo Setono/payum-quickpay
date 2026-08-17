@@ -20,6 +20,7 @@ use Setono\Payum\Quickpay\Operations;
 use Setono\Payum\Quickpay\Request\Api\CreatePaymentLink;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Request\Payment\CaptureRequest;
+use Setono\Quickpay\Response\Payment\Operation;
 use Setono\Quickpay\Response\Payment\Payment;
 
 /**
@@ -32,6 +33,11 @@ use Setono\Quickpay\Response\Payment\Payment;
  *   Sylius's default checkout do.
  * - **Authorized, via a link with `auto_capture`** — the return trip of the flow above. Quickpay is
  *   capturing (or has); a capture issued from here could only ever double up on it, so it is a no-op.
+ *   The one exception is Quickpay's own capture having been **declined** (an acquirer decline at
+ *   capture time — Quickpay attempts it once and does not retry): the money is still only held, and
+ *   a programmatic `Capture` — the merchant settling — captures through the API like on a plain link.
+ *   The return trip itself (a token-carrying `Capture`) still moves no money: the customer has to
+ *   land somewhere, and the shop sees the payment as `authorized`.
  * - **Authorized, via a plain link** — an {@see \Payum\Core\Request\Authorize} flow settling later,
  *   possibly in instalments (`capture_amount`). Capture through the API, as many times as the
  *   authorization allows.
@@ -61,11 +67,9 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
 
         if (Operations::hasApproved($operations, OperationType::Authorize)) {
             // Authorized through a link that captures by itself: Quickpay is taking the money, and
-            // there is no way to issue a capture from here that could not double up on it. Never risk
-            // that — if Quickpay's own capture is still queued, the callback (or the next status
-            // check) reports it; if it somehow never happens, the payment reports as authorized and
-            // the shop sees it.
-            if (self::linkAutoCaptures($payment)) {
+            // there is no way to issue a capture from here that could not double up on it — unless
+            // Quickpay's own capture has failed for good.
+            if (self::linkAutoCaptures($payment) && !self::quickpayGaveUpCapturing($operations, $request)) {
                 return;
             }
 
@@ -105,6 +109,40 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
     public function supports($request): bool
     {
         return $request instanceof Capture && $request->getModel() instanceof ArrayAccess;
+    }
+
+    /**
+     * On a link that captures by itself, whether Quickpay's own capture is over and done with — and
+     * declined — so that only a capture issued from here can still settle the payment.
+     *
+     * While a capture is approved or pending, or none is recorded yet (the moment right after the
+     * authorization, before Quickpay has recorded the capture it is already making), the answer is no:
+     * anything issued from here could double up. Once the newest capture is a completed decline
+     * (an acquirer "do not honor" at capture time), Quickpay will not try again; without this the
+     * payment was stuck — `authorized` forever, and every `Capture` a silent no-op, so nothing short
+     * of the Quickpay manager could ever take the money.
+     *
+     * Even then the return trip of the flow — the token-carrying `Capture` Payum's controller
+     * re-executes when the customer comes back — stays a no-op: the customer must land somewhere,
+     * and the shop sees `authorized`, which is the truth. Settling is the merchant's call: a
+     * programmatic `Capture` (no token — the shop's own code, or a state-machine hook), and that one
+     * captures.
+     *
+     * @param list<Operation> $operations
+     */
+    private static function quickpayGaveUpCapturing(array $operations, Capture $request): bool
+    {
+        if (Operations::hasApproved($operations, OperationType::Capture) ||
+            Operations::hasPending($operations, OperationType::Capture)) {
+            return false;
+        }
+
+        $capture = Operations::latestOfType($operations, OperationType::Capture);
+        if (null === $capture) {
+            return false;
+        }
+
+        return null === $request->getToken();
     }
 
     /**
