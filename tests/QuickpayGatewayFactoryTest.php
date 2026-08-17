@@ -7,12 +7,14 @@ namespace Setono\Payum\Quickpay\Tests;
 use GuzzleHttp\Psr7\Response;
 use Http\Discovery\Psr18ClientDiscovery;
 use Http\Mock\Client as MockHttpClient;
+use Payum\Core\Bridge\PlainPhp\Action\GetHttpRequestAction as PlainPhpGetHttpRequestAction;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\CoreGatewayFactory;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\Extension\ExtensionCollection;
 use Payum\Core\Gateway;
 use Payum\Core\GatewayFactory;
+use Payum\Core\Request\GetHttpRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -20,6 +22,7 @@ use ReflectionClass;
 use ReflectionException;
 use ReflectionProperty;
 use Setono\Payum\Quickpay\Api;
+use Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction;
 use Setono\Payum\Quickpay\QuickpayGatewayFactory;
 use Setono\Quickpay\Client\Client;
 use stdClass;
@@ -493,6 +496,70 @@ class QuickpayGatewayFactoryTest extends TestCase
         ] as $key) {
             self::assertArrayHasKey($key, $config, sprintf('Missing %s', $key));
         }
+    }
+
+    /**
+     * payum's core config puts its plain-PHP GetHttpRequestAction in place before this factory runs;
+     * that action never sets `headers`, so a plain-PHP Payum rejected every callback as unsigned unless
+     * the consumer knew to swap in the header-aware one. The factory does the swap itself — but only
+     * for payum's exact class: anything configured deliberately is left alone.
+     */
+    #[Test]
+    public function shouldReplacePayumsPlainPhpGetHttpRequestActionWithTheHeaderAwareOne(): void
+    {
+        $config = (new QuickpayGatewayFactory())->createConfig();
+
+        self::assertInstanceOf(HeaderAwareGetHttpRequestAction::class, $config['payum.action.get_http_request']);
+    }
+
+    /**
+     * @param object $configured what the consumer (or PayumBundle) put under payum.action.get_http_request
+     */
+    #[Test]
+    #[DataProvider('deliberateGetHttpRequestActionProvider')]
+    public function shouldLeaveADeliberatelyConfiguredGetHttpRequestActionAlone(object $configured): void
+    {
+        $config = (new QuickpayGatewayFactory())->createConfig([
+            'payum.action.get_http_request' => $configured,
+        ]);
+
+        self::assertSame($configured, $config['payum.action.get_http_request']);
+    }
+
+    /**
+     * @return iterable<string, array{object}>
+     */
+    public static function deliberateGetHttpRequestActionProvider(): iterable
+    {
+        yield 'a subclass of payum\'s plain-PHP action' => [new class() extends PlainPhpGetHttpRequestAction {
+        }];
+        yield 'the package\'s own header-aware action, already in place' => [new HeaderAwareGetHttpRequestAction()];
+        yield 'an unrelated action (the Symfony bridge, a stub)' => [new StubGetHttpRequestAction()];
+    }
+
+    /**
+     * And through a real gateway: with nothing configured, executing GetHttpRequest yields headers.
+     */
+    #[Test]
+    public function shouldExposeRequestHeadersToNotifyByDefault(): void
+    {
+        $gateway = (new QuickpayGatewayFactory())->create([
+            'api_key' => '1234',
+            'private_key' => '1234',
+        ]);
+
+        $backup = $_SERVER;
+        $_SERVER['HTTP_QUICKPAY_CHECKSUM_SHA256'] = 'the-checksum';
+
+        try {
+            $gateway->execute($request = new GetHttpRequest());
+        } finally {
+            $_SERVER = $backup;
+        }
+
+        /** @var array<string, string> $headers */
+        $headers = get_object_vars($request)['headers'] ?? [];
+        self::assertSame('the-checksum', $headers['Quickpay-Checksum-Sha256'] ?? null);
     }
 
     #[Test]

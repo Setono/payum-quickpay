@@ -70,6 +70,10 @@ excluding them. `^1.0` excludes every pre-release outright, so that is no longer
 
 `QuickpayGatewayFactory::populateConfig()` is the composition root. It registers every action under a
 `payum.action.*` key and defines `payum.api` — a factory closure that builds the `Api` value object.
+It also swaps payum's plain-PHP `GetHttpRequestAction` (the core config's default, in place before
+`populateConfig()` runs) for the package's `HeaderAwareGetHttpRequestAction` — only when the configured
+value is payum's *exact* class, so PayumBundle's Symfony bridge and anything a consumer chose stay put;
+without that, a plain-PHP Payum rejected every callback as unsigned unless the consumer knew to wire it.
 Required options are just `api_key` and `private_key`. Three 1.x names — `apikey`, `privatekey` and
 `agreement` — remain as deprecated aliases, mapped by `aliasDeprecatedOptions()` **before** the defaults
 are applied; after that, `api_key` exists as `''` and there is no way to tell the consumer only supplied

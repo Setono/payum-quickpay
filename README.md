@@ -163,20 +163,14 @@ acquirer declined throws `Setono\Payum\Quickpay\Exception\OperationRejectedExcep
 acquirer's status code and message). Any partial-amount instruction (`capture_amount`/`refund_amount`)
 survives it, like for any failed call.
 
-**Outside Symfony, headers need help.** payum/core's plain-PHP `GetHttpRequest` bridge does not
-expose request headers, and without the checksum header every callback is rejected as unsigned. If
-you are not on Symfony/Sylius (whose bridge exposes them), register the shipped header-aware action:
-
-```php
-use Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction;
-
-$payum = (new PayumBuilder)
-    ->addCoreGatewayFactoryConfig([
-        'payum.action.get_http_request' => new HeaderAwareGetHttpRequestAction(),
-    ])
-    // ...
-    ->getPayum();
-```
+**Outside Symfony, headers need help — and the gateway provides it.** payum/core's plain-PHP
+`GetHttpRequest` bridge does not expose request headers, and without the checksum header every
+callback would be rejected as unsigned. The gateway factory therefore replaces payum's plain-PHP
+action with the shipped `Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction`
+(a subclass that rebuilds the headers from `$_SERVER`) whenever it finds payum's own — the default on
+a plain-PHP Payum — so nothing needs configuring. Symfony/Sylius (whose bridge exposes the headers) and
+any `payum.action.get_http_request` you configured yourself are left alone; if you do wire your own,
+make sure it sets `headers`.
 
 ### The payment details
 
