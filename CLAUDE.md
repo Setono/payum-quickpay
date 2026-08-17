@@ -24,7 +24,10 @@ binaries live in `vendor/bin`, and the user's shell aliases (`ca`, `cf`, etc.) m
 - `composer fix-style` — ECS auto-fix
 - `composer rector` — Rector dry/apply (config in `rector.php`; not run in CI)
 - `composer infection` — Infection mutation testing (`infection.json.dist`: source `src`, gates
-  `minMsi 65` / `minCoveredMsi 70`; needs a coverage driver — CI runs it on PHP 8.3 with pcov). The
+  `minMsi 85` / `minCoveredMsi 85` — the suite sits at ~90, so a real regression fails CI; needs a
+  coverage driver — CI runs it on PHP 8.3 with pcov; locally on PHP 8.4 the initial run dies under
+  infection's own `thecodingmachine/safe` deprecation flood unless you pass
+  `--initial-tests-php-options='-d error_reporting=24575'`). The
   Stryker dashboard upload behind the README badge is **branch-gated** in `infection.json.dist`
   (`logs.stryker.badge`, currently `2.x`) and needs the `STRYKER_DASHBOARD_API_KEY` repository secret,
   which the CI job passes through — pull request runs compute the score but publish nothing. Update the

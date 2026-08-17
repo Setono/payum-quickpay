@@ -34,12 +34,20 @@ class ApiTest extends TestCase
         self::assertTrue($this->createApi(synchronized: true)->isSynchronized());
     }
 
+    /**
+     * The behavior options default to "off"/"unset": nothing restricted, no auto capture, no ids, `en`.
+     */
     #[Test]
-    public function shouldReturnNullPaymentMethodsWhenUnrestricted(): void
+    public function shouldDefaultTheBehaviorOptionsToOff(): void
     {
         $api = new Api(client: $this->api->getClient(), privateKey: 'test-privatekey');
 
         self::assertNull($api->getPaymentMethods());
+        self::assertFalse($api->isAutoCapture());
+        self::assertSame('', $api->getOrderPrefix());
+        self::assertSame('en', $api->getLanguage());
+        self::assertNull($api->getAgreementId());
+        self::assertNull($api->getBrandingId());
     }
 
     #[Test]

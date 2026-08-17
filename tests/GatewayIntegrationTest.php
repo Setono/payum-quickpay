@@ -7,6 +7,7 @@ namespace Setono\Payum\Quickpay\Tests;
 use GuzzleHttp\Psr7\Response;
 use Http\Mock\Client as MockHttpClient;
 use Payum\Core\Bridge\Spl\ArrayObject;
+use Payum\Core\Extension\GenericTokenFactoryExtension;
 use Payum\Core\GatewayInterface;
 use Payum\Core\Model\Payment;
 use Payum\Core\Model\Token;
@@ -35,7 +36,10 @@ use Setono\Quickpay\Enum\PaymentState;
  * The HTTP seam is the same as everywhere else: the SDK client wraps a mock PSR-18 client via the
  * `quickpay.client` option. The core gateway factory's default (plain-PHP, superglobal-reading)
  * GetHttpRequest action is replaced with the stub by passing the config key — the same override
- * mechanism `addCoreGatewayFactoryConfig()` uses.
+ * mechanism `addCoreGatewayFactoryConfig()` uses — and the token factory is wired the way
+ * `PayumBuilder` wires it, as the `payum.extension.token_factory` extension, so the one aware
+ * interface that only payum's extension machinery satisfies (`GenericTokenFactoryAwareInterface`, on
+ * `CreatePaymentLinkAction`) is exercised for real: the notify token must get minted.
  */
 final class GatewayIntegrationTest extends TestCase
 {
@@ -43,12 +47,15 @@ final class GatewayIntegrationTest extends TestCase
 
     private StubGetHttpRequestAction $httpRequestAction;
 
+    private StubTokenFactory $tokenFactory;
+
     private GatewayInterface $gateway;
 
     protected function setUp(): void
     {
         $this->httpClient = new MockHttpClient();
         $this->httpRequestAction = new StubGetHttpRequestAction();
+        $this->tokenFactory = new StubTokenFactory();
 
         $this->gateway = (new QuickpayGatewayFactory())->create([
             'api_key' => 'integration-apikey',
@@ -57,6 +64,7 @@ final class GatewayIntegrationTest extends TestCase
             'auto_capture' => false,
             'quickpay.client' => new Client('integration-apikey', $this->httpClient),
             'payum.action.get_http_request' => $this->httpRequestAction,
+            'payum.extension.token_factory' => new GenericTokenFactoryExtension($this->tokenFactory),
         ]);
     }
 
@@ -93,20 +101,24 @@ final class GatewayIntegrationTest extends TestCase
         self::assertSame('https://shop.example/capture?payum_token=cap', $details['continue_url'], 'The customer returns to the token url');
         self::assertSame('https://shop.example/after', $details['cancel_url']);
 
-        // -- Capture #1, fresh payment: the interactive entry point. The link is created with
-        // auto_capture and the customer is redirected. The callback url is preset (no token factory
-        // is wired into this bare gateway).
-        $details['callback_url'] = 'https://shop.example/notify';
+        // -- Capture #1, fresh payment: the interactive entry point, executed the way Payum's capture
+        // controller does — with the token — so the notify token for the link's callback_url has to be
+        // minted through the gateway's own extension wiring. The link is created with auto_capture and
+        // the customer is redirected.
+        $token->setDetails($details);
 
         $this->queuePayment(['id' => 2002, 'order_id' => 'it000000000001', 'state' => PaymentState::Initial->value]);
         $this->queueResponse('{"url":"https://payment.quickpay.net/payments/2002/window"}');
 
         try {
-            $this->gateway->execute(new Capture($details));
+            $this->gateway->execute(new Capture($token));
             self::fail('An HttpRedirect reply should have been thrown');
         } catch (HttpRedirect $redirect) {
             self::assertSame('https://payment.quickpay.net/payments/2002/window', $redirect->getUrl());
         }
+
+        self::assertCount(1, $this->tokenFactory->notifyTokensCreated, 'The notify token is minted through the token-factory extension');
+        self::assertSame('https://shop.example/notify?payum_token=stub-notify', $details['callback_url']);
 
         // -- Notify: Quickpay's signed callback once the customer paid. With auto_capture on the link,
         // Quickpay authorized AND captured; the gateway only refreshes its snapshot.
@@ -171,7 +183,10 @@ final class GatewayIntegrationTest extends TestCase
             );
         }
 
-        self::assertTrue($this->decodeBody($requests[2])['auto_capture'], 'Capture-driven: the link captures at authorization');
+        $link = $this->decodeBody($requests[2]);
+        self::assertTrue($link['auto_capture'], 'Capture-driven: the link captures at authorization');
+        self::assertSame('https://shop.example/notify?payum_token=stub-notify', $link['callback_url'], 'The minted notify token url is what Quickpay is given');
+        self::assertSame('https://shop.example/capture?payum_token=cap', $link['continue_url']);
     }
 
     /**
