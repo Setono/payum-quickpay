@@ -26,18 +26,6 @@ final class Operations
     }
 
     /**
-     * @param list<Operation> $operations
-     */
-    public static function latest(array $operations): ?Operation
-    {
-        if ([] === $operations) {
-            return null;
-        }
-
-        return $operations[array_key_last($operations)];
-    }
-
-    /**
      * The most recent approved operation, or null if nothing has been approved (yet).
      *
      * An operation list may end in rejected or still-pending attempts — a failed refund, an
@@ -121,29 +109,5 @@ final class Operations
     public static function isApprovedOfType(?Operation $operation, OperationType $type): bool
     {
         return null !== $operation && $type === $operation->type() && self::isApproved($operation);
-    }
-
-    /**
-     * @param list<Operation> $operations
-     */
-    public static function isLatestApproved(array $operations, OperationType $type): bool
-    {
-        return self::isApprovedOfType(self::latest($operations), $type);
-    }
-
-    /**
-     * The amount of the most recent approved authorize operation, or 0 if there is none.
-     *
-     * @param list<Operation> $operations
-     */
-    public static function authorizedAmount(array $operations): int
-    {
-        foreach (array_reverse($operations) as $operation) {
-            if (OperationType::Authorize === $operation->type() && self::isApproved($operation)) {
-                return (int) $operation->amount;
-            }
-        }
-
-        return 0;
     }
 }

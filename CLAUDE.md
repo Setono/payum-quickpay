@@ -215,11 +215,13 @@ source of truth for the flag.
 
 The custom `src/Model/*` classes are gone — responses are the SDK's readonly DTOs (`Response\Payment\
 {Payment,Operation,Link}`) plus the `PaymentState`/`OperationType` enums. The behavior that used to live
-on those models now lives in the stateless `Operations` helper over a `list<Operation>`: `latest()`,
-`isApproved()` (status code `20000`), `isApprovedOfType()`, `isLatestApproved()`, `latestApproved()`,
-`hasApproved()`, `hasPending()`, `authorizedAmount()`. `StatusAction` (last *approved* operation, so a
-trailing rejected/pending attempt does not mask what happened) and the `Authorize`/`Capture` entry-point
-decisions are driven by these helpers plus the SDK enums.
+on those models now lives in the stateless `Operations` helper over a `list<Operation>`:
+`isApproved()` (status code `20000`), `isApprovedOfType()`, `latestApproved()`, `latestOfType()`,
+`hasApproved()`, `hasPending()`. `StatusAction` (last *approved* operation, so a trailing
+rejected/pending attempt does not mask what happened), the `Authorize`/`Capture` entry-point decisions
+and the declined-operation check are driven by these helpers plus the SDK enums. Every helper has a
+caller in `src/`; the ones that lost theirs along the way (`latest()`, `isLatestApproved()`,
+`authorizedAmount()`) were dropped before 2.0 rather than kept as accidental public API.
 
 ## End-to-end harness (`examples/e2e/`)
 
