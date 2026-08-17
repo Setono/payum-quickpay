@@ -15,6 +15,7 @@ use Payum\Core\Request\Capture;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Amounts;
 use Setono\Payum\Quickpay\Details;
+use Setono\Payum\Quickpay\Exception\OperationPendingException;
 use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Payum\Quickpay\Operations;
 use Setono\Payum\Quickpay\Request\Api\CreatePaymentLink;
@@ -72,6 +73,11 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
             if (self::linkAutoCaptures($payment) && !self::quickpayGaveUpCapturing($operations, $request)) {
                 return;
             }
+
+            // One money operation at a time: a capture, refund or cancel still in flight has not
+            // settled, and another capture on top would race it — retried after a timeout, it takes
+            // the money twice.
+            OperationPendingException::assertNoneInFlight($paymentId, $payment);
 
             $captured = $this->api->payments()->capture(
                 $paymentId,
