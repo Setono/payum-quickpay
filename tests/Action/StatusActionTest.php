@@ -275,6 +275,8 @@ class StatusActionTest extends ActionTestAbstract
         $this->queuePayment(['state' => 'some_future_state']);
 
         $request = $this->statusRequest();
+        // A fresh GetHumanStatus already reads `unknown`, so pre-mark it: the action must actively say so.
+        $request->markNew();
         $this->executeStatus($request);
 
         self::assertSame($request::STATUS_UNKNOWN, $request->getValue());
@@ -303,6 +305,8 @@ class StatusActionTest extends ActionTestAbstract
         ]);
 
         $request = $this->statusRequest();
+        // A fresh GetHumanStatus already reads `unknown`, so pre-mark it: the action must actively say so.
+        $request->markNew();
         $this->executeStatus($request);
 
         self::assertSame($request::STATUS_UNKNOWN, $request->getValue());

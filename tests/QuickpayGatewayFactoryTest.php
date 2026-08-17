@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Setono\Payum\Quickpay\Tests;
 
+use GuzzleHttp\Psr7\Response;
+use Http\Discovery\Psr18ClientDiscovery;
+use Http\Mock\Client as MockHttpClient;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\CoreGatewayFactory;
 use Payum\Core\Exception\LogicException;
@@ -375,6 +378,100 @@ class QuickpayGatewayFactoryTest extends TestCase
         $this->expectExceptionMessage('private_key');
 
         $config['payum.api'](ArrayObject::ensureArrayObject($config));
+    }
+
+    #[Test]
+    public function shouldRequireTheApiKey(): void
+    {
+        $factory = new QuickpayGatewayFactory();
+
+        $config = $factory->createConfig(['private_key' => 'only-the-private-key']);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('api_key');
+
+        $config['payum.api'](ArrayObject::ensureArrayObject($config));
+    }
+
+    /**
+     * The api key never surfaces on the Api object — it goes straight into the SDK client the factory
+     * builds — so the one place to see it arrive is the wire: Quickpay authenticates with Basic auth,
+     * empty user, the key as password. Discovery is pointed at a shared mock client for the test, which
+     * is exactly how the factory builds the client in production (from the key, via php-http/discovery),
+     * and it pins that the deprecated `apikey` spelling reaches the same place.
+     */
+    #[Test]
+    #[DataProvider('apiKeyOptionProvider')]
+    public function shouldAuthenticateTheClientWithTheConfiguredApiKey(string $option): void
+    {
+        $httpClient = new MockHttpClient();
+        $httpClient->addResponse(new Response(200, [], '{"msg":"pong"}'));
+
+        $strategies = Psr18ClientDiscovery::getStrategies();
+        MockClientDiscoveryStrategy::$client = $httpClient;
+        Psr18ClientDiscovery::prependStrategy(MockClientDiscoveryStrategy::class);
+
+        try {
+            $config = (new QuickpayGatewayFactory())->createConfig([
+                $option => 'the-api-key',
+                'private_key' => 'the-private-key',
+            ]);
+
+            $api = $config['payum.api'](ArrayObject::ensureArrayObject($config));
+            self::assertInstanceOf(Api::class, $api);
+
+            $api->getClient()->ping();
+        } finally {
+            Psr18ClientDiscovery::setStrategies(is_array($strategies) ? $strategies : iterator_to_array($strategies));
+            MockClientDiscoveryStrategy::$client = null;
+        }
+
+        $request = $httpClient->getLastRequest();
+        self::assertNotFalse($request);
+        self::assertSame('Basic ' . base64_encode(':the-api-key'), $request->getHeaderLine('Authorization'));
+        self::assertSame('v10', $request->getHeaderLine('Accept-Version'));
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function apiKeyOptionProvider(): iterable
+    {
+        yield 'api_key' => ['api_key'];
+        yield 'deprecated apikey' => ['apikey'];
+    }
+
+    /**
+     * Every option lands on the Api, in the shape the actions read it. Each of these is asserted
+     * individually elsewhere; this pins the whole mapping in one place, so a cast or a key that quietly
+     * stops being passed through cannot slip past.
+     */
+    #[Test]
+    public function shouldPassEveryOptionThroughToTheApi(): void
+    {
+        $api = self::createApi(new QuickpayGatewayFactory(), [
+            'private_key' => 'the-private-key',
+            'order_prefix' => 'shop-',
+            'payment_methods' => ['creditcard', '!jcb'],
+            'language' => 'da',
+            'auto_capture' => '1',
+            'synchronized' => 'true',
+            'agreement_id' => '266017',
+            'branding_id' => 42,
+        ]);
+
+        self::assertSame('the-private-key', $api->getPrivateKey());
+        self::assertSame('shop-', $api->getOrderPrefix());
+        self::assertSame('creditcard,!jcb', $api->getPaymentMethods());
+        self::assertSame('da', $api->getLanguage());
+        self::assertTrue($api->isAutoCapture());
+        self::assertTrue($api->isSynchronized());
+        self::assertSame(266017, $api->getAgreementId());
+        self::assertSame(42, $api->getBrandingId());
+        self::assertTrue(
+            $api->createCallbackValidator()->isValid('body', hash_hmac('sha256', 'body', 'the-private-key')),
+            'The callback validator is bound to the same private key',
+        );
     }
 
     #[Test]
