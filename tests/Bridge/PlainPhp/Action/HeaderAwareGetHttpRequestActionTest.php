@@ -11,10 +11,11 @@ use Setono\Quickpay\Callback\CallbackValidator;
 use stdClass;
 
 /**
- * Under PHPUnit, getallheaders() exists as guzzle's polyfill (ralouphie/getallheaders), which
- * rebuilds headers from `$_SERVER` much like the action's own fallback — so setting `HTTP_*` server
- * variables exercises the real production path either way, and the action's sanitation is what
- * makes the result identical across the two sources.
+ * Under PHPUnit a getallheaders() polyfill (guzzle ships ralouphie/getallheaders) is loaded, so the
+ * default source never reaches the `$_SERVER` reconstruction on its own. The tests therefore pin
+ * three things separately: the action's sanitation over an injected source, the reconstruction
+ * itself via {@see HeaderAwareGetHttpRequestAction::headersFromServer()}, and that the default
+ * source — whichever provider it lands on — yields a header NotifyAction can find.
  */
 final class HeaderAwareGetHttpRequestActionTest extends TestCase
 {
@@ -53,7 +54,9 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         $_SERVER['HTTP_USER_AGENT'] = 'the-agent';
 
         $request = new GetHttpRequest();
-        (new HeaderAwareGetHttpRequestAction())->execute($request);
+        // The $_SERVER reconstruction, injected explicitly so this passes the same way with or
+        // without a getallheaders() polyfill on the include path.
+        (new HeaderAwareGetHttpRequestAction(HeaderAwareGetHttpRequestAction::headersFromServer(...)))->execute($request);
 
         // The parent's own population must be preserved…
         self::assertSame('POST', $request->method);
@@ -77,6 +80,7 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
     {
         $_SERVER['HTTP_QUICKPAY_CHECKSUM_SHA256'] = 'the-checksum';
 
+        // The DEFAULT source — the production wiring — whichever provider it lands on here.
         $request = new GetHttpRequest();
         (new HeaderAwareGetHttpRequestAction())->execute($request);
 
@@ -102,7 +106,7 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         $_SERVER['HTTP_WEIRD_ARRAY'] = ['not', 'scalar'];
 
         $request = new GetHttpRequest();
-        (new HeaderAwareGetHttpRequestAction())->execute($request);
+        (new HeaderAwareGetHttpRequestAction(HeaderAwareGetHttpRequestAction::headersFromServer(...)))->execute($request);
 
         /** @var array<string, string> $headers */
         $headers = $request->headers;
@@ -110,5 +114,44 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         self::assertArrayNotHasKey('Some-Var', $headers);
         self::assertArrayNotHasKey('SOME_VAR', $headers);
         self::assertArrayNotHasKey('Weird-Array', $headers);
+    }
+
+    /**
+     * A polyfilled getallheaders() passes `$_SERVER` values through untouched, so the source can hand
+     * back non-string names and non-scalar values. The action sanitizes whatever it is given the
+     * same way, so the result is identical across providers.
+     *
+     * @test
+     */
+    public function shouldSanitizeWhateverTheSourceReturns(): void
+    {
+        $request = new GetHttpRequest();
+        (new HeaderAwareGetHttpRequestAction(static fn (): array => [
+            'QuickPay-Checksum-Sha256' => 'the-checksum',
+            'X-Int' => 42,
+            'X-Array' => ['not', 'scalar'],
+            7 => 'numeric-name',
+        ]))->execute($request);
+
+        self::assertSame(['QuickPay-Checksum-Sha256' => 'the-checksum', 'X-Int' => '42'], $request->headers);
+    }
+
+    /**
+     * When the reconstruction is what the default source falls back to (no getallheaders(), or one
+     * that answers with an empty list), it reads `$_SERVER` — pinned here directly.
+     *
+     * @test
+     */
+    public function shouldReconstructHeadersFromServer(): void
+    {
+        $_SERVER['HTTP_QUICKPAY_CHECKSUM_SHA256'] = 'the-checksum';
+        $_SERVER['HTTP_X_CUSTOM_HEADER'] = 'custom';
+        $_SERVER['NOT_A_HEADER'] = 'ignored';
+
+        $headers = HeaderAwareGetHttpRequestAction::headersFromServer();
+
+        self::assertSame('the-checksum', $headers['Quickpay-Checksum-Sha256']);
+        self::assertSame('custom', $headers['X-Custom-Header']);
+        self::assertArrayNotHasKey('Not-A-Header', $headers);
     }
 }

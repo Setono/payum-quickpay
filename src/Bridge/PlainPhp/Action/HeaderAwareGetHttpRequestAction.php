@@ -28,6 +28,24 @@ use Payum\Core\Request\GetHttpRequest;
  */
 final class HeaderAwareGetHttpRequestAction extends GetHttpRequestAction
 {
+    /** @var callable(): array<mixed> */
+    private $headerSource;
+
+    /**
+     * @param (callable(): array<mixed>)|null $headerSource where the raw headers come from. Defaults to
+     *                                                     {@see self::defaultHeaderSource()}: the SAPI's
+     *                                                     getallheaders() when it has one, otherwise a
+     *                                                     reconstruction from `$_SERVER`. Injectable so the
+     *                                                     reconstruction can be exercised deterministically —
+     *                                                     under PHPUnit a getallheaders() polyfill is usually
+     *                                                     loaded (guzzle ships one), which would otherwise leave
+     *                                                     the fallback path untested.
+     */
+    public function __construct(?callable $headerSource = null)
+    {
+        $this->headerSource = $headerSource ?? self::defaultHeaderSource(...);
+    }
+
     /**
      * @param mixed|GetHttpRequest $request
      */
@@ -41,7 +59,7 @@ final class HeaderAwareGetHttpRequestAction extends GetHttpRequestAction
         // reads the raw body into `content` straight from php://input, un-re-encoded.
         parent::execute($request);
 
-        $request->headers = self::headers();
+        $request->headers = $this->headers();
     }
 
     /**
@@ -52,11 +70,11 @@ final class HeaderAwareGetHttpRequestAction extends GetHttpRequestAction
      *
      * @return array<string, string>
      */
-    private static function headers(): array
+    private function headers(): array
     {
         $headers = [];
 
-        foreach (self::rawHeaders() as $name => $value) {
+        foreach (($this->headerSource)() as $name => $value) {
             if (!is_string($name) || !is_scalar($value)) {
                 continue;
             }
@@ -68,9 +86,12 @@ final class HeaderAwareGetHttpRequestAction extends GetHttpRequestAction
     }
 
     /**
+     * The default source: getallheaders() when the SAPI (or a polyfill) provides one and it returns
+     * something, otherwise {@see self::headersFromServer()}.
+     *
      * @return array<mixed>
      */
-    private static function rawHeaders(): array
+    public static function defaultHeaderSource(): array
     {
         if (function_exists('getallheaders')) {
             $headers = getallheaders();
@@ -82,8 +103,18 @@ final class HeaderAwareGetHttpRequestAction extends GetHttpRequestAction
             }
         }
 
-        // Fallback for SAPIs without getallheaders(): rebuild from $_SERVER. NotifyAction matches the
-        // header name case-insensitively, so the exact casing produced here does not matter.
+        return self::headersFromServer();
+    }
+
+    /**
+     * Rebuilds the request headers from `$_SERVER`'s `HTTP_*` entries — the fallback for SAPIs
+     * without getallheaders(). NotifyAction matches the header name case-insensitively, so the exact
+     * casing produced here does not matter.
+     *
+     * @return array<string, mixed>
+     */
+    public static function headersFromServer(): array
+    {
         $headers = [];
 
         foreach ($_SERVER as $name => $value) {
