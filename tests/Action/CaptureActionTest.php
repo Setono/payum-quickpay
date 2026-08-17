@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use ReflectionException;
 use Setono\Payum\Quickpay\Action\CaptureAction;
+use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 use Setono\Quickpay\Exception\ValidationException;
@@ -309,6 +310,107 @@ class CaptureActionTest extends ActionTestAbstract
         self::assertCount(2, $requests);
         $this->assertRequest($requests[1], 'POST', '#/payments/1001/capture$#');
         self::assertSame('synchronized', $requests[1]->getUri()->getQuery());
+    }
+
+    /**
+     * Synchronized, Quickpay waits for the acquirer and answers 2xx with the COMPLETED capture — which
+     * includes a declined one: `qp_status_code` other than 20000, `pending` false. That is not an HTTP
+     * error, so the SDK does not throw; the action has to read the outcome, or a decline returns
+     * exactly like an approval and the caller who chose `synchronized` to learn the outcome is told
+     * nothing. The instruction survives, like for any failed call.
+     */
+    #[Test]
+    public function shouldThrowWhenASynchronizedCaptureIsDeclined(): void
+    {
+        $details = $this->details(['amount' => 1000, 'capture_amount' => 250]);
+
+        $action = new CaptureAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->createApi(synchronized: true));
+
+        $this->queueAuthorized(amount: 1000);
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'balance' => 0,
+            'operations' => [
+                $this->operation(OperationType::Authorize, amount: 1000),
+                ['id' => 2, 'type' => 'capture', 'amount' => 250, 'pending' => false, 'qp_status_code' => '40000', 'qp_status_msg' => 'Rejected by acquirer', 'aq_status_code' => '05', 'aq_status_msg' => 'Do not honor'],
+            ],
+        ]);
+
+        try {
+            $action->execute($this->capture($details));
+            self::fail('Expected the decline to surface');
+        } catch (OperationRejectedException $e) {
+            self::assertSame('Quickpay declined the capture of payment 1001: status 40000 (Rejected by acquirer).', $e->getMessage());
+            self::assertSame(1001, $e->getPaymentId());
+            self::assertSame('40000', $e->getOperation()->qpStatusCode);
+            self::assertSame('05', $e->getOperation()->aqStatusCode);
+            self::assertSame(250, $details['capture_amount'], 'The instruction survives for a retry');
+        }
+
+        self::assertCount(2, $this->getRequests());
+        self::assertSame('synchronized', $this->getRequests()[1]->getUri()->getQuery());
+    }
+
+    /**
+     * Asynchronously (the default) the returned payment is only a snapshot taken when the capture was
+     * queued: the new operation is pending and has no status code. That is not a decline — the outcome
+     * arrives later, via the callback or a re-fetch — so the action completes and consumes the override.
+     */
+    #[Test]
+    public function shouldNotMistakeAPendingCaptureForADecline(): void
+    {
+        $details = $this->details(['amount' => 1000, 'capture_amount' => 250]);
+
+        $this->queueAuthorized(amount: 1000);
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'balance' => 0,
+            'operations' => [
+                $this->operation(OperationType::Authorize, amount: 1000),
+                $this->operation(OperationType::Capture, null, amount: 250, pending: true),
+            ],
+        ]);
+
+        $this->action()->execute($this->capture($details));
+
+        self::assertFalse($details->offsetExists('capture_amount'));
+    }
+
+    /**
+     * An earlier declined capture in the list must not be read as the outcome of the one just issued:
+     * the newest capture is what was just done. Here that one is approved (synchronized retry after a
+     * decline), so the action completes.
+     */
+    #[Test]
+    public function shouldReadTheOutcomeOfTheNewestCaptureOnly(): void
+    {
+        $action = new CaptureAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->createApi(synchronized: true));
+
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'operations' => [
+                $this->operation(OperationType::Authorize, amount: 100),
+                ['id' => 2, 'type' => 'capture', 'amount' => 100, 'pending' => false, 'qp_status_code' => '40000'],
+            ],
+            'link' => $this->link(autoCapture: false),
+        ]);
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 100,
+            'operations' => [
+                $this->operation(OperationType::Authorize, amount: 100),
+                ['id' => 2, 'type' => 'capture', 'amount' => 100, 'pending' => false, 'qp_status_code' => '40000'],
+                ['id' => 3, 'type' => 'capture', 'amount' => 100, 'pending' => false, 'qp_status_code' => '20000'],
+            ],
+        ]);
+
+        $action->execute($this->capture());
+
+        self::assertCount(2, $this->getRequests());
     }
 
     /**

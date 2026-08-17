@@ -15,6 +15,7 @@ use Payum\Core\Request\Capture;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Amounts;
 use Setono\Payum\Quickpay\Details;
+use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Payum\Quickpay\Operations;
 use Setono\Payum\Quickpay\Request\Api\CreatePaymentLink;
 use Setono\Quickpay\Enum\OperationType;
@@ -68,10 +69,14 @@ class CaptureAction implements ActionInterface, ApiAwareInterface, GatewayAwareI
                 return;
             }
 
-            $this->api->payments()->capture(
+            $captured = $this->api->payments()->capture(
                 $paymentId,
                 new CaptureRequest(amount: Amounts::forOperation($model, 'capture_amount')),
             );
+
+            // Asynchronously the returned payment is a snapshot with the capture still pending and
+            // nothing to read; synchronized, it carries the outcome — and a decline is a 2xx.
+            OperationRejectedException::assertNotRejected($paymentId, $captured, OperationType::Capture);
 
             // Only once the API has accepted it — a failed call leaves the instruction in place to retry.
             Amounts::consume($model, 'capture_amount');

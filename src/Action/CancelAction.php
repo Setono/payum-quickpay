@@ -14,6 +14,8 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Cancel;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Details;
+use Setono\Payum\Quickpay\Exception\OperationRejectedException;
+use Setono\Quickpay\Enum\OperationType;
 
 class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -29,11 +31,17 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
+        $paymentId = Details::paymentId($model);
+
         // Errors are deliberately not caught here. Quickpay rejects cancelling an already captured or
         // cancelled payment with a `ValidationException`, and that surfaces to the caller: it is a real
         // state conflict, and swallowing it would tell a shop it had cancelled a payment whose money is
         // still held. A caller that genuinely wants a no-op can catch the typed exception itself.
-        $this->api->payments()->cancel(Details::paymentId($model));
+        $cancelled = $this->api->payments()->cancel($paymentId);
+
+        // Asynchronously the returned payment is a snapshot with the cancel still pending and nothing
+        // to read; synchronized, it carries the outcome — and a decline is a 2xx.
+        OperationRejectedException::assertNotRejected($paymentId, $cancelled, OperationType::Cancel);
     }
 
     public function supports($request): bool

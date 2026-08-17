@@ -10,6 +10,7 @@ use Payum\Core\Request\Refund;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Setono\Payum\Quickpay\Action\RefundAction;
+use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 use Setono\Quickpay\Exception\ValidationException;
@@ -188,5 +189,73 @@ class RefundActionTest extends ActionTestAbstract
         } catch (ValidationException) {
             self::assertSame(250, $details['refund_amount']);
         }
+    }
+
+    /**
+     * Synchronized, a declined refund comes back as a 2xx with the completed operation not approved.
+     * The action reads that outcome and throws; the override survives, like for any failed call.
+     */
+    #[Test]
+    public function shouldThrowWhenASynchronizedRefundIsDeclined(): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000, 'refund_amount' => 250]);
+
+        /** @var Refund $refund */
+        $refund = new static::$requestClass($details);
+
+        $action = new RefundAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->createApi(synchronized: true));
+
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
+            'operations' => [
+                $this->operation(OperationType::Capture, amount: 1000),
+                ['id' => 2, 'type' => 'refund', 'amount' => 250, 'pending' => false, 'qp_status_code' => '40000', 'qp_status_msg' => 'Rejected'],
+            ],
+        ]);
+
+        try {
+            $action->execute($refund);
+            self::fail('Expected the decline to surface');
+        } catch (OperationRejectedException $e) {
+            self::assertSame('Quickpay declined the refund of payment 1001: status 40000 (Rejected).', $e->getMessage());
+            self::assertSame(250, $details['refund_amount'], 'The instruction survives for a retry');
+        }
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        self::assertSame('synchronized', $requests[0]->getUri()->getQuery());
+    }
+
+    /**
+     * Asynchronously the returned payment carries the refund as pending — no outcome yet, not a
+     * decline. The action completes and consumes the override.
+     */
+    #[Test]
+    public function shouldNotMistakeAPendingRefundForADecline(): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000, 'refund_amount' => 250]);
+
+        /** @var Refund $refund */
+        $refund = new static::$requestClass($details);
+
+        $action = new RefundAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
+            'operations' => [
+                $this->operation(OperationType::Capture, amount: 1000),
+                $this->operation(OperationType::Refund, null, amount: 250, pending: true),
+            ],
+        ]);
+
+        $action->execute($refund);
+
+        self::assertFalse($details->offsetExists('refund_amount'));
     }
 }

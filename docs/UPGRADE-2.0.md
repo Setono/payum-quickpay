@@ -38,7 +38,8 @@ handling, and modernizes the test suite. This is a major release with breaking c
 - **Only the two credentials are required.** `language` is defaulted to `en`, and `agreement_id` is
   optional.
 - **New options:** `synchronized` (run capture/refund/cancel synchronously instead of relying on the
-  callback; default `false`, preserving 1.x behavior) and `branding_id` (payment-window branding).
+  callback; default `false`, preserving 1.x behavior — a declined operation then throws, see below) and
+  `branding_id` (payment-window branding).
 - The misspelled, unused `syncronized` option was removed; use `synchronized`.
 - **`auto_capture` is deprecated** — execute `Capture` instead of `Authorize` to capture at
   authorization; see the next section.
@@ -146,6 +147,24 @@ If you rely on those confirmations, you need both halves:
 Alternatively, skip callbacks for operations entirely: enable the `synchronized` option so
 capture/refund/cancel block until the transaction is settled, or poll `GetStatus`, which re-fetches from
 Quickpay.
+
+## A declined synchronized operation throws
+
+> Changed after `2.0.0-beta.1`.
+
+Quickpay reports a declined capture, refund or cancel with a `2xx` and the outcome on the operation
+(`qp_status_code` other than `20000`), never as an HTTP error, so nothing in the SDK throws for it. On
+the default asynchronous path that is fine — the response only carries the operation as pending, and the
+outcome arrives via the callback or the next `GetStatus`. With `synchronized`, though, the response *is*
+the outcome, and until now the actions ignored it: a declined synchronized capture returned exactly like
+an approved one.
+
+`CaptureAction`, `RefundAction` and `CancelAction` now read the newest operation of the type they just
+issued off the returned payment and throw `Setono\Payum\Quickpay\Exception\OperationRejectedException`
+(a `Payum\Core\Exception\RuntimeException`) when it has completed and was not approved. The exception
+carries `getPaymentId()` and `getOperation()` (the SDK `Operation`, with `qpStatusCode`/`qpStatusMsg` and
+the acquirer's `aqStatusCode`/`aqStatusMsg`). A `capture_amount`/`refund_amount` instruction is left in
+place, as for any failed call. Nothing changes for asynchronous operations.
 
 ## Cancelling a captured payment throws
 
