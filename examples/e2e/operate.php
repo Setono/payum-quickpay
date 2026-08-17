@@ -22,6 +22,7 @@ declare(strict_types=1);
  * — the settled state arrives in the callback. Run `status` again a moment later.
  */
 
+use Payum\Core\Exception\ExceptionInterface as PayumException;
 use Payum\Core\Request\Cancel;
 use Payum\Core\Request\Capture;
 use Payum\Core\Request\GetHumanStatus;
@@ -105,8 +106,12 @@ try {
         default:
             e2e_fail(sprintf('Unknown command "%s". Use status, capture, refund or cancel.', $command));
     }
-} catch (QuickpayException $e) {
-    e2e_fail(sprintf("%-9s ... FAILED: %s", $command, $e->getMessage()));
+} catch (QuickpayException|PayumException $e) {
+    // QuickpayException: the API refused the request (a 4xx/5xx). PayumException: the gateway itself
+    // declined to act, or read a bad outcome — OperationRejectedException (Quickpay processed the
+    // operation and the acquirer said no; seen live with the "capture rejected" test card),
+    // OperationPendingException, "nothing left to refund", a missing quickpayPaymentId.
+    e2e_fail(sprintf("%-9s ... FAILED: %s: %s", $command, (new ReflectionClass($e))->getShortName(), $e->getMessage()));
 }
 
 $payum->getStorage(get_class($payment))->update($payment);
