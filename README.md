@@ -35,7 +35,7 @@ Integration — used to verify callback signatures). Other options are optional:
 |-------------------|---------|----------------------------------------------------------------------|
 | `api_key`         | —       | **Required.** Quickpay API key.                                      |
 | `private_key`     | —       | **Required.** Private key; used to verify the callback HMAC.         |
-| `auto_capture`    | `0`     | Capture automatically once an approved authorize is confirmed.       |
+| `auto_capture`    | `0`     | **Deprecated.** Makes an `Authorize` flow capture on authorization; execute `Capture` instead. |
 | `payment_methods` | `''`    | Restrict the payment-window methods (e.g. `creditcard`). See below.  |
 | `order_prefix`    | `''`    | Prepended to the Payum payment number to form the Quickpay order id. |
 | `language`        | `en`    | Payment-window language.                                             |
@@ -91,18 +91,82 @@ The gateway accepts either shape, so a list is fine where that reads better:
 
 ## Usage
 
+### The flow — `Capture` or `Authorize` starts it, like everywhere in Payum
+
+Quickpay is an authorize/capture PSP behind a hosted payment window, and the gateway maps that onto
+Payum's requests the way Payum's own controllers — and Sylius — expect:
+
+1. **`Convert`** turns your Payum payment into the details array and creates the payment at Quickpay.
+2. **`Capture`** or **`Authorize`** against the fresh payment creates the payment link and
+   **redirects the customer to the Quickpay payment window** (Payum's `HttpRedirect` reply). Which
+   one you execute is how you say what the window should do once the card is authorized:
+   - `Capture` — take the money right away. The link carries `auto_capture`, so Quickpay captures
+     the moment the authorization is approved. This is what Payum's capture controller and Sylius's
+     default checkout execute, and it is the common case.
+   - `Authorize` — reserve the amount only. Settle later with `Capture` (in full or in instalments),
+     or release it with `Cancel`.
+3. Quickpay confirms with a signed **callback** (see below), which `Notify` verifies. Then it sends
+   the customer back to the **same token url**, where Payum re-executes the request from step 2 —
+   which now finds the payment authorized/captured and simply completes, and Payum's controller
+   sends the customer on to the after url. Nothing waits for the callback to have arrived.
+4. On an authorized payment, **`Capture`**, **`Refund`** and **`Cancel`** are pure money operations:
+   they call the API and never redirect anywhere.
+
+The interactive step is idempotent: `Capture`/`Authorize` decide from the payment's operations at
+Quickpay, so re-running either (the return trip, a refresh, a retry) never creates a second link
+and — the rule that matters — a `Capture` on a payment whose link captures by itself never issues a
+capture of its own. Only Quickpay moves that money, so it cannot be moved twice.
+
 ```php
 <?php
 
 use Payum\Core\Request\Capture;
 
-$quickpay = $payum->getGateway('quickpay');
+// Checkout, the common case: send the customer through Capture. In a framework this is Payum's
+// capture controller (Sylius does it for you); standalone, mint a capture token and redirect to it.
+$token = $payum->getTokenFactory()->createCaptureToken('quickpay', $payment, 'after-checkout.php');
+header('Location: ' . $token->getTargetUrl());
 
-$model = new \ArrayObject([
-  // ...
-]);
+// Authorize-then-settle instead: an authorize token at checkout…
+$token = $payum->getTokenFactory()->createAuthorizeToken('quickpay', $payment, 'after-checkout.php');
+// …and later — e.g. when the order ships — a programmatic Capture of what was authorized:
+$payum->getGateway('quickpay')->execute(new Capture($payment->getDetails()));
+```
 
-$quickpay->execute(new Capture($model));
+The `auto_capture` gateway option is **deprecated** in favour of this: it made an `Authorize` flow
+capture on authorization too, which is exactly what executing `Capture` means. It still works for
+existing configurations and goes in 3.0.
+
+### Callbacks
+
+Quickpay confirms operations with a signed server-to-server callback. `NotifyAction` verifies the
+`QuickPay-Checksum-Sha256` HMAC against your `private_key` before acting on one; an unsigned or
+tampered callback is rejected with a `400`. Two things are easy to get wrong:
+
+**Quickpay sends callbacks to two different places.** The payment-window authorize goes to the
+per-payment callback url the gateway builds (a Payum notify token). But `capture`/`refund`/`cancel`
+issued through the API go to the **account-wide** callback url (Quickpay manager → Settings →
+Integration) — which is empty by default, so those callbacks are simply not delivered anywhere, and
+a shop waiting to hear that its capture settled waits forever. That url is one static url for every
+payment and cannot carry a `payum_token`, so an endpoint for it must resolve the payment from the
+callback body's `order_id` (`order_prefix` + the Payum payment number) and execute `Notify` against
+that model. See [`docs/UPGRADE-2.0.md`](docs/UPGRADE-2.0.md) for the full picture and
+`examples/e2e/listen.php` for a working endpoint. Alternatively, skip operation callbacks entirely:
+set `synchronized` to `true` so the operations block until settled, or poll with `Sync`/`GetStatus`.
+
+**Outside Symfony, headers need help.** payum/core's plain-PHP `GetHttpRequest` bridge does not
+expose request headers, and without the checksum header every callback is rejected as unsigned. If
+you are not on Symfony/Sylius (whose bridge exposes them), register the shipped header-aware action:
+
+```php
+use Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction;
+
+$payum = (new PayumBuilder)
+    ->addCoreGatewayFactoryConfig([
+        'payum.action.get_http_request' => new HeaderAwareGetHttpRequestAction(),
+    ])
+    // ...
+    ->getPayum();
 ```
 
 ### The payment details
@@ -115,8 +179,9 @@ uses. `quickpayPaymentId` is the single source of truth — everything else is a
 | `quickpayPaymentId` | `Convert` | The Quickpay payment id. Everything else is re-fetched with it. |
 | `amount`, `currency` | `Convert` | The payment total, in minor units. |
 | `order_id` | `Convert` | `order_prefix` + the Payum payment number. |
-| `continue_url`, `cancel_url` | `Convert` | From the token's after-URL. |
-| `callback_url` | `Authorize` | The notify token url given to Quickpay. |
+| `continue_url` | `Convert` | The token's **target** url: the customer returns to it, and the `Capture`/`Authorize` that sent them out runs again to finish. |
+| `cancel_url` | `Convert` | The token's after url. |
+| `callback_url` | `Capture`, `Authorize` | The notify token url given to Quickpay. |
 | `balance` | `GetStatus`, `Sync`, `Notify`, `Refund` | **What is still captured** — captured minus refunded. |
 | `state` | `Sync` | Quickpay's own payment state. |
 | `capture_amount`, `refund_amount` | *you* | Optional partial-operation amounts; see below. |
@@ -183,6 +248,41 @@ The status follows the **balance**, not the last operation:
 
 So `captured` means "something is held", never how much — Payum has no "partially refunded" mark. Read
 the `balance` details key for the actual figure rather than inferring it from the mark.
+
+## Sylius
+
+Register the gateway factory with PayumBundle under the name `quickpay`:
+
+```yaml
+# config/services.yaml
+services:
+    app.payum.quickpay_gateway_factory:
+        class: Payum\Core\Bridge\Symfony\Builder\GatewayFactoryBuilder
+        arguments: [Setono\Payum\Quickpay\QuickpayGatewayFactory]
+        tags:
+            - { name: payum.gateway_factory_builder, factory: quickpay }
+```
+
+Then create a payment method with this gateway in the Sylius admin. The stored configuration is
+keyed by exactly the option names in the table above (the 1.x spellings `apikey`, `privatekey` and
+`agreement` keep working for configs stored before 2.0).
+
+Sylius drives its checkout through `Capture` by default, which is the common flow here (see above):
+the payment window captures at authorization and the payment completes. Nothing to configure. If you
+want to **authorize only** at checkout and capture later — when the order ships, say — set
+`use_authorize: true` in the gateway configuration so Sylius executes `Authorize` instead, and issue
+the `Capture` yourself when the time comes.
+
+The callback urls (see Callbacks above) apply unchanged: the payment-window callback routes itself
+via the notify token, and an account-wide callback endpoint — if you rely on operation
+confirmations — needs to resolve the payment by `order_id` and execute `Notify` on it.
+
+## What this package does not do
+
+The gateway drives Quickpay's **hosted payment window** only — deliberately, since that keeps card
+data out of your application (SAQ-A). Not covered: API/card-data authorize, Quickpay
+**subscriptions** (recurring payments) and **payouts** — the underlying SDK does not model those
+endpoints yet. If you need one of them, open an issue.
 
 [ico-version]: https://img.shields.io/packagist/v/setono/payum-quickpay.svg?include_prereleases&style=flat-square
 [ico-license]: https://img.shields.io/badge/license-MIT-brightgreen.svg?style=flat-square
