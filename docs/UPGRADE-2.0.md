@@ -40,6 +40,50 @@ handling, and modernizes the test suite. This is a major release with breaking c
 - **New options:** `synchronized` (run capture/refund/cancel synchronously instead of relying on the
   callback; default `false`, preserving 1.x behavior) and `branding_id` (payment-window branding).
 - The misspelled, unused `syncronized` option was removed; use `synchronized`.
+- **`auto_capture` is deprecated** — execute `Capture` instead of `Authorize` to capture at
+  authorization; see the next section.
+
+## `Capture` now drives the checkout — and `auto_capture` is deprecated
+
+In 1.x, `Capture` was strictly the money operation: executed against a payment that had not been
+authorized, it asked Quickpay to capture money that was never held and failed with a
+`ValidationException`. The interactive step was `Authorize` only, so a default Sylius checkout — which
+executes `Capture` — did not work until you found `use_authorize: true`.
+
+2.0 follows Payum's convention, which is also what Payum's controllers and Sylius expect:
+
+- **`Capture` on a payment that is not authorized yet opens the payment window**, with `auto_capture`
+  set on the link, so Quickpay captures the moment the card is authorized. Executing `Capture` is how
+  you say "take the money".
+- **`Authorize`** opens an auth-only window, exactly as before.
+- **Both are idempotent.** They decide from the payment's operations at Quickpay, so re-executing
+  either — the return trip, a refresh, a retry — never creates a second link. And a `Capture` on a
+  payment whose link captures by itself never issues a capture of its own: only Quickpay moves that
+  money, so it cannot be moved twice.
+- **`Capture` on an authorized payment** (an `Authorize` flow settling later, possibly in
+  `capture_amount` instalments) captures through the API, as before.
+
+Because "capture at authorization" is now expressed by executing `Capture`, the **`auto_capture`
+gateway option is deprecated**. It still works — it makes an `Authorize` flow capture on
+authorization, which is what it always did — and it goes in 3.0. Prefer executing `Capture`.
+
+Two knock-on changes:
+
+- **`continue_url` is now the token's *target* url**, not its after url — so the customer returns to
+  the `Capture`/`Authorize` that sent them out, which runs again, finds the outcome and completes;
+  Payum's controller then sends them on to the after url. `cancel_url` stays the after url. If you
+  serve the token urls yourself (outside Payum's controllers), the return trip now hits them; see
+  `examples/e2e/listen.php` for what a controller has to do. Under Payum's own capture/authorize
+  controllers, nothing changes for you.
+- **`ConfirmPaymentAction` no longer captures.** In 1.x it captured on the authorize callback when
+  `auto_capture` was on — a second capture mechanism next to the link's own flag, and the two raced:
+  the callback could arrive before Quickpay had recorded the capture it was already making, and the
+  gateway would issue another. The link's flag is now the only mechanism, and the callback path only
+  refreshes the details (`balance`, `state`). It never moves money.
+
+The public actions no longer implement `GenericTokenFactoryAwareInterface`; the token is minted by the
+new internal `CreatePaymentLinkAction` (`payum.action.api.create_payment_link`), which `Authorize` and
+`Capture` delegate to.
 
 ## Payment details contract
 
@@ -83,7 +127,7 @@ live account (2026-08):
 
 | Origin | Callback goes to |
 |---|---|
-| The customer paying in the hosted payment window | the **per-payment** `callback_url` on the payment link — the Payum notify token url `AuthorizeAction` mints |
+| The customer paying in the hosted payment window | the **per-payment** `callback_url` on the payment link — the Payum notify token url the gateway mints when it creates the link |
 | `capture` / `refund` / `cancel` issued through the API | the **account-wide** callback url (manager → Settings → Integration) |
 
 So the gateway's notify token only ever receives the authorize callback. If the account-wide url is

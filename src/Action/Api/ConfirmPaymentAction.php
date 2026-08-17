@@ -8,16 +8,27 @@ use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
 use Setono\Payum\Quickpay\Details;
-use Setono\Payum\Quickpay\Operations;
 use Setono\Payum\Quickpay\Request\Api\ConfirmPayment;
-use Setono\Quickpay\Enum\OperationType;
-use Setono\Quickpay\Request\Payment\CaptureRequest;
 
+/**
+ * What the gateway does with a verified Quickpay callback: refresh the scalar snapshot in the
+ * details (`balance`, `state`) from the payment the callback is about.
+ *
+ * It used to also capture, when `auto_capture` was on and the callback reported an approved
+ * authorize. That was a second capture mechanism next to the payment link's own `auto_capture` flag,
+ * and the two raced: the callback for the authorize could arrive before Quickpay had recorded the
+ * capture it was already making, and the gateway would issue another. The link's flag is now the
+ * only mechanism — a payment that should be captured on authorization is one whose link says so
+ * ({@see \Setono\Payum\Quickpay\Action\CaptureAction}) — so this action never moves money.
+ *
+ * It stays a distinct request rather than being folded into NotifyAction so a consumer can replace
+ * `payum.action.api.confirm_payment` to react to callbacks (dispatch an event, log, notify) without
+ * touching the signature verification that runs before it.
+ */
 class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, ApiAwareInterface
 {
     use GatewayAwareTrait;
@@ -32,47 +43,12 @@ class ConfirmPaymentAction implements ActionInterface, GatewayAwareInterface, Ap
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        $paymentId = Details::paymentId($model);
+        $payment = $this->api->payments()->getById(Details::paymentId($model));
 
-        $payment = $this->api->payments()->getById($paymentId);
-
-        // Persist the balance before any early return below, so a callback for a payment with nothing
-        // to confirm still refreshes it.
+        // Same keys SyncAction writes: the callback is the moment the payment changed, so this is the
+        // freshest snapshot the details will get without another round trip.
         $model['balance'] = $payment->balance;
-
-        $latestOperation = Operations::latest($payment->operations);
-        if (null === $latestOperation) {
-            // A payment can legitimately have no operations yet — Quickpay fires a callback when the
-            // payment is merely created, which becomes visible as soon as an account-wide callback url
-            // (Settings → Integration) is configured. There is nothing to confirm, so do nothing.
-            // Throwing here would 500 the notify endpoint, and Quickpay would retry a callback that
-            // can never succeed.
-            return;
-        }
-
-        // Only an APPROVED authorize is worth capturing. The callback also fires for a rejected
-        // authorize (a declined card is routine in the payment window) and for one still pending —
-        // both have type `authorize`, so gating on the type alone would fall through to the amount
-        // check below, find an authorized amount of 0 and throw. Throwing 500s the notify endpoint
-        // and has Quickpay retry a callback that can never succeed; a not-approved authorize is
-        // simply nothing to confirm.
-        if ($this->api->isAutoCapture() && Operations::isApprovedOfType($latestOperation, OperationType::Authorize)) {
-            $authorizedAmount = Operations::authorizedAmount($payment->operations);
-            $expectedAmount = (int) $model['amount'];
-
-            if ($authorizedAmount !== $expectedAmount) {
-                throw new LogicException(sprintf(
-                    'Authorized amount does not match. Authorized %s expected %s',
-                    $authorizedAmount,
-                    $expectedAmount,
-                ));
-            }
-
-            $this->api->payments()->capture(
-                $paymentId,
-                new CaptureRequest(amount: $expectedAmount),
-            );
-        }
+        $model['state'] = $payment->state;
     }
 
     public function supports($request): bool

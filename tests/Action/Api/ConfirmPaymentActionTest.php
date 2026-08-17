@@ -8,10 +8,8 @@ use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Action\Api\ConfirmPaymentAction;
-use Setono\Payum\Quickpay\Api;
 use Setono\Payum\Quickpay\Request\Api\ConfirmPayment;
 use Setono\Payum\Quickpay\Tests\ApiTestTrait;
-use Setono\Quickpay\Client\Client;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 
@@ -24,43 +22,19 @@ class ConfirmPaymentActionTest extends TestCase
      */
     public function shouldThrowWhenPaymentHasNotBeenCreated(): void
     {
-        $action = $this->action($this->api);
-
         $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('The payment has not been created');
+        $this->expectExceptionMessage('quickpayPaymentId');
 
-        $action->execute(new ConfirmPayment(new ArrayObject(['amount' => 100])));
+        $this->action()->execute(new ConfirmPayment(new ArrayObject(['amount' => 100])));
     }
 
     /**
-     * A callback can arrive for a payment that has no operations yet — Quickpay fires one when the
-     * payment is merely created, which becomes visible as soon as an account-wide callback url is
-     * configured. There is nothing to confirm, so it must be a no-op: throwing would 500 the notify
-     * endpoint and have Quickpay retry a callback that can never succeed.
+     * The callback is the moment the payment changed, so the scalar snapshot is refreshed from it —
+     * the same keys Sync writes.
      *
      * @test
      */
-    public function shouldDoNothingWhenThereIsNoLatestOperation(): void
-    {
-        $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
-
-        $action = $this->action($this->api);
-
-        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
-
-        // Only the fetch — no capture may follow from a payment with nothing to confirm.
-        $requests = $this->getRequests();
-        self::assertCount(1, $requests);
-        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
-    }
-
-    /**
-     * The callback path fetches the payment anyway, so the balance it carries is persisted — including
-     * on the nothing-to-confirm path above, which is the one that runs for every operation callback.
-     *
-     * @test
-     */
-    public function shouldPersistTheBalanceIntoTheDetails(): void
+    public function shouldRefreshTheScalarSnapshot(): void
     {
         $this->queuePayment([
             'state' => PaymentState::Processed->value,
@@ -70,75 +44,10 @@ class ConfirmPaymentActionTest extends TestCase
 
         $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000]);
 
-        $this->action($this->api)->execute(new ConfirmPayment($details));
+        $this->action()->execute(new ConfirmPayment($details));
 
         self::assertSame(750, $details['balance']);
-        self::assertCount(1, $this->getRequests(), 'A refund operation is not auto-captured');
-    }
-
-    /**
-     * @test
-     */
-    public function shouldCaptureWhenAutoCaptureAndAmountMatches(): void
-    {
-        $this->queuePayment([
-            'state' => PaymentState::New->value,
-            'operations' => [$this->operation(OperationType::Authorize, amount: 100)],
-        ]);
-        $this->queuePayment([
-            'state' => PaymentState::Processed->value,
-            'operations' => [$this->operation(OperationType::Capture)],
-        ]);
-
-        $action = $this->action($this->api);
-        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
-
-        $requests = $this->getRequests();
-        self::assertCount(2, $requests);
-        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
-        $this->assertRequest($requests[1], 'POST', '#/payments/1001/capture$#');
-        self::assertSame(100, $this->decodeBody($requests[1])['amount']);
-    }
-
-    /**
-     * A rejected authorize — a declined card is routine in the payment window — also arrives as a
-     * callback, and its latest operation has type `authorize`. Capturing it is impossible and
-     * throwing would 500 the notify endpoint, making Quickpay retry a callback that can never
-     * succeed. It must be a silent no-op.
-     *
-     * @test
-     */
-    public function shouldNotCaptureWhenTheLatestAuthorizeIsRejected(): void
-    {
-        $this->queuePayment([
-            'state' => PaymentState::Rejected->value,
-            'operations' => [$this->operation(OperationType::Authorize, '40000', amount: 100)],
-        ]);
-
-        $action = $this->action($this->api);
-        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
-
-        // Only the reload — no capture, and no exception.
-        $requests = $this->getRequests();
-        self::assertCount(1, $requests);
-        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
-    }
-
-    /**
-     * Same for an authorize that is still pending: it has no status code yet, so there is no outcome
-     * to confirm. The next callback (or a re-fetch) will tell.
-     *
-     * @test
-     */
-    public function shouldNotCaptureWhenTheLatestAuthorizeIsStillPending(): void
-    {
-        $this->queuePayment([
-            'state' => PaymentState::Pending->value,
-            'operations' => [$this->operation(OperationType::Authorize, null, amount: 100, pending: true)],
-        ]);
-
-        $action = $this->action($this->api);
-        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
+        self::assertSame(PaymentState::Processed->value, $details['state']);
 
         $requests = $this->getRequests();
         self::assertCount(1, $requests);
@@ -146,66 +55,64 @@ class ConfirmPaymentActionTest extends TestCase
     }
 
     /**
+     * A callback can arrive for a payment with no operations yet — Quickpay fires one when the
+     * payment is merely created, visible as soon as an account-wide callback url is configured. It
+     * must be a quiet no-op: throwing would 500 the notify endpoint and have Quickpay retry forever.
+     *
      * @test
      */
-    public function shouldThrowWhenAuthorizedAmountDoesNotMatch(): void
+    public function shouldCompleteQuietlyForAPaymentWithoutOperations(): void
     {
-        $this->queuePayment([
-            'state' => PaymentState::New->value,
-            'operations' => [$this->operation(OperationType::Authorize, amount: 100)],
-        ]);
+        $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
 
-        $action = $this->action($this->api);
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]);
+        $this->action()->execute(new ConfirmPayment($details));
 
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('Authorized amount does not match');
-
-        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 99])));
+        self::assertCount(1, $this->getRequests());
+        self::assertSame(PaymentState::Initial->value, $details['state']);
     }
 
     /**
+     * The callback path never moves money — not even for an approved authorize with the (deprecated)
+     * auto_capture option on. Capturing on authorization is the payment LINK's job (its own
+     * auto_capture flag, set by CaptureAction); a second capture from here would only race it.
+     *
      * @test
+     *
+     * @dataProvider authorizeCallbackProvider
+     *
+     * @param array<string, mixed> $authorize
      */
-    public function shouldNotCaptureWhenAutoCaptureDisabled(): void
+    public function shouldNeverCaptureFromACallback(string $state, array $authorize): void
     {
-        $api = new Api(
-            client: new Client('test-apikey', $this->httpClient),
-            privateKey: 'test-privatekey',
-            autoCapture: false,
-        );
-
         $this->queuePayment([
-            'state' => PaymentState::New->value,
-            'operations' => [$this->operation(OperationType::Authorize, amount: 100)],
+            'state' => $state,
+            'operations' => [$authorize],
+            'link' => $this->link(autoCapture: true),
         ]);
 
-        $action = $this->action($api);
-        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
+        // The api under test has auto_capture ON — the setting that used to trigger a capture here.
+        $this->action()->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
 
-        // Only the reload happened, no capture.
-        self::assertCount(1, $this->getRequests());
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests, 'Only the fetch — no capture may be issued from the callback path');
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
     }
 
     /**
-     * @test
+     * @return iterable<string, array{string, array<string, mixed>}>
      */
-    public function shouldNotCaptureWhenLatestOperationIsNotAnAuthorize(): void
+    public static function authorizeCallbackProvider(): iterable
     {
-        $this->queuePayment([
-            'state' => PaymentState::Processed->value,
-            'operations' => [$this->operation(OperationType::Capture, amount: 100)],
-        ]);
-
-        $action = $this->action($this->api);
-        $action->execute(new ConfirmPayment(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100])));
-
-        self::assertCount(1, $this->getRequests());
+        yield 'approved authorize' => [PaymentState::New->value, ['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => false, 'qp_status_code' => '20000']];
+        yield 'rejected authorize' => [PaymentState::Rejected->value, ['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => false, 'qp_status_code' => '40000']];
+        yield 'pending authorize' => [PaymentState::Pending->value, ['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => true, 'qp_status_code' => null]];
     }
 
-    private function action(Api $api): ConfirmPaymentAction
+    private function action(): ConfirmPaymentAction
     {
         $action = new ConfirmPaymentAction();
-        $action->setApi($api);
+        $action->setApi($this->api);
         $action->setGateway($this->gateway);
 
         return $action;

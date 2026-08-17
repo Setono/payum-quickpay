@@ -61,6 +61,42 @@ class OperationsTest extends TestCase
     }
 
     /**
+     * "Has this payment ever been authorized?" — regardless of what came after. The last-approved
+     * view (latestApproved) says no once a capture follows; this says yes.
+     *
+     * @test
+     */
+    public function hasApprovedFindsAnApprovedOperationOfTheTypeAnywhereInTheList(): void
+    {
+        $operations = [
+            $this->operation(1, OperationType::Authorize, '20000'),
+            $this->operation(2, OperationType::Capture, '20000'),
+            $this->operation(3, OperationType::Refund, '40000'),
+        ];
+
+        self::assertTrue(Operations::hasApproved($operations, OperationType::Authorize));
+        self::assertTrue(Operations::hasApproved($operations, OperationType::Capture));
+        self::assertFalse(Operations::hasApproved($operations, OperationType::Refund), 'A rejected refund is not an approved one');
+        self::assertFalse(Operations::hasApproved($operations, OperationType::Cancel));
+        self::assertFalse(Operations::hasApproved([], OperationType::Authorize));
+    }
+
+    /**
+     * @test
+     */
+    public function hasPendingFindsAnOperationOfTheTypeStillInFlight(): void
+    {
+        $operations = [
+            $this->operation(1, OperationType::Authorize, '20000'),
+            new Operation(id: 2, type: OperationType::Capture->value, amount: 100, pending: true),
+        ];
+
+        self::assertTrue(Operations::hasPending($operations, OperationType::Capture));
+        self::assertFalse(Operations::hasPending($operations, OperationType::Authorize), 'A settled operation is not pending');
+        self::assertFalse(Operations::hasPending([], OperationType::Capture));
+    }
+
+    /**
      * @test
      */
     public function isApprovedReflectsTheStatusCode(): void

@@ -10,12 +10,11 @@ use Payum\Core\Model\Token;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Authorize;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
-use Payum\Core\Security\GenericTokenFactoryInterface;
 use ReflectionClass;
 use ReflectionException;
 use Setono\Payum\Quickpay\Action\AuthorizeAction;
-use Setono\Payum\Quickpay\Api;
-use Setono\Quickpay\Client\Client;
+use Setono\Quickpay\Enum\OperationType;
+use Setono\Quickpay\Enum\PaymentState;
 
 class AuthorizeActionTest extends ActionTestAbstract
 {
@@ -24,65 +23,34 @@ class AuthorizeActionTest extends ActionTestAbstract
     protected $actionClass = AuthorizeAction::class;
 
     /**
+     * Only the internal CreatePaymentLinkAction mints a token; the public actions delegate to it
+     * rather than dragging payum/core's deprecated GenericTokenFactoryInterface in themselves (#3).
+     *
      * @test
      *
      * @throws ReflectionException
      */
-    public function shouldImplementGenericTokenFactoryAwareInterface(): void
+    public function shouldNotDependOnTheTokenFactory(): void
     {
-        $rc = new ReflectionClass($this->actionClass);
-
-        self::assertTrue($rc->implementsInterface(GenericTokenFactoryAwareInterface::class));
+        self::assertFalse((new ReflectionClass($this->actionClass))->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
 
     /**
-     * A model without a quickpayPaymentId has no payment to create a link for. The guard throws
-     * before a notify token is minted and before any HTTP happens — without it, `(int) null = 0`
-     * would reach the API as `PUT /payments/0/link`.
+     * A fresh payment: create the link (auth-only, since this is Authorize) and redirect. The token
+     * travels along so the notify token can be minted from it.
      *
      * @test
      */
-    public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
-    {
-        $details = new ArrayObject([
-            'amount' => 100,
-            'continue_url' => 'theContinueUrl',
-            'cancel_url' => 'theContinueUrl',
-            'callback_url' => 'theCallbackUrl',
-        ]);
-
-        /** @var Authorize $authorize */
-        $authorize = new $this->requestClass($details);
-
-        $action = new AuthorizeAction();
-        $action->setGateway($this->gateway);
-        $action->setApi($this->api);
-
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('quickpayPaymentId');
-
-        try {
-            $action->execute($authorize);
-        } finally {
-            self::assertCount(0, $this->getRequests(), 'No API call may be made for a payment that does not exist yet');
-        }
-    }
-
-    /**
-     * @test
-     */
-    public function shouldCreatePaymentLinkAndRedirectToIt(): void
+    public function shouldSendAFreshPaymentToThePaymentWindow(): void
     {
         $token = new Token();
-        $token->setTargetUrl('theCallbackUrl');
-        $token->setAfterUrl('theContinueUrl');
         $token->setGatewayName('quickpay');
 
         $details = new ArrayObject([
             'quickpayPaymentId' => 1001,
             'amount' => 100,
             'continue_url' => 'theContinueUrl',
-            'cancel_url' => 'theContinueUrl',
+            'cancel_url' => 'theCancelUrl',
         ]);
         $token->setDetails($details);
 
@@ -90,177 +58,200 @@ class AuthorizeActionTest extends ActionTestAbstract
         $authorize = new $this->requestClass($token);
         $authorize->setModel($details);
 
-        $tokenFactory = $this->prophesize(GenericTokenFactoryInterface::class);
-        $tokenFactory->createNotifyToken('quickpay', $details)->shouldBeCalledOnce()->willReturn($token);
-
-        $action = new AuthorizeAction();
-        $action->setGateway($this->gateway);
-        $action->setApi($this->api);
-        $action->setGenericTokenFactory($tokenFactory->reveal());
-
+        // The status fetch, then the link.
+        $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
         $this->queueResponse('{"url":"https://payment.quickpay.net/payments/1001/payment-window"}');
 
         try {
-            $action->execute($authorize);
+            $this->action()->execute($authorize);
             self::fail('An HttpRedirect reply should have been thrown');
         } catch (HttpRedirect $redirect) {
             self::assertSame('https://payment.quickpay.net/payments/1001/payment-window', $redirect->getUrl());
         }
 
-        // The callback url is built from the notify token.
-        self::assertSame('theCallbackUrl', $details['callback_url']);
-
-        // The link request shape.
         $requests = $this->getRequests();
-        self::assertCount(1, $requests);
-        $this->assertRequest($requests[0], 'PUT', '#/payments/1001/link$#');
+        self::assertCount(2, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+        $this->assertRequest($requests[1], 'PUT', '#/payments/1001/link$#');
 
-        $body = $this->decodeBody($requests[0]);
+        $body = $this->decodeBody($requests[1]);
         self::assertSame(100, $body['amount']);
         self::assertSame('theContinueUrl', $body['continue_url']);
-        self::assertSame('theContinueUrl', $body['cancel_url']);
-        self::assertSame('theCallbackUrl', $body['callback_url']);
-        self::assertSame('en', $body['language']);
-        self::assertSame('visa', $body['payment_methods']);
+        self::assertSame('theCancelUrl', $body['cancel_url']);
+        self::assertSame('https://shop.example/notify?payum_token=stub-notify', $body['callback_url']);
+        // The api under test has auto_capture on, so this Authorize is a sale — the deprecated
+        // option's meaning. The other value is pinned in shouldCreateAnAuthOnlyLinkWhenAutoCaptureIsOff.
         self::assertTrue($body['auto_capture']);
-        self::assertSame(266017, $body['agreement_id']);
+
+        self::assertSame('https://shop.example/notify?payum_token=stub-notify', $details['callback_url']);
+        self::assertCount(1, $this->tokenFactory->notifyTokensCreated);
     }
 
     /**
-     * A consumer that routes callbacks itself presets `callback_url` and executes Authorize without
-     * a token. That path must not need the token factory at all — the action only mints a notify
-     * token when the request carries a token to mint it from.
+     * @test
+     */
+    public function shouldCreateAnAuthOnlyLinkWhenAutoCaptureIsOff(): void
+    {
+        $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
+        $this->queueResponse('{"url":"https://payment.quickpay.net/payments/1001/payment-window"}');
+
+        try {
+            $this->action(autoCapture: false)->execute($this->authorize());
+        } catch (HttpRedirect) {
+        }
+
+        self::assertFalse($this->decodeBody($this->getRequests()[1])['auto_capture']);
+    }
+
+    /**
+     * The return trip: Quickpay sends the customer back to the token url, Payum re-executes the
+     * Authorize that sent them out, and the payment is now authorized. Redirecting again would loop;
+     * this must be a no-op that touches nothing but the balance.
      *
      * @test
      */
-    public function shouldCreateTheLinkWithoutATokenWhenTheCallbackUrlIsPreset(): void
+    public function shouldDoNothingWhenThePaymentIsAlreadyAuthorized(): void
     {
-        $details = new ArrayObject([
+        $details = $this->details();
+
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'balance' => 0,
+            'operations' => [$this->operation(OperationType::Authorize, amount: 100)],
+        ]);
+
+        $this->action()->execute($this->authorize($details));
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests, 'Only the status fetch — no link may be created again');
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+        self::assertSame(0, $details['balance']);
+        self::assertSame([], $this->tokenFactory->notifyTokensCreated);
+    }
+
+    /**
+     * Past authorization altogether — captured (approved or still queued). Authorize has nothing to add.
+     *
+     * @test
+     *
+     * @dataProvider capturedProvider
+     *
+     * @param array<string, mixed> $capture
+     */
+    public function shouldDoNothingWhenThePaymentIsAlreadyCaptured(array $capture): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'operations' => [$this->operation(OperationType::Authorize, amount: 100), $capture],
+        ]);
+
+        $this->action()->execute($this->authorize());
+
+        self::assertCount(1, $this->getRequests());
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function capturedProvider(): iterable
+    {
+        yield 'approved capture' => [['id' => 2, 'type' => 'capture', 'amount' => 100, 'pending' => false, 'qp_status_code' => '20000']];
+        yield 'pending capture' => [['id' => 2, 'type' => 'capture', 'amount' => 100, 'pending' => true, 'qp_status_code' => null]];
+    }
+
+    /**
+     * An authorize in flight (3-D Secure, an asynchronous acquirer): creating another link would race
+     * its outcome. Wait for it.
+     *
+     * @test
+     */
+    public function shouldDoNothingWhileAnAuthorizeIsPending(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Pending->value,
+            'operations' => [$this->operation(OperationType::Authorize, null, amount: 100, pending: true)],
+        ]);
+
+        $this->action()->execute($this->authorize());
+
+        self::assertCount(1, $this->getRequests());
+    }
+
+    /**
+     * A declined attempt is not the end: Quickpay lets the customer try again on the same payment,
+     * so a rejected authorize — and nothing approved or pending — means "send them to the window".
+     *
+     * @test
+     */
+    public function shouldSendTheCustomerBackToTheWindowAfterADeclinedAttempt(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::Rejected->value,
+            'operations' => [$this->operation(OperationType::Authorize, '40000', amount: 100)],
+        ]);
+        $this->queueResponse('{"url":"https://payment.quickpay.net/payments/1001/payment-window"}');
+
+        try {
+            $this->action()->execute($this->authorize());
+            self::fail('An HttpRedirect reply should have been thrown');
+        } catch (HttpRedirect $redirect) {
+            self::assertSame('https://payment.quickpay.net/payments/1001/payment-window', $redirect->getUrl());
+        }
+
+        self::assertCount(2, $this->getRequests());
+    }
+
+    /**
+     * @test
+     */
+    public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
+    {
+        $details = $this->details();
+        unset($details['quickpayPaymentId']);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('quickpayPaymentId');
+
+        try {
+            $this->action()->execute($this->authorize($details));
+        } finally {
+            self::assertCount(0, $this->getRequests(), 'No API call may be made for a payment that does not exist yet');
+        }
+    }
+
+    private function action(bool $autoCapture = true): AuthorizeAction
+    {
+        $action = new AuthorizeAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($autoCapture ? $this->api : $this->createApi(autoCapture: false));
+
+        return $action;
+    }
+
+    /**
+     * @param ArrayObject<string, mixed>|null $details
+     */
+    private function authorize(?ArrayObject $details = null): Authorize
+    {
+        /** @var Authorize $authorize */
+        $authorize = new $this->requestClass($details ?? $this->details());
+
+        return $authorize;
+    }
+
+    /**
+     * Details with a preset callback_url, so no token is needed.
+     *
+     * @return ArrayObject<string, mixed>
+     */
+    private function details(): ArrayObject
+    {
+        return new ArrayObject([
             'quickpayPaymentId' => 1001,
             'amount' => 100,
             'continue_url' => 'theContinueUrl',
             'cancel_url' => 'theCancelUrl',
             'callback_url' => 'thePresetCallbackUrl',
         ]);
-
-        /** @var Authorize $authorize */
-        $authorize = new $this->requestClass($details);
-
-        $action = new AuthorizeAction();
-        $action->setGateway($this->gateway);
-        $action->setApi($this->api);
-        // Deliberately no setGenericTokenFactory().
-
-        $this->queueResponse('{"url":"https://payment.quickpay.net/payments/1001/payment-window"}');
-
-        try {
-            $action->execute($authorize);
-            self::fail('An HttpRedirect reply should have been thrown');
-        } catch (HttpRedirect $redirect) {
-            self::assertSame('https://payment.quickpay.net/payments/1001/payment-window', $redirect->getUrl());
-        }
-
-        $requests = $this->getRequests();
-        self::assertCount(1, $requests);
-        self::assertSame('thePresetCallbackUrl', $this->decodeBody($requests[0])['callback_url']);
-    }
-
-    /**
-     * @test
-     */
-    public function shouldThrowBeforeAnyRequestWhenARequiredDetailIsMissing(): void
-    {
-        // No callback_url, and no token to mint one from.
-        $details = new ArrayObject([
-            'quickpayPaymentId' => 1001,
-            'amount' => 100,
-            'continue_url' => 'theContinueUrl',
-            'cancel_url' => 'theCancelUrl',
-        ]);
-
-        /** @var Authorize $authorize */
-        $authorize = new $this->requestClass($details);
-
-        $action = new AuthorizeAction();
-        $action->setGateway($this->gateway);
-        $action->setApi($this->api);
-
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('callback_url');
-
-        try {
-            $action->execute($authorize);
-        } finally {
-            self::assertCount(0, $this->getRequests(), 'The link request must not be issued');
-        }
-    }
-
-    /**
-     * @test
-     */
-    public function shouldThrowWhenQuickpayReturnsNoLinkUrl(): void
-    {
-        $details = new ArrayObject([
-            'quickpayPaymentId' => 1001,
-            'amount' => 100,
-            'continue_url' => 'theContinueUrl',
-            'cancel_url' => 'theCancelUrl',
-            'callback_url' => 'theCallbackUrl',
-        ]);
-
-        /** @var Authorize $authorize */
-        $authorize = new $this->requestClass($details);
-
-        $action = new AuthorizeAction();
-        $action->setGateway($this->gateway);
-        $action->setApi($this->api);
-
-        $this->queueResponse('{"url":null}');
-
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('did not return a payment link url');
-
-        $action->execute($authorize);
-    }
-
-    /**
-     * `branding_id` is optional, so if it silently stopped being read the link would simply be
-     * created without it and Quickpay would fall back to the account default — the same failure mode
-     * the factory tests guard against for `agreement`. Pin that the option reaches the wire.
-     *
-     * @test
-     */
-    public function shouldPassTheBrandingIdToTheLink(): void
-    {
-        $api = new Api(
-            client: new Client('test-apikey', $this->httpClient),
-            privateKey: 'test-privatekey',
-            brandingId: 424242,
-        );
-
-        $details = new ArrayObject([
-            'quickpayPaymentId' => 1001,
-            'amount' => 100,
-            'continue_url' => 'theContinueUrl',
-            'cancel_url' => 'theCancelUrl',
-            'callback_url' => 'theCallbackUrl',
-        ]);
-
-        /** @var Authorize $authorize */
-        $authorize = new $this->requestClass($details);
-
-        $action = new AuthorizeAction();
-        $action->setGateway($this->gateway);
-        $action->setApi($api);
-
-        $this->queueResponse('{"url":"https://payment.quickpay.net/payments/1001/payment-window"}');
-
-        try {
-            $action->execute($authorize);
-            self::fail('An HttpRedirect reply should have been thrown');
-        } catch (HttpRedirect) {
-        }
-
-        self::assertSame(424242, $this->decodeBody($this->getRequests()[0])['branding_id']);
     }
 }

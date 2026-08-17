@@ -28,33 +28,33 @@ class NotifyActionTest extends ActionTestAbstract
             CallbackValidator::CHECKSUM_HEADER => hash_hmac('sha256', $body, 'test-privatekey'),
         ]);
 
-        // ConfirmPayment reloads the payment and, with auto_capture on + matching amount, captures.
+        // ConfirmPayment reloads the payment and refreshes the scalar snapshot. It never captures —
+        // capturing on authorization is the payment link's own auto_capture flag, not the callback's.
         $this->queuePayment([
             'state' => PaymentState::New->value,
+            'balance' => 0,
             'operations' => [$this->operation(OperationType::Authorize, amount: 100)],
-        ]);
-        $this->queuePayment([
-            'state' => PaymentState::Processed->value,
-            'operations' => [$this->operation(OperationType::Capture)],
         ]);
 
         $action = new NotifyAction();
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
-        $action->execute($this->notify());
+        $notify = $this->notify();
+        $action->execute($notify);
 
         $requests = $this->getRequests();
-        self::assertCount(2, $requests);
+        self::assertCount(1, $requests);
         $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
-        $this->assertRequest($requests[1], 'POST', '#/payments/1001/capture$#');
+
+        /** @var ArrayObject<string, mixed> $details */
+        $details = $notify->getModel();
+        self::assertSame(PaymentState::New->value, $details['state']);
     }
 
     /**
-     * The callback for a DECLINED payment must complete without error: the api under test has
-     * auto_capture on, and a rejected authorize has type `authorize` — but there is nothing to
-     * capture. Throwing here would 500 the notify endpoint and have Quickpay retry a callback that
-     * can never succeed.
+     * The callback for a DECLINED payment must complete without error — throwing here would 500 the
+     * notify endpoint and have Quickpay retry a callback that can never succeed.
      *
      * @test
      */

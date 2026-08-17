@@ -8,23 +8,30 @@ use ArrayAccess;
 use Payum\Core\Action\ActionInterface;
 use Payum\Core\ApiAwareInterface;
 use Payum\Core\Bridge\Spl\ArrayObject;
-use Payum\Core\Exception\LogicException;
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\GatewayAwareInterface;
 use Payum\Core\GatewayAwareTrait;
-use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Authorize;
-use Payum\Core\Security\GenericTokenFactoryAwareInterface;
-use Payum\Core\Security\GenericTokenFactoryAwareTrait;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Details;
-use Setono\Quickpay\Request\Payment\CreateLinkRequest;
+use Setono\Payum\Quickpay\Operations;
+use Setono\Payum\Quickpay\Request\Api\CreatePaymentLink;
+use Setono\Quickpay\Enum\OperationType;
 
-class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface, GenericTokenFactoryAwareInterface
+/**
+ * Authorize: send the customer through the hosted payment window to have the amount reserved on
+ * their card, without capturing it. The money is captured later with {@see \Payum\Core\Request\Capture}
+ * — or never, with {@see \Payum\Core\Request\Cancel}.
+ *
+ * The action runs twice in an interactive flow: once to create the link and redirect, and once more
+ * when Quickpay sends the customer back to the token url (`continue_url`). The second run must be a
+ * no-op — the authorization has happened, redirecting again would loop — so the decision is made
+ * from the payment's operations, not from "was I called before".
+ */
+class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
     use GatewayAwareTrait;
     use ApiAwareTrait;
-    use GenericTokenFactoryAwareTrait;
 
     /**
      * @param mixed|Authorize $request
@@ -35,37 +42,36 @@ class AuthorizeAction implements ActionInterface, ApiAwareInterface, GatewayAwar
 
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
-        // Resolve the payment id first: minting a notify token or validating the urls is pointless
-        // for a payment that does not exist at Quickpay yet.
-        $paymentId = Details::paymentId($model);
+        $payment = $this->api->payments()->getById(Details::paymentId($model));
+        $operations = $payment->operations;
 
-        if (null !== $token = $request->getToken()) {
-            // Build the server-to-server callback (notify) url.
-            $model['callback_url'] = $this->tokenFactory
-                ->createNotifyToken($token->getGatewayName(), $token->getDetails())
-                ->getTargetUrl();
+        // The payment is in hand, so keep the balance fresh — same key every fetching action writes.
+        $model['balance'] = $payment->balance;
+
+        // Already authorized (the return trip, or a repeat call), or already past authorization —
+        // a capture means the money was authorized and taken. Nothing left for Authorize to do.
+        if (Operations::hasApproved($operations, OperationType::Authorize) ||
+            Operations::hasApproved($operations, OperationType::Capture) ||
+            Operations::hasPending($operations, OperationType::Capture)) {
+            return;
         }
 
-        $model->validateNotEmpty(['continue_url', 'cancel_url', 'callback_url', 'amount']);
+        // An authorize is in flight (3-D Secure, an asynchronous acquirer). Creating a fresh link now
+        // would race its outcome; the next call — after the callback, or the customer's return —
+        // will see the result.
+        if (Operations::hasPending($operations, OperationType::Authorize)) {
+            return;
+        }
 
-        $link = $this->api->payments()->createLink($paymentId, new CreateLinkRequest(
-            amount: (int) $model['amount'],
-            agreementId: $this->api->getAgreementId(),
-            language: $this->api->getLanguage(),
-            continueUrl: (string) $model['continue_url'],
-            cancelUrl: (string) $model['cancel_url'],
-            callbackUrl: (string) $model['callback_url'],
-            paymentMethods: $this->api->getPaymentMethods(),
+        // Nothing approved and nothing pending: a fresh payment, or one whose previous attempt was
+        // declined (Quickpay lets the customer try again on the same payment). Send them to the
+        // window. Whether the window also captures is the deprecated `auto_capture` option — the
+        // request that says "capture" is Capture, and it drives the flow the same way.
+        $this->gateway->execute(new CreatePaymentLink(
+            $model,
             autoCapture: $this->api->isAutoCapture(),
-            brandingId: $this->api->getBrandingId(),
+            token: $request->getToken(),
         ));
-
-        if (null === $link->url) {
-            throw new LogicException('Quickpay did not return a payment link url');
-        }
-
-        // Redirect the customer to the Quickpay payment window.
-        throw new HttpRedirect($link->url);
     }
 
     public function supports($request): bool

@@ -6,15 +6,22 @@ the requests you execute are `Authorize` / `Capture` / `Refund` / `Cancel` / `No
 `GetHumanStatus`, and the actions in `src/` do the rest.
 
 ```
-   e2e:create ──► Authorize ──► ConvertPaymentAction  (creates the Quickpay payment)
-                              └► AuthorizeAction      (creates the link, HttpRedirect)
+   e2e:create ──► Capture ──► ConvertPaymentAction     (creates the Quickpay payment)
+   (or --authorize)          └► CaptureAction / AuthorizeAction
+                                 └► CreatePaymentLinkAction  (creates the link, HttpRedirect)
                                        │
-   browser (test card) ────────────────┘
+   browser (test card) ────────────────┤
                                        │
-   Quickpay ──► POST notify token url ─┴─► NotifyAction  (verifies the HMAC)
-                                            └► ConfirmPaymentAction (auto-captures)
+   Quickpay ──► POST notify token url ─┼─► NotifyAction  (verifies the HMAC)
+                                       │    └► ConfirmPaymentAction (refreshes the details)
+   Quickpay ──► GET continue_url ──────┴─► the token url: the SAME Capture / Authorize runs again,
+                (= the token url)          finds the outcome, and lands the customer on /done
    e2e:operate ──► Capture / Refund / Cancel / GetHumanStatus
 ```
+
+`Capture` is the checkout entry point, as everywhere in Payum: on a fresh payment it opens the
+window with `auto_capture` on the link, so Quickpay captures the moment the card is authorized.
+`--authorize` opens an auth-only window instead; settle later with `e2e:operate capture`.
 
 ## How Quickpay test mode works (important)
 
@@ -163,9 +170,15 @@ a capture may still show the pre-operation state — the settled state arrives i
 - **Callback rejected:** replay the same callback with a tampered checksum and the listener returns
   **400** and logs `CALLBACK REJECTED`. This is the security property `NotifyAction` exists for — a
   forged callback must never move a payment.
-- **`auto_capture`:** with `QUICKPAY_AUTO_CAPTURE=1`, an approved authorize is captured by
-  `ConfirmPaymentAction` as soon as the callback lands — the status goes to `captured` without you
-  running `capture`.
+- **Capture on authorization is the link's job, not the callback's:** with the default `Capture`
+  flow the link carries `auto_capture`, and Quickpay captures right after the card is authorized —
+  the status goes to `captured` without you running `capture`, and the return trip through the
+  `/capture` token url is a no-op (it must never issue a second capture; watch that it only logs
+  "done"). `QUICKPAY_AUTO_CAPTURE=1` is the deprecated way to make an `--authorize` flow do the same.
+- **The return trip:** after paying, the browser is sent to `continue_url`, which is the token url
+  itself (with `payum_token`). The listener runs the flow's request again, invalidates the token and
+  redirects to `/done`. Both hops must show up in the log — that is the second thing the live check
+  verifies, next to the callback.
 - **Details stay scalar:** `e2e:operate status` prints the details array; no objects, and
   `quickpayPaymentId` is the only handle the gateway needs.
 - **Cancel fails loudly:** `cancel` on an already captured payment surfaces Quickpay's

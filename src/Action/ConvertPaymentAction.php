@@ -63,7 +63,14 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         }
 
         if (null !== $token = $request->getToken()) {
-            $details['continue_url'] = $details['cancel_url'] = $token->getAfterUrl();
+            // The customer comes back to the token's TARGET url, not its after url: that re-executes
+            // the Authorize/Capture that sent them out, which is how the action gets to finish the
+            // job (or find it done) the moment they are back — Payum's return-trip convention — rather
+            // than leaving the outcome to a callback that may not have landed yet. The after url is
+            // where Payum's controller sends them once the action has run. A cancel skips straight
+            // there: nothing was done, so there is nothing to finish.
+            $details['continue_url'] = $token->getTargetUrl();
+            $details['cancel_url'] = $token->getAfterUrl();
         }
 
         $request->setResult((array) $details);

@@ -9,8 +9,9 @@ declare(strict_types=1);
  *
  * Drives Payum exactly as a shop would: build the gateway, execute `Authorize` against a token, and
  * let the actions do the rest. That single call exercises `ConvertPaymentAction` (which creates the
- * real Quickpay payment) and `AuthorizeAction` (which creates the real payment link and throws
- * `HttpRedirect`), then `GetHumanStatus` runs `StatusAction` over the freshly fetched payment.
+ * real Quickpay payment) and `AuthorizeAction` → `CreatePaymentLinkAction` (which create the real
+ * payment link and throw `HttpRedirect`), then `GetHumanStatus` runs `StatusAction` over the freshly
+ * fetched payment.
  *
  * No card is entered, so nothing is charged and no callback is fired. Without --base the token urls
  * are built on a placeholder host — fine here precisely because no callback will arrive.
@@ -43,7 +44,7 @@ $report = static function (string $label, string $result): void {
 
 $report('payment', sprintf('created number=%s amount=%d %s', $payment->getNumber(), $amount, $currency));
 
-// Authorize: Convert creates the Quickpay payment, AuthorizeAction creates the link and redirects.
+// Authorize: Convert creates the Quickpay payment, AuthorizeAction has the link created and redirects.
 $windowUrl = null;
 
 try {
