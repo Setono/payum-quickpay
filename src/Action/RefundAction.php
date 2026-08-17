@@ -16,9 +16,11 @@ use Payum\Core\Request\Refund;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Amounts;
 use Setono\Payum\Quickpay\Details;
+use Setono\Payum\Quickpay\Exception\OperationPendingException;
 use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Request\Payment\RefundRequest;
+use Setono\Quickpay\Response\Payment\Payment;
 
 class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -35,10 +37,19 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
         $paymentId = Details::paymentId($model);
+        $payment = $this->api->payments()->getById($paymentId);
+
+        // Keep it fresh for the caller while we have it — same key every fetching action writes.
+        $model['balance'] = $payment->balance;
+
+        // One money operation at a time: a capture or refund still in flight has not settled, so the
+        // balance above is the pre-operation one, and a refund on top would race it — retried after a
+        // timeout, it refunds twice.
+        OperationPendingException::assertNoneInFlight($paymentId, $payment);
 
         $refunded = $this->api->payments()->refund(
             $paymentId,
-            new RefundRequest(amount: $this->resolveAmount($model, $paymentId)),
+            new RefundRequest(amount: self::resolveAmount($model, $paymentId, $payment)),
         );
 
         // Asynchronously the returned payment is a snapshot with the refund still pending and nothing
@@ -62,23 +73,20 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
      * Quickpay rejects it outright. The maximal refundable amount is the payment's `balance` (captured
      * minus refunded), so that is what an unqualified "refund this payment" means.
      *
-     * An explicit `refund_amount` is used as given and skips the fetch entirely, so partial refunds
-     * cost nothing extra and the caller's instruction is never second-guessed.
+     * An explicit `refund_amount` is used as given — the caller's instruction is never second-guessed
+     * against the balance; Quickpay validates it.
      *
      * @param ArrayObject<string, mixed> $model
      *
      * @throws LogicException if nothing is left to refund
      */
-    private function resolveAmount(ArrayObject $model, int $paymentId): int
+    private static function resolveAmount(ArrayObject $model, int $paymentId, Payment $payment): int
     {
         if ($model->offsetExists('refund_amount')) {
             return Amounts::forOperation($model, 'refund_amount');
         }
 
-        $balance = $this->api->payments()->getById($paymentId)->balance;
-
-        // Keep it fresh for the caller while we have it — same key StatusAction and SyncAction write.
-        $model['balance'] = $balance;
+        $balance = $payment->balance;
 
         if (null === $balance || $balance <= 0) {
             throw new LogicException(sprintf(

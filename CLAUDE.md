@@ -201,7 +201,12 @@ The keys are `capture_amount` and `refund_amount`.
 **`RefundAction` does not use that fallback.** With no explicit `refund_amount` it fetches the payment
 and refunds the `balance`, because falling back to the full `amount` is guaranteed to be rejected once
 anything has been refunded — a payment is refundable only up to what is captured. Nothing refundable
-throws a `LogicException` naming the payment and balance. An explicit amount skips the fetch.
+throws a `LogicException` naming the payment and balance. An explicit amount is used as given (Quickpay
+validates it), but the fetch happens regardless: **every money operation fetches the payment first** and
+`OperationPendingException::assertNoneInFlight()` refuses to queue a capture/refund/cancel while any of
+the three is still pending — a retry after a timeout must not take or return the money twice, and the
+async response's `balance` is pre-operation anyway. `CancelAction` fetches for the same reason (it used
+to be the one action that did not).
 
 Quickpay accepts **repeated** captures against one authorization and repeated refunds against what is
 captured — verified live 2026-08 (authorize 1000 → capture 250 → capture 250 → refund 250 → refund 250,

@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use ReflectionException;
 use Setono\Payum\Quickpay\Action\CaptureAction;
+use Setono\Payum\Quickpay\Exception\OperationPendingException;
 use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
@@ -369,6 +370,48 @@ class CaptureActionTest extends ActionTestAbstract
 
         self::assertCount(2, $this->getRequests());
         self::assertSame(250, $this->decodeBody($this->getRequests()[1])['amount']);
+    }
+
+    /**
+     * One money operation at a time: a capture (or refund/cancel) still in flight on a plain link has
+     * not settled, and another capture on top would race it — retried after a timeout, it takes the
+     * money twice. Nothing is issued; the instruction survives.
+     *
+     * @param list<array<string, mixed>> $operations
+     */
+    #[Test]
+    #[DataProvider('inFlightProvider')]
+    public function shouldRefuseWhileAnotherOperationIsInFlight(array $operations, string $expectedType): void
+    {
+        $details = $this->details(['amount' => 1000, 'capture_amount' => 250]);
+
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'balance' => 0,
+            'operations' => $operations,
+            'link' => $this->link(autoCapture: false),
+        ]);
+
+        try {
+            $this->action()->execute($this->capture($details));
+            self::fail('Expected the in-flight guard to fire');
+        } catch (OperationPendingException $e) {
+            self::assertStringContainsString(sprintf('A %s of Quickpay payment 1001 is still pending', $expectedType), $e->getMessage());
+            self::assertSame(250, $details['capture_amount'], 'The instruction survives');
+        }
+
+        self::assertCount(1, $this->getRequests(), 'Only the fetch — nothing may be issued');
+    }
+
+    /**
+     * @return iterable<string, array{list<array<string, mixed>>, string}>
+     */
+    public static function inFlightProvider(): iterable
+    {
+        $authorize = ['id' => 1, 'type' => 'authorize', 'amount' => 1000, 'pending' => false, 'qp_status_code' => '20000'];
+
+        yield 'capture pending (a retry, or a fast second instalment)' => [[$authorize, ['id' => 2, 'type' => 'capture', 'amount' => 250, 'pending' => true, 'qp_status_code' => null]], 'capture'];
+        yield 'cancel pending' => [[$authorize, ['id' => 2, 'type' => 'cancel', 'amount' => 1000, 'pending' => true, 'qp_status_code' => null]], 'cancel'];
     }
 
     #[Test]

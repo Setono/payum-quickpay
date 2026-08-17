@@ -10,6 +10,7 @@ use Payum\Core\Request\Cancel;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Setono\Payum\Quickpay\Action\CancelAction;
+use Setono\Payum\Quickpay\Exception\OperationPendingException;
 use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
@@ -33,18 +34,26 @@ class CancelActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
+        // The fetch (for the in-flight guard and the balance), then the cancel.
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'balance' => 0,
+            'operations' => [$this->operation(OperationType::Authorize)],
+        ]);
         $this->queuePayment([
             'state' => PaymentState::Processed->value,
-            'operations' => [$this->operation(OperationType::Cancel)],
+            'operations' => [$this->operation(OperationType::Authorize), $this->operation(OperationType::Cancel)],
         ]);
 
         $action->execute($cancel);
 
         $requests = $this->getRequests();
-        self::assertCount(1, $requests);
-        $this->assertRequest($requests[0], 'POST', '#/payments/1001/cancel$#');
+        self::assertCount(2, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+        $this->assertRequest($requests[1], 'POST', '#/payments/1001/cancel$#');
         // Cancel takes no body.
-        self::assertSame('', (string) $requests[0]->getBody());
+        self::assertSame('', (string) $requests[1]->getBody());
+        self::assertSame(0, $details['balance']);
     }
 
     /**
@@ -89,6 +98,10 @@ class CancelActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'operations' => [$this->operation(OperationType::Authorize), $this->operation(OperationType::Capture)],
+        ]);
         $this->queueResponse($body, 400);
 
         $this->expectException(ValidationException::class);
@@ -96,7 +109,7 @@ class CancelActionTest extends ActionTestAbstract
         try {
             $action->execute($cancel);
         } finally {
-            self::assertCount(1, $this->getRequests());
+            self::assertCount(2, $this->getRequests());
         }
     }
 
@@ -127,6 +140,10 @@ class CancelActionTest extends ActionTestAbstract
 
         $this->queuePayment([
             'state' => PaymentState::New->value,
+            'operations' => [$this->operation(OperationType::Authorize)],
+        ]);
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
             'operations' => [
                 $this->operation(OperationType::Authorize),
                 ['id' => 2, 'type' => 'cancel', 'amount' => 100, 'pending' => false, 'qp_status_code' => '40000', 'qp_status_msg' => null],
@@ -141,7 +158,7 @@ class CancelActionTest extends ActionTestAbstract
             self::assertSame(OperationType::Cancel, $e->getOperation()->type());
         }
 
-        self::assertSame('synchronized', $this->getRequests()[0]->getUri()->getQuery());
+        self::assertSame('synchronized', $this->getRequests()[1]->getUri()->getQuery());
     }
 
     /**
@@ -159,6 +176,10 @@ class CancelActionTest extends ActionTestAbstract
 
         $this->queuePayment([
             'state' => PaymentState::New->value,
+            'operations' => [$this->operation(OperationType::Authorize)],
+        ]);
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
             'operations' => [
                 $this->operation(OperationType::Authorize),
                 $this->operation(OperationType::Cancel, null, pending: true),
@@ -167,6 +188,46 @@ class CancelActionTest extends ActionTestAbstract
 
         $action->execute($cancel);
 
-        self::assertCount(1, $this->getRequests());
+        self::assertCount(2, $this->getRequests());
+    }
+
+    /**
+     * One money operation at a time: a capture, refund or cancel still in flight has not settled, and
+     * a cancel on top would race it. Nothing is issued.
+     *
+     * @param list<array<string, mixed>> $operations
+     */
+    #[Test]
+    #[DataProvider('inFlightProvider')]
+    public function shouldRefuseWhileAnotherOperationIsInFlight(array $operations, string $expectedType): void
+    {
+        /** @var Cancel $cancel */
+        $cancel = new static::$requestClass(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]));
+
+        $action = new CancelAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queuePayment(['state' => PaymentState::New->value, 'operations' => $operations]);
+
+        try {
+            $action->execute($cancel);
+            self::fail('Expected the in-flight guard to fire');
+        } catch (OperationPendingException $e) {
+            self::assertStringContainsString(sprintf('A %s of Quickpay payment 1001 is still pending', $expectedType), $e->getMessage());
+        }
+
+        self::assertCount(1, $this->getRequests(), 'Only the fetch — nothing may be issued');
+    }
+
+    /**
+     * @return iterable<string, array{list<array<string, mixed>>, string}>
+     */
+    public static function inFlightProvider(): iterable
+    {
+        $authorize = ['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => false, 'qp_status_code' => '20000'];
+
+        yield 'capture pending' => [[$authorize, ['id' => 2, 'type' => 'capture', 'amount' => 100, 'pending' => true, 'qp_status_code' => null]], 'capture'];
+        yield 'cancel pending (a retry)' => [[$authorize, ['id' => 2, 'type' => 'cancel', 'amount' => 100, 'pending' => true, 'qp_status_code' => null]], 'cancel'];
     }
 }

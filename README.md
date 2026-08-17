@@ -244,11 +244,21 @@ $quickpay->execute(new Capture($model));
 ```
 
 The keys are per operation and are read only when present — leave them unset for the default described
-above. An explicit `refund_amount` also skips the balance fetch, so a partial refund costs no extra
-API call. The
+above. An explicit `refund_amount` is used as given, never second-guessed against the balance. The
 gateway **consumes the key once the API has accepted the operation**, so the next capture or refund is
 for the full amount again and a stale key cannot silently make it partial. A failed operation keeps its
 key, so a retry still refunds what you asked for.
+
+**One money operation at a time.** Operations are asynchronous by default: Quickpay queues them and
+answers before the acquirer has, so until the callback (or a `Sync`/`GetStatus`) reports the outcome
+the payment's `balance` and `state` are the pre-operation ones — and a second operation issued on top
+would race the first: a `Capture` retried after a timeout would take the money twice, a `Refund` would
+refund the stale balance again. So `Capture`, `Refund` and `Cancel` each fetch the payment first and,
+while a capture, refund or cancel is still pending on it, throw
+`Setono\Payum\Quickpay\Exception\OperationPendingException` (a Payum `RuntimeException` naming the
+pending operation) instead of queuing another. Wait for the outcome, then retry — or configure the
+gateway with `synchronized`, which has no in-flight window at all. This also means a second instalment
+has to wait for the first to settle.
 
 Set the key freshly for each partial operation rather than relying on a previous one: re-executing a
 *successful* partial refund against a reloaded payment would fall back to the full `amount`.

@@ -10,6 +10,7 @@ use Payum\Core\Request\Refund;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Setono\Payum\Quickpay\Action\RefundAction;
+use Setono\Payum\Quickpay\Exception\OperationPendingException;
 use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
@@ -141,6 +142,12 @@ class RefundActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
+        // The fetch (for the in-flight guard and the balance), then the refund.
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
+            'operations' => [$this->operation(OperationType::Capture, amount: 1000)],
+        ]);
         $this->queuePayment([
             'state' => PaymentState::Processed->value,
             'balance' => 750,
@@ -150,9 +157,11 @@ class RefundActionTest extends ActionTestAbstract
         $action->execute($refund);
 
         $requests = $this->getRequests();
-        self::assertCount(1, $requests, 'An explicit amount must skip the balance fetch entirely');
-        $this->assertRequest($requests[0], 'POST', '#/payments/1001/refund$#');
-        self::assertSame(250, $this->decodeBody($requests[0])['amount'], 'The override must win over the full amount');
+        self::assertCount(2, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+        $this->assertRequest($requests[1], 'POST', '#/payments/1001/refund$#');
+        self::assertSame(250, $this->decodeBody($requests[1])['amount'], 'The override must win over the full amount');
+        self::assertSame(1000, $details['balance'], 'The balance is refreshed for the caller, as on the default path');
 
         self::assertFalse(
             $details->offsetExists('refund_amount'),
@@ -181,6 +190,11 @@ class RefundActionTest extends ActionTestAbstract
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
+            'operations' => [$this->operation(OperationType::Capture, amount: 1000)],
+        ]);
         $this->queueResponse('{"message":"Validation error"}', 400);
 
         try {
@@ -210,6 +224,11 @@ class RefundActionTest extends ActionTestAbstract
         $this->queuePayment([
             'state' => PaymentState::Processed->value,
             'balance' => 1000,
+            'operations' => [$this->operation(OperationType::Capture, amount: 1000)],
+        ]);
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
             'operations' => [
                 $this->operation(OperationType::Capture, amount: 1000),
                 ['id' => 2, 'type' => 'refund', 'amount' => 250, 'pending' => false, 'qp_status_code' => '40000', 'qp_status_msg' => 'Rejected'],
@@ -225,8 +244,8 @@ class RefundActionTest extends ActionTestAbstract
         }
 
         $requests = $this->getRequests();
-        self::assertCount(1, $requests);
-        self::assertSame('synchronized', $requests[0]->getUri()->getQuery());
+        self::assertCount(2, $requests);
+        self::assertSame('synchronized', $requests[1]->getUri()->getQuery());
     }
 
     /**
@@ -248,6 +267,11 @@ class RefundActionTest extends ActionTestAbstract
         $this->queuePayment([
             'state' => PaymentState::Processed->value,
             'balance' => 1000,
+            'operations' => [$this->operation(OperationType::Capture, amount: 1000)],
+        ]);
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
             'operations' => [
                 $this->operation(OperationType::Capture, amount: 1000),
                 $this->operation(OperationType::Refund, null, amount: 250, pending: true),
@@ -257,5 +281,65 @@ class RefundActionTest extends ActionTestAbstract
         $action->execute($refund);
 
         self::assertFalse($details->offsetExists('refund_amount'));
+    }
+
+    /**
+     * One money operation at a time. A refund (or capture) still in flight has not settled: the
+     * balance is the pre-operation one, and a refund on top would race it — retried after a
+     * timeout, it refunds twice. Nothing is issued; the instruction survives; the caller can wait
+     * for the callback or use `synchronized`.
+     *
+     * @param list<array<string, mixed>> $operations
+     */
+    #[Test]
+    #[DataProvider('inFlightProvider')]
+    public function shouldRefuseWhileAnotherOperationIsInFlight(array $operations, string $expectedType, ?int $refundAmount): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000]);
+        if (null !== $refundAmount) {
+            $details['refund_amount'] = $refundAmount;
+        }
+
+        /** @var Refund $refund */
+        $refund = new static::$requestClass($details);
+
+        $action = new RefundAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queuePayment([
+            'state' => PaymentState::Processed->value,
+            'balance' => 1000,
+            'operations' => $operations,
+        ]);
+
+        try {
+            $action->execute($refund);
+            self::fail('Expected the in-flight guard to fire');
+        } catch (OperationPendingException $e) {
+            self::assertStringContainsString(sprintf('A %s of Quickpay payment 1001 is still pending', $expectedType), $e->getMessage());
+            self::assertSame(1001, $e->getPaymentId());
+            self::assertTrue($e->getOperation()->pending);
+        }
+
+        self::assertCount(1, $this->getRequests(), 'Only the fetch — nothing may be issued');
+        self::assertSame(1000, $details['balance']);
+        if (null !== $refundAmount) {
+            self::assertSame($refundAmount, $details['refund_amount'], 'The instruction survives');
+        }
+    }
+
+    /**
+     * @return iterable<string, array{list<array<string, mixed>>, string, int|null}>
+     */
+    public static function inFlightProvider(): iterable
+    {
+        $capture = ['id' => 1, 'type' => 'capture', 'amount' => 1000, 'pending' => false, 'qp_status_code' => '20000'];
+        $pendingRefund = ['id' => 2, 'type' => 'refund', 'amount' => 250, 'pending' => true, 'qp_status_code' => null];
+        $pendingCapture = ['id' => 2, 'type' => 'capture', 'amount' => 250, 'pending' => true, 'qp_status_code' => null];
+
+        yield 'refund pending, default amount' => [[$capture, $pendingRefund], 'refund', null];
+        yield 'refund pending, explicit amount' => [[$capture, $pendingRefund], 'refund', 250];
+        yield 'capture pending' => [[$capture, $pendingCapture], 'capture', 250];
     }
 }

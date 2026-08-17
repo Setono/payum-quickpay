@@ -203,7 +203,27 @@ An unqualified `Refund` now fetches the payment and refunds its `balance`, which
 refundable amount. Nothing left to refund throws a `LogicException` naming the payment and the balance,
 rather than surfacing Quickpay's generic validation error.
 
-An explicit `refund_amount` is unaffected and still skips the fetch entirely.
+An explicit `refund_amount` is used as given. (Since `2.0.0-beta.1` it no longer skips the fetch — see
+the next section — but it is never second-guessed against the balance.)
+
+## One money operation at a time
+
+> Changed after `2.0.0-beta.1`.
+
+Operations run asynchronously by default: Quickpay queues them and answers before the acquirer has, and
+until the callback (or a `Sync`/`GetStatus`) reports the outcome, the payment's `balance` and `state` are
+the pre-operation ones. A second operation issued meanwhile races the first — a `Capture` retried after
+a timeout takes the money twice, a `Refund` refunds the stale balance again, a `Cancel` races a capture.
+
+`CaptureAction`, `RefundAction` and `CancelAction` therefore now fetch the payment first (Cancel and an
+explicit-amount Refund did not before) and throw
+`Setono\Payum\Quickpay\Exception\OperationPendingException` (a `Payum\Core\Exception\RuntimeException`
+with `getPaymentId()` and the pending `getOperation()`) while a capture, refund or cancel is still
+pending, instead of queuing another. Nothing is sent, and a `capture_amount`/`refund_amount` instruction
+survives. Wait for the outcome and retry, or configure `synchronized`, which has no in-flight window.
+A second instalment issued within seconds of the first now has to wait for it to settle. The extra
+`GET` costs one round trip on the two paths that did not fetch before; the `balance` it brings is written
+into the details like everywhere else.
 
 If you were relying on a bare `Refund` to refund the original total, note that it now refunds only what
 remains — which is the only amount that could ever have succeeded.

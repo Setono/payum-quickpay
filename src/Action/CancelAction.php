@@ -14,6 +14,7 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\Cancel;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Details;
+use Setono\Payum\Quickpay\Exception\OperationPendingException;
 use Setono\Payum\Quickpay\Exception\OperationRejectedException;
 use Setono\Quickpay\Enum\OperationType;
 
@@ -32,6 +33,14 @@ class CancelAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         $model = ArrayObject::ensureArrayObject($request->getModel());
 
         $paymentId = Details::paymentId($model);
+        $payment = $this->api->payments()->getById($paymentId);
+
+        // Keep it fresh for the caller while we have it — same key every fetching action writes.
+        $model['balance'] = $payment->balance;
+
+        // One money operation at a time: a capture, refund or cancel still in flight has not settled,
+        // and a cancel on top would race it.
+        OperationPendingException::assertNoneInFlight($paymentId, $payment);
 
         // Errors are deliberately not caught here. Quickpay rejects cancelling an already captured or
         // cancelled payment with a `ValidationException`, and that surfaces to the caller: it is a real
