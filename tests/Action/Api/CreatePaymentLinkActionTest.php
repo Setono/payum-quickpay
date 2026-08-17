@@ -10,6 +10,8 @@ use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\Model\Token;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use Setono\Payum\Quickpay\Action\Api\CreatePaymentLinkAction;
@@ -27,17 +29,14 @@ class CreatePaymentLinkActionTest extends TestCase
      * This is the ONE action that mints a token — the notify token for `callback_url` — and so the
      * one contact with payum/core's deprecated GenericTokenFactoryInterface (see #3). The public
      * actions must not implement it; their tests pin that side.
-     *
-     * @test
      */
+    #[Test]
     public function shouldBeTheOnlyTokenFactoryAwareAction(): void
     {
         self::assertTrue((new ReflectionClass(CreatePaymentLinkAction::class))->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldSupportCreatePaymentLinkWithAnArrayAccessModelOnly(): void
     {
         $action = new CreatePaymentLinkAction();
@@ -50,9 +49,7 @@ class CreatePaymentLinkActionTest extends TestCase
         $action->execute(new stdClass());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldCreateTheLinkFromTheTokenAndRedirectToIt(): void
     {
         $token = new Token();
@@ -98,11 +95,9 @@ class CreatePaymentLinkActionTest extends TestCase
     /**
      * The request, not the gateway option, decides whether the window captures: Capture asks for it,
      * Authorize does not. Pin both values on the wire.
-     *
-     * @test
-     *
-     * @dataProvider autoCaptureProvider
      */
+    #[Test]
+    #[DataProvider('autoCaptureProvider')]
     public function shouldPutTheRequestedAutoCaptureOnTheLink(bool $autoCapture): void
     {
         $this->queueResponse('{"url":"https://payment.quickpay.net/payments/1001/payment-window"}');
@@ -127,9 +122,8 @@ class CreatePaymentLinkActionTest extends TestCase
     /**
      * A consumer that routes callbacks itself presets `callback_url` and executes without a token.
      * That path must not need the token factory at all.
-     *
-     * @test
      */
+    #[Test]
     public function shouldCreateTheLinkWithoutATokenWhenTheCallbackUrlIsPreset(): void
     {
         $action = new CreatePaymentLinkAction();
@@ -150,9 +144,7 @@ class CreatePaymentLinkActionTest extends TestCase
         self::assertSame([], $this->tokenFactory->notifyTokensCreated);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowBeforeAnyRequestWhenARequiredDetailIsMissing(): void
     {
         // No callback_url, and no token to mint one from.
@@ -173,9 +165,7 @@ class CreatePaymentLinkActionTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
     {
         $details = $this->presetDetails();
@@ -192,9 +182,7 @@ class CreatePaymentLinkActionTest extends TestCase
         }
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenQuickpayReturnsNoLinkUrl(): void
     {
         $this->queueResponse('{"url":null}');
@@ -209,9 +197,8 @@ class CreatePaymentLinkActionTest extends TestCase
      * `branding_id` is optional, so if it silently stopped being read the link would simply be
      * created without it and Quickpay would fall back to the account default — the same failure mode
      * the factory tests guard against for `agreement`. Pin that the option reaches the wire.
-     *
-     * @test
      */
+    #[Test]
     public function shouldPassTheBrandingIdToTheLink(): void
     {
         $api = new Api(

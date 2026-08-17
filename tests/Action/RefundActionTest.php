@@ -7,6 +7,8 @@ namespace Setono\Payum\Quickpay\Tests\Action;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\Request\Refund;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use Setono\Payum\Quickpay\Action\RefundAction;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
@@ -14,22 +16,19 @@ use Setono\Quickpay\Exception\ValidationException;
 
 class RefundActionTest extends ActionTestAbstract
 {
-    /** @var string */
-    protected $requestClass = Refund::class;
+    protected static string $requestClass = Refund::class;
 
-    /** @var string */
-    protected $actionClass = RefundAction::class;
+    protected static string $actionClass = RefundAction::class;
 
     /**
      * A model without a quickpayPaymentId has no payment to refund. The guard throws before any
      * HTTP happens — without it, `(int) null = 0` would reach the API as a request on payment 0.
-     *
-     * @test
      */
+    #[Test]
     public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
     {
         /** @var Refund $refund */
-        $refund = new $this->requestClass(new ArrayObject(['amount' => 100]));
+        $refund = new static::$requestClass(new ArrayObject(['amount' => 100]));
 
         $action = new RefundAction();
         $action->setGateway($this->gateway);
@@ -49,15 +48,14 @@ class RefundActionTest extends ActionTestAbstract
      * With no explicit amount, a refund is for whatever is still refundable — the balance. Defaulting
      * to the payment's full `amount` would be rejected outright the moment anything had already been
      * refunded, since a payment is refundable only up to what is captured.
-     *
-     * @test
      */
+    #[Test]
     public function shouldRefundTheRemainingBalanceByDefault(): void
     {
         $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000]);
 
         /** @var Refund $refund */
-        $refund = new $this->requestClass($details);
+        $refund = new static::$requestClass($details);
 
         $action = new RefundAction();
         $action->setGateway($this->gateway);
@@ -87,17 +85,14 @@ class RefundActionTest extends ActionTestAbstract
         self::assertSame(1000, $details['amount'], 'The full amount is left alone');
     }
 
-    /**
-     * @test
-     *
-     * @dataProvider nothingRefundableProvider
-     */
+    #[Test]
+    #[DataProvider('nothingRefundableProvider')]
     public function shouldThrowWhenThereIsNothingLeftToRefund(?int $balance, string $expectedMessage): void
     {
         $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000]);
 
         /** @var Refund $refund */
-        $refund = new $this->requestClass($details);
+        $refund = new static::$requestClass($details);
 
         $action = new RefundAction();
         $action->setGateway($this->gateway);
@@ -129,9 +124,7 @@ class RefundActionTest extends ActionTestAbstract
         yield 'balance absent from the response' => [null, 'the balance is unknown'];
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldRefundThePartialAmountWhenTheDetailsCarryAnOverride(): void
     {
         $details = new ArrayObject([
@@ -141,7 +134,7 @@ class RefundActionTest extends ActionTestAbstract
         ]);
 
         /** @var Refund $refund */
-        $refund = new $this->requestClass($details);
+        $refund = new static::$requestClass($details);
 
         $action = new RefundAction();
         $action->setGateway($this->gateway);
@@ -170,9 +163,8 @@ class RefundActionTest extends ActionTestAbstract
     /**
      * A failed call did not carry out the instruction, so the override has to survive for a retry —
      * otherwise retrying a failed partial refund would refund the full amount.
-     *
-     * @test
      */
+    #[Test]
     public function shouldKeepTheOverrideWhenTheRefundFails(): void
     {
         $details = new ArrayObject([
@@ -182,7 +174,7 @@ class RefundActionTest extends ActionTestAbstract
         ]);
 
         /** @var Refund $refund */
-        $refund = new $this->requestClass($details);
+        $refund = new static::$requestClass($details);
 
         $action = new RefundAction();
         $action->setGateway($this->gateway);

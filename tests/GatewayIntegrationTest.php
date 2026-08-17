@@ -16,6 +16,7 @@ use Payum\Core\Request\Capture;
 use Payum\Core\Request\Convert;
 use Payum\Core\Request\GetHumanStatus;
 use Payum\Core\Request\Notify;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Message\RequestInterface;
 use Setono\Payum\Quickpay\QuickpayGatewayFactory;
@@ -64,9 +65,8 @@ final class GatewayIntegrationTest extends TestCase
      * Convert → Capture (fresh payment: hosted window, auto-capturing) → Quickpay's callback →
      * Capture again (the customer is back at the token url; the payment is being captured by
      * Quickpay, so this must be a no-op) → GetStatus. All through the factory-built gateway, offline.
-     *
-     * @test
      */
+    #[Test]
     public function shouldRunTheCaptureDrivenCheckoutThroughTheFactoryWiredGateway(): void
     {
         // -- Convert: creates the payment at Quickpay and produces the scalar details.
@@ -177,9 +177,8 @@ final class GatewayIntegrationTest extends TestCase
     /**
      * The other flow: Authorize (auth-only window), then a later Capture through the API — the
      * shape of a shop that settles when it ships.
-     *
-     * @test
      */
+    #[Test]
     public function shouldRunTheAuthorizeThenCaptureFlowThroughTheFactoryWiredGateway(): void
     {
         $details = new ArrayObject([

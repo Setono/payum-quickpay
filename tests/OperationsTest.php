@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Setono\Payum\Quickpay\Tests;
 
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Enum\OperationType;
@@ -11,17 +12,13 @@ use Setono\Quickpay\Response\Payment\Operation;
 
 class OperationsTest extends TestCase
 {
-    /**
-     * @test
-     */
+    #[Test]
     public function latestReturnsNullForNoOperations(): void
     {
         self::assertNull(Operations::latest([]));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function latestReturnsTheLastOperation(): void
     {
         $first = $this->operation(1, OperationType::Authorize);
@@ -30,9 +27,7 @@ class OperationsTest extends TestCase
         self::assertSame($last, Operations::latest([$first, $last]));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function latestApprovedSkipsTrailingRejectedAndPendingOperations(): void
     {
         $approvedCapture = $this->operation(2, OperationType::Capture, '20000');
@@ -48,9 +43,7 @@ class OperationsTest extends TestCase
         self::assertSame($approvedCapture, Operations::latestApproved($operations));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function latestApprovedReturnsNullWhenNothingIsApproved(): void
     {
         self::assertNull(Operations::latestApproved([]));
@@ -63,9 +56,8 @@ class OperationsTest extends TestCase
     /**
      * "Has this payment ever been authorized?" — regardless of what came after. The last-approved
      * view (latestApproved) says no once a capture follows; this says yes.
-     *
-     * @test
      */
+    #[Test]
     public function hasApprovedFindsAnApprovedOperationOfTheTypeAnywhereInTheList(): void
     {
         $operations = [
@@ -81,9 +73,7 @@ class OperationsTest extends TestCase
         self::assertFalse(Operations::hasApproved([], OperationType::Authorize));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function hasPendingFindsAnOperationOfTheTypeStillInFlight(): void
     {
         $operations = [
@@ -96,9 +86,7 @@ class OperationsTest extends TestCase
         self::assertFalse(Operations::hasPending([], OperationType::Capture));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function isApprovedReflectsTheStatusCode(): void
     {
         self::assertTrue(Operations::isApproved($this->operation(1, OperationType::Capture, '20000')));
@@ -106,9 +94,7 @@ class OperationsTest extends TestCase
         self::assertFalse(Operations::isApproved($this->operation(1, OperationType::Capture, null)));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function isApprovedOfTypeChecksBothTypeAndApproval(): void
     {
         $approvedCapture = $this->operation(1, OperationType::Capture, '20000');
@@ -119,9 +105,7 @@ class OperationsTest extends TestCase
         self::assertFalse(Operations::isApprovedOfType(null, OperationType::Capture));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function isLatestApprovedLooksAtTheLastOperation(): void
     {
         $operations = [
@@ -134,9 +118,7 @@ class OperationsTest extends TestCase
         self::assertFalse(Operations::isLatestApproved([], OperationType::Capture));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function authorizedAmountReturnsTheMostRecentApprovedAuthorizeAmount(): void
     {
         $operations = [
@@ -148,9 +130,7 @@ class OperationsTest extends TestCase
         self::assertSame(100, Operations::authorizedAmount($operations));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function authorizedAmountIsZeroWithoutAnApprovedAuthorize(): void
     {
         self::assertSame(0, Operations::authorizedAmount([]));

@@ -6,19 +6,18 @@ namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Request\GetHumanStatus;
+use PHPUnit\Framework\Attributes\Test;
 use Setono\Payum\Quickpay\Action\StatusAction;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 
 class StatusActionTest extends ActionTestAbstract
 {
-    protected $requestClass = GetHumanStatus::class;
+    protected static string $requestClass = GetHumanStatus::class;
 
-    protected $actionClass = StatusAction::class;
+    protected static string $actionClass = StatusAction::class;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkEmptyAsNew(): void
     {
         $request = new GetHumanStatus([]);
@@ -29,9 +28,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isNew(), 'Request should be marked as new');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkInitialAsNew(): void
     {
         $this->queuePayment(['state' => PaymentState::Initial->value]);
@@ -42,9 +39,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isNew(), 'Request should be marked as new');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkNewWithApprovedAuthorizeAsAuthorized(): void
     {
         $this->queuePayment([
@@ -58,9 +53,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isAuthorized(), 'Request should be marked as authorized');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkNewWithRejectedAuthorizeAsFailed(): void
     {
         $this->queuePayment([
@@ -74,9 +67,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isFailed(), 'Request should be marked as failed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkPendingAsPending(): void
     {
         $this->queuePayment(['state' => PaymentState::Pending->value]);
@@ -87,9 +78,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertSame($request::STATUS_PENDING, $request->getValue());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkRejectedAsFailed(): void
     {
         $this->queuePayment(['state' => PaymentState::Rejected->value]);
@@ -100,9 +89,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isFailed(), 'Request should be marked as failed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkInvalidAsFailed(): void
     {
         $this->queuePayment(['state' => PaymentState::Invalid->value]);
@@ -113,9 +100,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isFailed(), 'Request should be marked as failed');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkProcessedWithCaptureAsCaptured(): void
     {
         $this->queuePayment([
@@ -129,9 +114,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isCaptured(), 'Request should be marked as captured');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkProcessedWithRefundAsRefundedWhenTheBalanceIsEmpty(): void
     {
         $this->queuePayment([
@@ -150,9 +133,8 @@ class StatusActionTest extends ActionTestAbstract
      * A partial refund leaves money captured, and Payum has no partial mark — so the payment is still
      * captured, not refunded. Reporting it as refunded would tell a shop the customer got everything
      * back when most of it is still held.
-     *
-     * @test
      */
+    #[Test]
     public function shouldMarkProcessedWithAPartialRefundAsStillCaptured(): void
     {
         $this->queuePayment([
@@ -174,9 +156,8 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * `balance` is nullable in the API. Absent, fall back to treating a refund as full rather than
      * inventing a number.
-     *
-     * @test
      */
+    #[Test]
     public function shouldMarkProcessedWithRefundAsRefundedWhenTheBalanceIsAbsent(): void
     {
         $this->queuePayment([
@@ -194,9 +175,8 @@ class StatusActionTest extends ActionTestAbstract
      * A trailing REJECTED attempt must not mask what actually happened: capture 1000, then a refund
      * the acquirer bounced — the 1000 is demonstrably still held, so the payment is still captured,
      * not unknown.
-     *
-     * @test
      */
+    #[Test]
     public function shouldStayCapturedWhenARefundAttemptWasRejected(): void
     {
         $this->queuePayment([
@@ -217,9 +197,8 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * Same for a PENDING attempt: an asynchronous refund that has not settled yet has no outcome,
      * so the status keeps reporting the last operation that did succeed.
-     *
-     * @test
      */
+    #[Test]
     public function shouldStayCapturedWhileARefundIsStillPending(): void
     {
         $this->queuePayment([
@@ -240,9 +219,8 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * And in the `new` state: an authorized payment whose capture attempt was rejected is still
      * authorized — the money is still held and a retry is possible. It must not report as failed.
-     *
-     * @test
      */
+    #[Test]
     public function shouldStayAuthorizedWhenACaptureAttemptWasRejected(): void
     {
         $this->queuePayment([
@@ -259,9 +237,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isAuthorized(), 'Request should be marked as authorized');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkNewWithoutAnyOperationsAsFailed(): void
     {
         $this->queuePayment(['state' => PaymentState::New->value, 'operations' => []]);
@@ -275,9 +251,8 @@ class StatusActionTest extends ActionTestAbstract
     /**
      * The SDK's PaymentState enum is non-exhaustive by design — Quickpay may grow states. An
      * unmodeled state maps to unknown rather than anything more confident.
-     *
-     * @test
      */
+    #[Test]
     public function shouldMarkAnUnmodeledStateAsUnknown(): void
     {
         $this->queuePayment(['state' => 'some_future_state']);
@@ -288,9 +263,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertSame($request::STATUS_UNKNOWN, $request->getValue());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkProcessedWithCancelAsCanceled(): void
     {
         $this->queuePayment([
@@ -304,9 +277,7 @@ class StatusActionTest extends ActionTestAbstract
         self::assertSame($request::STATUS_CANCELED, $request->getValue());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldMarkProcessedWithoutApprovedOperationAsUnknown(): void
     {
         $this->queuePayment([
@@ -324,9 +295,8 @@ class StatusActionTest extends ActionTestAbstract
      * The payment is fetched anyway to decide the status, so the balance it carries is written back
      * into the details — it is the number the Payum marks cannot express, and re-fetching it downstream
      * would cost another API call.
-     *
-     * @test
      */
+    #[Test]
     public function shouldPersistTheBalanceIntoTheDetails(): void
     {
         $this->queuePayment([

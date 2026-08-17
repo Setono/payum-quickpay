@@ -7,6 +7,7 @@ namespace Setono\Payum\Quickpay\Tests\Action;
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Reply\HttpResponse;
 use Payum\Core\Request\Notify;
+use PHPUnit\Framework\Attributes\Test;
 use Setono\Payum\Quickpay\Action\NotifyAction;
 use Setono\Quickpay\Callback\CallbackValidator;
 use Setono\Quickpay\Enum\OperationType;
@@ -14,13 +15,11 @@ use Setono\Quickpay\Enum\PaymentState;
 
 class NotifyActionTest extends ActionTestAbstract
 {
-    protected $requestClass = Notify::class;
+    protected static string $requestClass = Notify::class;
 
-    protected $actionClass = NotifyAction::class;
+    protected static string $actionClass = NotifyAction::class;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldConfirmPaymentWhenChecksumIsValid(): void
     {
         $body = '{"id":1001}';
@@ -55,9 +54,8 @@ class NotifyActionTest extends ActionTestAbstract
     /**
      * The callback for a DECLINED payment must complete without error — throwing here would 500 the
      * notify endpoint and have Quickpay retry a callback that can never succeed.
-     *
-     * @test
      */
+    #[Test]
     public function shouldCompleteQuietlyWhenTheAuthorizeWasDeclined(): void
     {
         $body = '{"id":1001}';
@@ -82,9 +80,7 @@ class NotifyActionTest extends ActionTestAbstract
         $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldRejectInvalidChecksum(): void
     {
         $this->httpRequestAction->setHttpRequest('{"id":1001}', [
@@ -105,9 +101,7 @@ class NotifyActionTest extends ActionTestAbstract
         self::assertCount(0, $this->getRequests(), 'No API call should be made for an invalid callback');
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldRejectMissingChecksum(): void
     {
         $this->httpRequestAction->setHttpRequest('{"id":1001}', []);
@@ -130,9 +124,8 @@ class NotifyActionTest extends ActionTestAbstract
      * Symfony's HeaderBag lower-cases header names, and the Symfony bridge is what feeds
      * GetHttpRequest in production Sylius/Symfony setups — so the lower-cased spelling is the shape
      * the checksum lookup actually meets there. It must match case-insensitively.
-     *
-     * @test
      */
+    #[Test]
     public function shouldAcceptALowerCasedChecksumHeader(): void
     {
         $body = '{"id":1001}';
@@ -156,9 +149,8 @@ class NotifyActionTest extends ActionTestAbstract
 
     /**
      * Bridges may expose a header's value as a list. The first entry is the checksum.
-     *
-     * @test
      */
+    #[Test]
     public function shouldAcceptAListValuedChecksumHeader(): void
     {
         $body = '{"id":1001}';

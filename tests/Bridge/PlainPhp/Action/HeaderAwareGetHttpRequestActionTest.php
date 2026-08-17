@@ -6,6 +6,7 @@ namespace Setono\Payum\Quickpay\Tests\Bridge\PlainPhp\Action;
 
 use Payum\Core\Exception\RequestNotSupportedException;
 use Payum\Core\Request\GetHttpRequest;
+use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction;
 use Setono\Quickpay\Callback\CallbackValidator;
@@ -30,9 +31,7 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         $_SERVER = $this->originalServer;
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldSupportGetHttpRequestOnly(): void
     {
         $action = new HeaderAwareGetHttpRequestAction();
@@ -42,9 +41,7 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         self::assertFalse($action->supports('foo'));
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenExecutedWithAnUnsupportedRequest(): void
     {
         $this->expectException(RequestNotSupportedException::class);
@@ -52,9 +49,7 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         (new HeaderAwareGetHttpRequestAction())->execute(new stdClass());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldPopulateTheHeadersAlongsideTheParentFields(): void
     {
         $_SERVER['REQUEST_METHOD'] = 'POST';
@@ -79,9 +74,8 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
      * The reconstruction produces `Quickpay-Checksum-Sha256` while Quickpay sends
      * `QuickPay-Checksum-Sha256` (capital P). NotifyAction matches the header name
      * case-insensitively, and this pins that the two really do meet.
-     *
-     * @test
      */
+    #[Test]
     public function shouldProduceAHeaderNameNotifyActionMatches(): void
     {
         $_SERVER['HTTP_QUICKPAY_CHECKSUM_SHA256'] = 'the-checksum';
@@ -105,9 +99,8 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
     /**
      * The CGI convention strips the HTTP_ prefix from the two entity headers, so they need their
      * own mapping to show up in the result at all.
-     *
-     * @test
      */
+    #[Test]
     public function shouldMapTheEntityHeadersTheCgiConventionLeavesUnprefixed(): void
     {
         $_SERVER['CONTENT_TYPE'] = 'application/json';
@@ -123,9 +116,7 @@ final class HeaderAwareGetHttpRequestActionTest extends TestCase
         self::assertSame('42', $headers['Content-Length']);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldSkipNonHeaderAndNonScalarServerEntries(): void
     {
         $_SERVER['SOME_VAR'] = 'not-a-header';

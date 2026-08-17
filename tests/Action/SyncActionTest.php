@@ -6,27 +6,24 @@ namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Request\Sync;
+use PHPUnit\Framework\Attributes\Test;
 use Setono\Payum\Quickpay\Action\SyncAction;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 
 class SyncActionTest extends ActionTestAbstract
 {
-    /** @var string */
-    protected $requestClass = Sync::class;
+    protected static string $requestClass = Sync::class;
 
-    /** @var string */
-    protected $actionClass = SyncAction::class;
+    protected static string $actionClass = SyncAction::class;
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldWriteTheScalarSnapshotIntoTheDetails(): void
     {
         $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000]);
 
         /** @var Sync $sync */
-        $sync = new $this->requestClass($details);
+        $sync = new static::$requestClass($details);
 
         $action = new SyncAction();
         $action->setGateway($this->gateway);
@@ -56,15 +53,14 @@ class SyncActionTest extends ActionTestAbstract
     /**
      * A model that has not been converted yet has nothing to sync. That is a normal state, not an
      * error, so it must not throw and must not call the API.
-     *
-     * @test
      */
+    #[Test]
     public function shouldDoNothingWhenThePaymentDoesNotExistYet(): void
     {
         $details = new ArrayObject(['amount' => 1000]);
 
         /** @var Sync $sync */
-        $sync = new $this->requestClass($details);
+        $sync = new static::$requestClass($details);
 
         $action = new SyncAction();
         $action->setGateway($this->gateway);

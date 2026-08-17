@@ -251,7 +251,11 @@ Tests assert both the resulting Payum marks/replies **and** that the correct Qui
 
 Most action tests extend `ActionTestAbstract` → `GenericActionTestCase`, a **local copy** of Payum's
 `GenericActionTest` (Payum ships it `export-ignore`, so it is absent on `--prefer-dist`/CI installs); it
-uses Prophecy for gateway/token doubles. `ConvertPaymentActionTest` stands alone because Payum's `Convert`
+uses Prophecy for gateway/token doubles. Its `$requestClass`/`$actionClass` are **static** properties
+(redeclared per subclass) because the shared data providers read them and PHPUnit calls providers
+statically. Test metadata is PHPUnit **attributes** (`#[Test]`, `#[DataProvider]`), not docblock
+annotations — the suite runs with zero PHPUnit deprecations on 10.5 and is ready for 11/12 whenever the
+constraint is bumped. `ConvertPaymentActionTest` stands alone because Payum's `Convert`
 is not a `Generic` request. `NotifyAction`'s callback verification is tested via
 `tests/StubGetHttpRequestAction` (feeds a raw body + checksum header into `GetHttpRequest`).
 

@@ -10,6 +10,8 @@ use Payum\Core\Model\Token;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Authorize;
 use Payum\Core\Security\GenericTokenFactoryAwareInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use ReflectionClass;
 use ReflectionException;
 use Setono\Payum\Quickpay\Action\AuthorizeAction;
@@ -18,29 +20,27 @@ use Setono\Quickpay\Enum\PaymentState;
 
 class AuthorizeActionTest extends ActionTestAbstract
 {
-    protected $requestClass = Authorize::class;
+    protected static string $requestClass = Authorize::class;
 
-    protected $actionClass = AuthorizeAction::class;
+    protected static string $actionClass = AuthorizeAction::class;
 
     /**
      * Only the internal CreatePaymentLinkAction mints a token; the public actions delegate to it
      * rather than dragging payum/core's deprecated GenericTokenFactoryInterface in themselves (#3).
      *
-     * @test
-     *
      * @throws ReflectionException
      */
+    #[Test]
     public function shouldNotDependOnTheTokenFactory(): void
     {
-        self::assertFalse((new ReflectionClass($this->actionClass))->implementsInterface(GenericTokenFactoryAwareInterface::class));
+        self::assertFalse((new ReflectionClass(static::$actionClass))->implementsInterface(GenericTokenFactoryAwareInterface::class));
     }
 
     /**
      * A fresh payment: create the link (auth-only, since this is Authorize) and redirect. The token
      * travels along so the notify token can be minted from it.
-     *
-     * @test
      */
+    #[Test]
     public function shouldSendAFreshPaymentToThePaymentWindow(): void
     {
         $token = new Token();
@@ -55,7 +55,7 @@ class AuthorizeActionTest extends ActionTestAbstract
         $token->setDetails($details);
 
         /** @var Authorize $authorize */
-        $authorize = new $this->requestClass($token);
+        $authorize = new static::$requestClass($token);
         $authorize->setModel($details);
 
         // The status fetch, then the link.
@@ -87,9 +87,7 @@ class AuthorizeActionTest extends ActionTestAbstract
         self::assertCount(1, $this->tokenFactory->notifyTokensCreated);
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldCreateAnAuthOnlyLinkWhenAutoCaptureIsOff(): void
     {
         $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
@@ -107,9 +105,8 @@ class AuthorizeActionTest extends ActionTestAbstract
      * The return trip: Quickpay sends the customer back to the token url, Payum re-executes the
      * Authorize that sent them out, and the payment is now authorized. Redirecting again would loop;
      * this must be a no-op that touches nothing but the balance.
-     *
-     * @test
      */
+    #[Test]
     public function shouldDoNothingWhenThePaymentIsAlreadyAuthorized(): void
     {
         $details = $this->details();
@@ -132,12 +129,10 @@ class AuthorizeActionTest extends ActionTestAbstract
     /**
      * Past authorization altogether — captured (approved or still queued). Authorize has nothing to add.
      *
-     * @test
-     *
-     * @dataProvider capturedProvider
-     *
      * @param array<string, mixed> $capture
      */
+    #[Test]
+    #[DataProvider('capturedProvider')]
     public function shouldDoNothingWhenThePaymentIsAlreadyCaptured(array $capture): void
     {
         $this->queuePayment([
@@ -162,9 +157,8 @@ class AuthorizeActionTest extends ActionTestAbstract
     /**
      * An authorize in flight (3-D Secure, an asynchronous acquirer): creating another link would race
      * its outcome. Wait for it.
-     *
-     * @test
      */
+    #[Test]
     public function shouldDoNothingWhileAnAuthorizeIsPending(): void
     {
         $this->queuePayment([
@@ -180,9 +174,8 @@ class AuthorizeActionTest extends ActionTestAbstract
     /**
      * A declined attempt is not the end: Quickpay lets the customer try again on the same payment,
      * so a rejected authorize — and nothing approved or pending — means "send them to the window".
-     *
-     * @test
      */
+    #[Test]
     public function shouldSendTheCustomerBackToTheWindowAfterADeclinedAttempt(): void
     {
         $this->queuePayment([
@@ -201,9 +194,7 @@ class AuthorizeActionTest extends ActionTestAbstract
         self::assertCount(2, $this->getRequests());
     }
 
-    /**
-     * @test
-     */
+    #[Test]
     public function shouldThrowWhenThePaymentHasNotBeenCreated(): void
     {
         $details = $this->details();
@@ -234,7 +225,7 @@ class AuthorizeActionTest extends ActionTestAbstract
     private function authorize(?ArrayObject $details = null): Authorize
     {
         /** @var Authorize $authorize */
-        $authorize = new $this->requestClass($details ?? $this->details());
+        $authorize = new static::$requestClass($details ?? $this->details());
 
         return $authorize;
     }
