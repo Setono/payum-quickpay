@@ -6,6 +6,7 @@ namespace Setono\Payum\Quickpay\Tests\Action;
 
 use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Request\GetHumanStatus;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Setono\Payum\Quickpay\Action\StatusAction;
 use Setono\Quickpay\Enum\OperationType;
@@ -84,15 +85,77 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isFailed(), 'Request should be marked as failed');
     }
 
+    /**
+     * `pending` with nothing approved yet — no operations, an authorize held up in 3-D Secure, a
+     * declined attempt with a retry in flight — is genuinely pending.
+     *
+     * @param list<array<string, mixed>> $operations
+     */
     #[Test]
-    public function shouldMarkPendingAsPending(): void
+    #[DataProvider('genuinelyPendingProvider')]
+    public function shouldMarkPendingAsPending(array $operations): void
     {
-        $this->queuePayment(['state' => PaymentState::Pending->value]);
+        $this->queuePayment(['state' => PaymentState::Pending->value, 'operations' => $operations]);
 
         $request = $this->statusRequest();
         $this->executeStatus($request);
 
         self::assertSame($request::STATUS_PENDING, $request->getValue());
+    }
+
+    /**
+     * @return iterable<string, array{list<array<string, mixed>>}>
+     */
+    public static function genuinelyPendingProvider(): iterable
+    {
+        yield 'no operations' => [[]];
+        yield 'authorize in flight (3-D Secure)' => [[['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => true, 'qp_status_code' => null]]];
+        yield 'declined authorize, retry in flight' => [[
+            ['id' => 1, 'type' => 'authorize', 'amount' => 100, 'pending' => false, 'qp_status_code' => '40000'],
+            ['id' => 2, 'type' => 'authorize', 'amount' => 100, 'pending' => true, 'qp_status_code' => null],
+        ]];
+    }
+
+    /**
+     * `pending` is Quickpay's state whenever an operation is in flight — including an asynchronous
+     * capture, refund or cancel on a payment that already has money captured or held (verified live,
+     * 2026-08: a captured payment reads `pending` for the ~second its refund takes). An operation in
+     * flight never changes what already happened, so what has been approved decides: the same rule
+     * as `processed`.
+     *
+     * @param list<array<string, mixed>> $operations
+     */
+    #[Test]
+    #[DataProvider('pendingWithHistoryProvider')]
+    public function shouldDecidePendingFromWhatAlreadyHappened(array $operations, ?int $balance, string $expected): void
+    {
+        $this->queuePayment(['state' => PaymentState::Pending->value, 'balance' => $balance, 'operations' => $operations]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertSame($expected, $request->getValue());
+    }
+
+    /**
+     * @return iterable<string, array{list<array<string, mixed>>, int|null, string}>
+     */
+    public static function pendingWithHistoryProvider(): iterable
+    {
+        $authorize = ['id' => 1, 'type' => 'authorize', 'amount' => 1000, 'pending' => false, 'qp_status_code' => '20000'];
+        $capture = ['id' => 2, 'type' => 'capture', 'amount' => 1000, 'pending' => false, 'qp_status_code' => '20000'];
+        $pendingCapture = ['id' => 2, 'type' => 'capture', 'amount' => 1000, 'pending' => true, 'qp_status_code' => null];
+        $pendingRefund = ['id' => 3, 'type' => 'refund', 'amount' => 250, 'pending' => true, 'qp_status_code' => null];
+        $pendingCancel = ['id' => 2, 'type' => 'cancel', 'amount' => 1000, 'pending' => true, 'qp_status_code' => null];
+
+        yield 'authorized, capture in flight (auto-capture return trip)' => [[$authorize, $pendingCapture], 0, GetHumanStatus::STATUS_AUTHORIZED];
+        yield 'authorized, cancel in flight' => [[$authorize, $pendingCancel], 0, GetHumanStatus::STATUS_AUTHORIZED];
+        yield 'captured, refund in flight' => [[$authorize, $capture, $pendingRefund], 1000, GetHumanStatus::STATUS_CAPTURED];
+        yield 'partially refunded, another refund in flight' => [[
+            $authorize, $capture,
+            ['id' => 3, 'type' => 'refund', 'amount' => 250, 'pending' => false, 'qp_status_code' => '20000'],
+            ['id' => 4, 'type' => 'refund', 'amount' => 250, 'pending' => true, 'qp_status_code' => null],
+        ], 750, GetHumanStatus::STATUS_CAPTURED];
     }
 
     #[Test]

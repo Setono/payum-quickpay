@@ -269,6 +269,11 @@ The status follows the **balance**, not the last operation:
 So `captured` means "something is held", never how much — Payum has no "partially refunded" mark. Read
 the `balance` details key for the actual figure rather than inferring it from the mark.
 
+An operation **in flight** never changes that: while an asynchronous capture, refund or cancel is still
+being processed Quickpay reports the payment as `pending`, but the status keeps saying what has already
+happened to the money — `authorized` with a capture queued, `captured` with a refund queued. Only a
+payment with nothing approved yet (an authorize held up in 3-D Secure, say) is `pending`.
+
 ## Sylius
 
 The supported way to use this gateway in a Sylius shop is
