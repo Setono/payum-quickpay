@@ -40,7 +40,6 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
 
         $details = ArrayObject::ensureArrayObject($paymentModel->getDetails());
         $details['amount'] = $paymentModel->getTotalAmount();
-        $details['currency'] = $paymentModel->getCurrencyCode();
 
         // Only scalars are stored in the details so they survive serialization by the consumer.
         // `quickpayPaymentId` is the single source of truth; the payment is re-fetched when needed.
@@ -58,6 +57,9 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
 
             $details['quickpayPaymentId'] = $payment->id;
             $details['order_id'] = $payment->orderId;
+            $details['currency'] = $currency;
+        } else {
+            self::assertCurrencyUnchanged($details, $paymentModel->getCurrencyCode());
         }
 
         if (null !== $token = $request->getToken()) {
@@ -96,6 +98,42 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         }
 
         return $value;
+    }
+
+    /**
+     * A Quickpay payment's currency is fixed when it is created — the authorize will happen in that
+     * currency no matter what the details say. Before this guard, a Payum payment whose currency
+     * changed after conversion simply had its stored `currency` overwritten: the shop then believed
+     * one currency while Quickpay kept charging in the other, with the amount silently read in the
+     * wrong unit. A drifted currency is a hard error; the payment must be cancelled and a fresh one
+     * converted instead.
+     *
+     * A model without a currency (both properties are nullable on Payum's model) leaves the stored
+     * value alone, and a model that agrees is a no-op refresh.
+     *
+     * @param ArrayObject<string, mixed> $details
+     *
+     * @throws LogicException if the model's currency no longer matches the created payment's
+     */
+    private static function assertCurrencyUnchanged(ArrayObject $details, mixed $currency): void
+    {
+        if (!is_string($currency) || '' === $currency) {
+            return;
+        }
+
+        $stored = $details['currency'] ?? null;
+
+        if (is_string($stored) && '' !== $stored && $stored !== $currency) {
+            throw new LogicException(sprintf(
+                'The Quickpay payment %s was created in %s, but the Payum payment now says %s. A Quickpay '
+                . 'payment cannot change currency — cancel it and convert a new payment instead.',
+                is_scalar($details['quickpayPaymentId']) ? (string) $details['quickpayPaymentId'] : '(unknown)',
+                $stored,
+                $currency,
+            ));
+        }
+
+        $details['currency'] = $currency;
     }
 
     /**
