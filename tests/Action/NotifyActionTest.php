@@ -126,6 +126,57 @@ class NotifyActionTest extends ActionTestAbstract
         self::assertCount(0, $this->getRequests(), 'No API call should be made for an unsigned callback');
     }
 
+    /**
+     * Symfony's HeaderBag lower-cases header names, and the Symfony bridge is what feeds
+     * GetHttpRequest in production Sylius/Symfony setups — so the lower-cased spelling is the shape
+     * the checksum lookup actually meets there. It must match case-insensitively.
+     *
+     * @test
+     */
+    public function shouldAcceptALowerCasedChecksumHeader(): void
+    {
+        $body = '{"id":1001}';
+        $this->httpRequestAction->setHttpRequest($body, [
+            strtolower(CallbackValidator::CHECKSUM_HEADER) => hash_hmac('sha256', $body, 'test-privatekey'),
+        ]);
+
+        // No operations: ConfirmPayment fetches and finds nothing to confirm.
+        $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
+
+        $action = new NotifyAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $action->execute($this->notify());
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests);
+        $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
+    }
+
+    /**
+     * Bridges may expose a header's value as a list. The first entry is the checksum.
+     *
+     * @test
+     */
+    public function shouldAcceptAListValuedChecksumHeader(): void
+    {
+        $body = '{"id":1001}';
+        $this->httpRequestAction->setHttpRequest($body, [
+            CallbackValidator::CHECKSUM_HEADER => [hash_hmac('sha256', $body, 'test-privatekey')],
+        ]);
+
+        $this->queuePayment(['state' => PaymentState::Initial->value, 'operations' => []]);
+
+        $action = new NotifyAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $action->execute($this->notify());
+
+        self::assertCount(1, $this->getRequests());
+    }
+
     private function notify(): Notify
     {
         return new Notify(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100]));
