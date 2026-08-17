@@ -227,6 +227,13 @@ partially refunded payment — it will now stay `captured` where it previously f
 Partial operations themselves are set through the new `capture_amount` / `refund_amount` details keys;
 see the README.
 
+The same rule now covers Quickpay's `pending` state (changed after `2.0.0-beta.1`). `pending` is not
+only an authorize held up in 3-D Secure: Quickpay reports it while *any* asynchronous operation is being
+processed — a captured payment reads `pending` for the second or so its refund takes, with the
+pre-operation balance. `GetStatus` used to answer `pending` for that; it now answers from what has
+already been approved (`authorized` with a capture queued, `captured` with a refund queued) and says
+`pending` only when nothing has been approved yet.
+
 ## Order ids are now validated before they are sent
 
 `ConvertPaymentAction` builds `order_id` as `order_prefix` + the Payum payment number, and now enforces

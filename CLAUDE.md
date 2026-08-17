@@ -181,7 +181,11 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   decided by the operation alone: it consults the payment's `balance` (captured minus refunded), so a
   partial refund stays `markCaptured` and only a zero balance is `markRefunded`. Payum has no partial
   mark, and reporting a partly refunded payment as fully refunded is a lie a shop acts on. A null
-  `balance` falls back to treating the refund as full.
+  `balance` falls back to treating the refund as full. **`pending` is Quickpay's state during ANY
+  in-flight operation** — not just an authorize in 3-D Secure but an async capture/refund/cancel too
+  (verified live 2026-08: a captured payment reads `pending` for the ~second its refund takes, with the
+  pre-operation balance). So `pending`, like `processed`, is decided from the last *approved* operation
+  (`markFromLastApprovedOperation()`) and is `markPending` only when nothing has been approved yet.
 
 ### Amounts (`src/Amounts.php`)
 

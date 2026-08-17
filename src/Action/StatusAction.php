@@ -17,6 +17,7 @@ use Setono\Payum\Quickpay\Details;
 use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
+use Setono\Quickpay\Response\Payment\Payment;
 
 class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
 {
@@ -62,7 +63,16 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             case PaymentState::Pending:
-                $request->markPending();
+                // `pending` is Quickpay's state whenever an operation is in flight — an authorize held
+                // up in 3-D Secure, but ALSO an asynchronous capture, refund or cancel that has not
+                // settled (verified live: a captured payment reads `pending` for the ~second its
+                // refund takes). An operation in flight never changes what already happened to the
+                // money, so when something has been approved, that decides — a captured payment with a
+                // refund in flight is still captured, an authorized one with a capture queued still
+                // authorized. Only a payment with no approved operation yet is genuinely pending.
+                if (!self::markFromLastApprovedOperation($request, $payment)) {
+                    $request->markPending();
+                }
 
                 break;
             case PaymentState::Rejected:
@@ -75,25 +85,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
                 // (a refund the acquirer bounced, an async operation not yet settled), and deciding
                 // from that trailing attempt would flip a payment whose money is demonstrably still
                 // held to `unknown`. The last approved operation is what actually happened.
-                $latestApproved = Operations::latestApproved($operations);
-                if (Operations::isApprovedOfType($latestApproved, OperationType::Capture)) {
-                    $request->markCaptured();
-                } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Refund)) {
-                    // A refund does not necessarily empty the payment. Quickpay's `balance` is what is
-                    // still captured (captured minus refunded), so a partial refund leaves it positive
-                    // and the money is, in Payum's vocabulary, still captured — there is no partial
-                    // mark to reach for. Only a balance of zero is genuinely refunded.
-                    //
-                    // `balance` is nullable in the API; when it is absent, fall back to treating any
-                    // refund as full rather than inventing a number.
-                    if (null === $payment->balance || 0 === $payment->balance) {
-                        $request->markRefunded();
-                    } else {
-                        $request->markCaptured();
-                    }
-                } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Cancel)) {
-                    $request->markCanceled();
-                } else {
+                if (!self::markFromLastApprovedOperation($request, $payment)) {
                     $request->markUnknown();
                 }
 
@@ -101,6 +93,41 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
             default:
                 $request->markUnknown();
         }
+    }
+
+    /**
+     * Marks the request from the payment's last APPROVED operation — what actually happened to the
+     * money, whatever attempts came after it. Returns false when nothing has been approved, leaving
+     * the caller to say what that means in the payment's state.
+     */
+    private static function markFromLastApprovedOperation(GetStatusInterface $request, Payment $payment): bool
+    {
+        $latestApproved = Operations::latestApproved($payment->operations);
+
+        if (Operations::isApprovedOfType($latestApproved, OperationType::Authorize)) {
+            $request->markAuthorized();
+        } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Capture)) {
+            $request->markCaptured();
+        } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Refund)) {
+            // A refund does not necessarily empty the payment. Quickpay's `balance` is what is
+            // still captured (captured minus refunded), so a partial refund leaves it positive
+            // and the money is, in Payum's vocabulary, still captured — there is no partial
+            // mark to reach for. Only a balance of zero is genuinely refunded.
+            //
+            // `balance` is nullable in the API; when it is absent, fall back to treating any
+            // refund as full rather than inventing a number.
+            if (null === $payment->balance || 0 === $payment->balance) {
+                $request->markRefunded();
+            } else {
+                $request->markCaptured();
+            }
+        } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Cancel)) {
+            $request->markCanceled();
+        } else {
+            return false;
+        }
+
+        return true;
     }
 
     public function supports($request): bool
