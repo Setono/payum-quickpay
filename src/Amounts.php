@@ -28,24 +28,31 @@ final class Amounts
     }
 
     /**
+     * Only integers (and integer strings, the shape a serialization round trip may produce) are
+     * accepted. A fractional value is always a caller bug — amounts are minor units, so `249.99`
+     * can only mean someone passed kroner where øre were expected — and the old `is_numeric()` +
+     * `(int)` combination silently truncated it to 249 instead of saying so.
+     *
      * @param ArrayAccess<string, mixed> $details
      * @param string $overrideKey the details key holding a partial amount, if the caller set one
      *
-     * @throws LogicException if neither the override nor `amount` is a usable positive amount
+     * @throws LogicException if neither the override nor `amount` is a usable positive integer
      */
     public static function forOperation(ArrayAccess $details, string $overrideKey): int
     {
         $amount = $details->offsetExists($overrideKey) ? $details[$overrideKey] : ($details['amount'] ?? null);
 
-        if (!is_numeric($amount)) {
-            throw new LogicException(sprintf(
-                'The payment details must carry a numeric "%s" or "amount" to operate on; got %s.',
-                $overrideKey,
-                get_debug_type($amount),
-            ));
+        if (is_string($amount) && 1 === preg_match('/^-?\d+$/', $amount)) {
+            $amount = (int) $amount;
         }
 
-        $amount = (int) $amount;
+        if (!is_int($amount)) {
+            throw new LogicException(sprintf(
+                'The payment details must carry an integer "%s" or "amount" (minor units) to operate on; got %s.',
+                $overrideKey,
+                is_scalar($amount) ? var_export($amount, true) : get_debug_type($amount),
+            ));
+        }
 
         if ($amount <= 0) {
             throw new LogicException(sprintf(
