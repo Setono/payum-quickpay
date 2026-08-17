@@ -33,6 +33,36 @@ class OperationsTest extends TestCase
     /**
      * @test
      */
+    public function latestApprovedSkipsTrailingRejectedAndPendingOperations(): void
+    {
+        $approvedCapture = $this->operation(2, OperationType::Capture, '20000');
+
+        $operations = [
+            $this->operation(1, OperationType::Authorize, '20000'),
+            $approvedCapture,
+            $this->operation(3, OperationType::Refund, '40000'),
+            // A pending operation has no status code yet.
+            $this->operation(4, OperationType::Refund, null),
+        ];
+
+        self::assertSame($approvedCapture, Operations::latestApproved($operations));
+    }
+
+    /**
+     * @test
+     */
+    public function latestApprovedReturnsNullWhenNothingIsApproved(): void
+    {
+        self::assertNull(Operations::latestApproved([]));
+        self::assertNull(Operations::latestApproved([
+            $this->operation(1, OperationType::Authorize, '40000'),
+            $this->operation(2, OperationType::Authorize, null),
+        ]));
+    }
+
+    /**
+     * @test
+     */
     public function isApprovedReflectsTheStatusCode(): void
     {
         self::assertTrue(Operations::isApproved($this->operation(1, OperationType::Capture, '20000')));
