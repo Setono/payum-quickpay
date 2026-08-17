@@ -86,6 +86,29 @@ class OperationsTest extends TestCase
         self::assertFalse(Operations::hasPending([], OperationType::Capture));
     }
 
+    /**
+     * The newest operation of a type, whatever its outcome — what a caller that just issued one of
+     * that type reads the result from. Quickpay appends operations in the order they happen.
+     */
+    #[Test]
+    public function latestOfTypeReturnsTheNewestOperationOfThatTypeRegardlessOfOutcome(): void
+    {
+        $rejectedCapture = $this->operation(3, OperationType::Capture, '40000');
+        $pendingRefund = new Operation(id: 4, type: OperationType::Refund->value, amount: 100, pending: true);
+
+        $operations = [
+            $this->operation(1, OperationType::Authorize, '20000'),
+            $this->operation(2, OperationType::Capture, '20000'),
+            $rejectedCapture,
+            $pendingRefund,
+        ];
+
+        self::assertSame($rejectedCapture, Operations::latestOfType($operations, OperationType::Capture), 'The rejected one is newer than the approved one');
+        self::assertSame($pendingRefund, Operations::latestOfType($operations, OperationType::Refund));
+        self::assertNull(Operations::latestOfType($operations, OperationType::Cancel));
+        self::assertNull(Operations::latestOfType([], OperationType::Capture));
+    }
+
     #[Test]
     public function isApprovedReflectsTheStatusCode(): void
     {

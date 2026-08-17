@@ -39,7 +39,7 @@ Integration — used to verify callback signatures). Other options are optional:
 | `payment_methods` | `''`    | Restrict the payment-window methods (e.g. `creditcard`). See below.  |
 | `order_prefix`    | `''`    | Prepended to the Payum payment number to form the Quickpay order id. |
 | `language`        | `en`    | Payment-window language.                                             |
-| `synchronized`    | `false` | Run capture/refund/cancel synchronously instead of via callbacks.    |
+| `synchronized`    | `false` | Run capture/refund/cancel synchronously; a decline then throws (see below). |
 | `agreement_id`    | `''`    | Optional payment-window agreement id.                                |
 | `branding_id`     | `''`    | Optional payment-window branding id.                                 |
 
@@ -153,6 +153,15 @@ callback body's `order_id` (`order_prefix` + the Payum payment number) and execu
 that model. See [`docs/UPGRADE-2.0.md`](docs/UPGRADE-2.0.md) for the full picture and
 `examples/e2e/listen.php` for a working endpoint. Alternatively, skip operation callbacks entirely:
 set `synchronized` to `true` so the operations block until settled, or poll with `Sync`/`GetStatus`.
+
+**A declined operation is not an HTTP error.** Quickpay answers `2xx` and puts the outcome on the
+operation, so the SDK does not throw for it. Asynchronously (the default) the response only says the
+operation is pending and the outcome arrives via the callback or the next `GetStatus`. With
+`synchronized` the response *is* the outcome, and the gateway reads it: a capture, refund or cancel the
+acquirer declined throws `Setono\Payum\Quickpay\Exception\OperationRejectedException` (a Payum
+`RuntimeException` carrying the payment id and the declined `Operation` with Quickpay's and the
+acquirer's status code and message). Any partial-amount instruction (`capture_amount`/`refund_amount`)
+survives it, like for any failed call.
 
 **Outside Symfony, headers need help.** payum/core's plain-PHP `GetHttpRequest` bridge does not
 expose request headers, and without the checksum header every callback is rejected as unsigned. If

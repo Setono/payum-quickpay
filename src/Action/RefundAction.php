@@ -16,6 +16,8 @@ use Payum\Core\Request\Refund;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Amounts;
 use Setono\Payum\Quickpay\Details;
+use Setono\Payum\Quickpay\Exception\OperationRejectedException;
+use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Request\Payment\RefundRequest;
 
 class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareInterface
@@ -34,10 +36,14 @@ class RefundAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
         $paymentId = Details::paymentId($model);
 
-        $this->api->payments()->refund(
+        $refunded = $this->api->payments()->refund(
             $paymentId,
             new RefundRequest(amount: $this->resolveAmount($model, $paymentId)),
         );
+
+        // Asynchronously the returned payment is a snapshot with the refund still pending and nothing
+        // to read; synchronized, it carries the outcome — and a decline is a 2xx.
+        OperationRejectedException::assertNotRejected($paymentId, $refunded, OperationType::Refund);
 
         // Only once the API has accepted it — a failed call leaves the instruction in place to retry.
         Amounts::consume($model, 'refund_amount');

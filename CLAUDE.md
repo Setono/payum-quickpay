@@ -133,9 +133,13 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   asynchronous by default (final state arrives via the callback); the actions pass no per-call
   `synchronized` argument — the SDK client's client-wide default (from the `synchronized` option, default
   off) is the single toggle that flips them to synchronous (`?synchronized`). The `Payment` these calls
-  return is deliberately ignored — on the async path it is a snapshot taken when the operation was
-  queued (`pending: true`, pre-operation `state`/`balance`), so `StatusAction` re-fetches instead of
-  trusting it. `CancelAction` catches **nothing** — cancelling an already captured or cancelled payment
+  return is used for exactly one thing: `OperationRejectedException::assertNotRejected()` reads the
+  newest operation of the type just issued (`Operations::latestOfType()`) and throws if it has an
+  outcome that is not approved. A decline is a **2xx** — the SDK maps only HTTP status to exceptions —
+  so without that check a synchronized decline returned like an approval. On the async path the
+  operation is `pending` (the payment is a snapshot taken when the operation was queued, with
+  pre-operation `state`/`balance`), so nothing fires and `StatusAction` re-fetches instead of trusting
+  the snapshot. `CancelAction` catches **nothing** — cancelling an already captured or cancelled payment
   fails with a `ValidationException` and that reaches the caller. It used to try to swallow that case
   for idempotency by matching the error message, which was both fragile (Quickpay's wording drifted from
   "Transaction in wrong state for this operation" to "Validation error: Payment is not in a valid state

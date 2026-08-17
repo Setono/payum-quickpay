@@ -58,6 +58,25 @@ final class Operations
         return null;
     }
 
+    /**
+     * The most recent operation of the given type — approved, rejected or still pending — or null if
+     * none was ever recorded. This is the operation whose outcome a caller that just issued one of
+     * that type wants to read: Quickpay appends operations in the order they happen, so the last one
+     * of a type is the attempt made last.
+     *
+     * @param list<Operation> $operations
+     */
+    public static function latestOfType(array $operations, OperationType $type): ?Operation
+    {
+        foreach (array_reverse($operations) as $operation) {
+            if ($type === $operation->type()) {
+                return $operation;
+            }
+        }
+
+        return null;
+    }
+
     public static function isApproved(Operation $operation): bool
     {
         return self::APPROVED_STATUS_CODE === $operation->qpStatusCode;
