@@ -10,19 +10,35 @@ declare(strict_types=1);
  *   php -S 0.0.0.0:8000 examples/e2e/listen.php
  *
  * Routes (paths come from the Payum token urls built in bootstrap.php):
- *   POST /notify   the Quickpay callback — verified and handled by NotifyAction through the gateway
- *   GET  /done     where the customer lands after the payment window; shows the Payum status
- *   GET  /         recent callbacks (tail of var/callbacks.log)
+ *   GET  /capture    the capture token url — Payum's capture controller, framework-less: it executes
+ *                    Capture(token) and either redirects to the payment window (first pass) or, on
+ *                    the RETURN TRIP from Quickpay (continue_url points here), lets CaptureAction find
+ *                    the payment captured, invalidates the token and redirects to the after url
+ *   GET  /authorize  the same for Authorize(token)
+ *   POST /notify     the Quickpay callback — verified and handled by NotifyAction through the gateway
+ *   GET  /done       the after url: where the customer lands once the token url has run; shows status
+ *   GET  /           recent callbacks (tail of var/callbacks.log)
  *
  * Note this goes through the real gateway: `Notify` runs NotifyAction, which verifies the
- * `QuickPay-Checksum-Sha256` HMAC and, when `auto_capture` is on, captures via ConfirmPaymentAction.
+ * `QuickPay-Checksum-Sha256` HMAC and refreshes the details via ConfirmPaymentAction. Capturing on
+ * authorization is the payment link's own auto_capture flag (set by CaptureAction), never the callback.
  */
 
+use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Reply\HttpResponse;
+use Payum\Core\Reply\ReplyInterface;
+use Payum\Core\Request\Authorize;
+use Payum\Core\Request\Capture;
 use Payum\Core\Request\GetHumanStatus;
 use Payum\Core\Request\Notify;
 
 require __DIR__ . '/bootstrap.php';
+
+// payum/core's plain-PHP TokenFactory and RequestTokenVerifier call league/uri 7 methods that are
+// deprecated in that version, and the built-in server prints deprecations into the response body —
+// which turned the /done page into a wall of notices during the live check. Not our code, not
+// actionable here; hide only that class of notice so anything real still shows.
+error_reporting(\E_ALL & ~\E_DEPRECATED & ~\E_USER_DEPRECATED);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), \PHP_URL_PATH) ?: '/';
@@ -31,6 +47,57 @@ $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), \PHP_URL_PATH) ?: '
 $base = e2e_env('QUICKPAY_CALLBACK_BASE', false);
 if ('' === $base) {
     $base = 'https://' . (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+}
+
+// The token urls: Payum's capture / authorize controllers, framework-less. Both passes of an
+// interactive flow land here — the first when the shop starts the checkout (create-payment.php does
+// that from the CLI instead, so this is mostly for the RETURN TRIP: continue_url is this very url,
+// with the payum_token, so the action that sent the customer out runs again and finds the outcome).
+if ('GET' === $method && in_array($path, ['/capture', '/authorize'], true)) {
+    $payum = e2e_payum($base);
+
+    try {
+        $token = $payum->getHttpRequestVerifier()->verify($_REQUEST);
+    } catch (Throwable $e) {
+        http_response_code(400);
+        e2e_log(sprintf('TOKEN URL REJECTED %s: %s', $path, $e->getMessage()));
+        echo e2e_page('Invalid token', htmlspecialchars($e->getMessage(), \ENT_QUOTES));
+
+        return;
+    }
+
+    $gateway = $payum->getGateway($token->getGatewayName());
+    $request = '/capture' === $path ? new Capture($token) : new Authorize($token);
+
+    try {
+        $gateway->execute($request);
+    } catch (HttpRedirect $reply) {
+        // First pass: off to the payment window. The token stays valid for the return trip.
+        e2e_log(sprintf('TOKEN URL %s → redirect to %s', $path, $reply->getUrl()));
+        header('Location: ' . $reply->getUrl(), true, 302);
+
+        return;
+    } catch (ReplyInterface $reply) {
+        http_response_code(500);
+        e2e_log(sprintf('TOKEN URL %s: unexpected reply %s', $path, get_class($reply)));
+        echo e2e_page('Unexpected reply', htmlspecialchars(get_class($reply), \ENT_QUOTES));
+
+        return;
+    } catch (Throwable $e) {
+        http_response_code(500);
+        e2e_log(sprintf('TOKEN URL %s ERROR: %s: %s', $path, get_class($e), $e->getMessage()));
+        echo e2e_page('Error', htmlspecialchars($e->getMessage(), \ENT_QUOTES));
+
+        return;
+    }
+
+    // Second pass, the return trip: the action ran to completion (no redirect), so the flow is done —
+    // exactly what Payum's controller does next: invalidate the token and send the customer on.
+    $payum->getHttpRequestVerifier()->invalidate($token);
+    e2e_log(sprintf('TOKEN URL %s → done, on to %s', $path, (string) $token->getAfterUrl()));
+    header('Location: ' . (string) $token->getAfterUrl(), true, 302);
+
+    return;
 }
 
 if ('POST' === $method && '/notify' === $path) {
@@ -117,8 +184,10 @@ if ('GET' === $method && '/done' === $path) {
         $gateway->execute($status = new GetHumanStatus($token));
 
         echo e2e_page('Payment ' . $status->getValue(), sprintf(
-            'Payum reports <strong>%s</strong>. The browser redirect carries no payment data — only the '
-            . 'verified callback (and this status, which re-fetches from Quickpay) is trustworthy.',
+            'Payum reports <strong>%s</strong>. You got here through the token url (continue_url), where '
+            . 'the Capture/Authorize that started the flow ran once more and found its outcome — that, '
+            . 'the verified callback, and this status (which re-fetches from Quickpay) are trustworthy; '
+            . 'the redirect itself carries no payment data.',
             htmlspecialchars($status->getValue(), \ENT_QUOTES),
         ));
     } catch (Throwable $e) {

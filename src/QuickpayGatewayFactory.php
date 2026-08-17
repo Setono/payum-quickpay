@@ -8,6 +8,7 @@ use Payum\Core\Bridge\Spl\ArrayObject;
 use Payum\Core\Exception\LogicException;
 use Payum\Core\GatewayFactory;
 use Setono\Payum\Quickpay\Action\Api\ConfirmPaymentAction;
+use Setono\Payum\Quickpay\Action\Api\CreatePaymentLinkAction;
 use Setono\Payum\Quickpay\Action\AuthorizeAction;
 use Setono\Payum\Quickpay\Action\CancelAction;
 use Setono\Payum\Quickpay\Action\CaptureAction;
@@ -47,6 +48,7 @@ class QuickpayGatewayFactory extends GatewayFactory
             'payum.action.sync' => new SyncAction(),
             'payum.action.convert_payment' => new ConvertPaymentAction(),
             'payum.action.api.confirm_payment' => new ConfirmPaymentAction(),
+            'payum.action.api.create_payment_link' => new CreatePaymentLinkAction(),
         ]);
 
         if (!$config->offsetExists('payum.api')) {

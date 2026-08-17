@@ -63,6 +63,42 @@ final class Operations
         return self::APPROVED_STATUS_CODE === $operation->qpStatusCode;
     }
 
+    /**
+     * Whether any operation of the given type has been approved — regardless of what came after it.
+     * "Has this payment ever been authorized?" is this question; the last-approved-operation view
+     * that drives the status marks would say no once a capture follows.
+     *
+     * @param list<Operation> $operations
+     */
+    public static function hasApproved(array $operations, OperationType $type): bool
+    {
+        foreach ($operations as $operation) {
+            if ($type === $operation->type() && self::isApproved($operation)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Whether an operation of the given type is still in flight: queued asynchronously (or, for an
+     * authorize, held up in 3-D Secure) and without an outcome yet. Acting on the payment while one
+     * is pending — creating another link, issuing another capture — would race the outcome.
+     *
+     * @param list<Operation> $operations
+     */
+    public static function hasPending(array $operations, OperationType $type): bool
+    {
+        foreach ($operations as $operation) {
+            if ($type === $operation->type() && $operation->pending) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function isApprovedOfType(?Operation $operation, OperationType $type): bool
     {
         return null !== $operation && $type === $operation->type() && self::isApproved($operation);

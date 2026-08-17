@@ -12,10 +12,12 @@ use Payum\Core\Model\Payment;
 use Payum\Core\Model\Token;
 use Payum\Core\Reply\HttpRedirect;
 use Payum\Core\Request\Authorize;
+use Payum\Core\Request\Capture;
 use Payum\Core\Request\Convert;
 use Payum\Core\Request\GetHumanStatus;
 use Payum\Core\Request\Notify;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Message\RequestInterface;
 use Setono\Payum\Quickpay\QuickpayGatewayFactory;
 use Setono\Quickpay\Callback\CallbackValidator;
 use Setono\Quickpay\Client\Client;
@@ -51,19 +53,21 @@ final class GatewayIntegrationTest extends TestCase
             'api_key' => 'integration-apikey',
             'private_key' => 'integration-privatekey',
             'order_prefix' => 'it',
-            'auto_capture' => true,
+            'auto_capture' => false,
             'quickpay.client' => new Client('integration-apikey', $this->httpClient),
             'payum.action.get_http_request' => $this->httpRequestAction,
         ]);
     }
 
     /**
-     * Convert → Authorize → Notify (signed, auto-captures) → GetStatus, all through the
-     * factory-built gateway, fully offline.
+     * The Payum-idiomatic checkout, exactly as Payum's capture controller and Sylius drive it:
+     * Convert → Capture (fresh payment: hosted window, auto-capturing) → Quickpay's callback →
+     * Capture again (the customer is back at the token url; the payment is being captured by
+     * Quickpay, so this must be a no-op) → GetStatus. All through the factory-built gateway, offline.
      *
      * @test
      */
-    public function shouldRunTheWholeFlowThroughTheFactoryWiredGateway(): void
+    public function shouldRunTheCaptureDrivenCheckoutThroughTheFactoryWiredGateway(): void
     {
         // -- Convert: creates the payment at Quickpay and produces the scalar details.
         $payment = new Payment();
@@ -72,6 +76,7 @@ final class GatewayIntegrationTest extends TestCase
         $payment->setCurrencyCode('DKK');
 
         $token = new Token();
+        $token->setTargetUrl('https://shop.example/capture?payum_token=cap');
         $token->setAfterUrl('https://shop.example/after');
         $token->setGatewayName(QuickpayGatewayFactory::NAME);
 
@@ -85,48 +90,32 @@ final class GatewayIntegrationTest extends TestCase
         $details = new ArrayObject($result);
 
         self::assertSame(2002, $details['quickpayPaymentId']);
-        self::assertSame('https://shop.example/after', $details['continue_url']);
+        self::assertSame('https://shop.example/capture?payum_token=cap', $details['continue_url'], 'The customer returns to the token url');
+        self::assertSame('https://shop.example/after', $details['cancel_url']);
 
-        // -- Authorize: creates the payment link and redirects to the payment window. The callback
-        // url is preset, so no token factory is involved.
+        // -- Capture #1, fresh payment: the interactive entry point. The link is created with
+        // auto_capture and the customer is redirected. The callback url is preset (no token factory
+        // is wired into this bare gateway).
         $details['callback_url'] = 'https://shop.example/notify';
 
+        $this->queuePayment(['id' => 2002, 'order_id' => 'it000000000001', 'state' => PaymentState::Initial->value]);
         $this->queueResponse('{"url":"https://payment.quickpay.net/payments/2002/window"}');
 
         try {
-            $this->gateway->execute(new Authorize($details));
+            $this->gateway->execute(new Capture($details));
             self::fail('An HttpRedirect reply should have been thrown');
         } catch (HttpRedirect $redirect) {
             self::assertSame('https://payment.quickpay.net/payments/2002/window', $redirect->getUrl());
         }
 
-        // -- Notify: a signed authorize callback. auto_capture is on and the amount matches, so the
-        // gateway's own ConfirmPayment routing captures.
+        // -- Notify: Quickpay's signed callback once the customer paid. With auto_capture on the link,
+        // Quickpay authorized AND captured; the gateway only refreshes its snapshot.
         $body = '{"id":2002}';
         $this->httpRequestAction->setHttpRequest($body, [
             CallbackValidator::CHECKSUM_HEADER => hash_hmac('sha256', $body, 'integration-privatekey'),
         ]);
 
-        $this->queuePayment([
-            'id' => 2002,
-            'order_id' => 'it000000000001',
-            'state' => PaymentState::New->value,
-            'operations' => [$this->operation(OperationType::Authorize, amount: 100)],
-        ]);
-        $this->queuePayment([
-            'id' => 2002,
-            'order_id' => 'it000000000001',
-            'state' => PaymentState::Processed->value,
-            'operations' => [
-                $this->operation(OperationType::Authorize, amount: 100),
-                $this->operation(OperationType::Capture, amount: 100),
-            ],
-        ]);
-
-        $this->gateway->execute(new Notify($details));
-
-        // -- GetStatus: the captured payment reports as captured, and the balance is persisted.
-        $this->queuePayment([
+        $captured = [
             'id' => 2002,
             'order_id' => 'it000000000001',
             'state' => PaymentState::Processed->value,
@@ -135,25 +124,41 @@ final class GatewayIntegrationTest extends TestCase
                 $this->operation(OperationType::Authorize, amount: 100),
                 $this->operation(OperationType::Capture, amount: 100),
             ],
-        ]);
+            'link' => ['url' => 'https://payment.quickpay.net/payments/2002/window', 'amount' => 100, 'auto_capture' => true],
+        ];
+        $this->queuePayment($captured);
+
+        $this->gateway->execute(new Notify($details));
+
+        self::assertSame(100, $details['balance']);
+        self::assertSame(PaymentState::Processed->value, $details['state']);
+
+        // -- Capture #2, the return trip: Payum re-executes the Capture that sent the customer out.
+        // Quickpay captured through the link, so this must not capture again.
+        $this->queuePayment($captured);
+
+        $this->gateway->execute(new Capture($details));
+
+        // -- GetStatus: captured.
+        $this->queuePayment($captured);
 
         $status = new GetHumanStatus($details);
         $this->gateway->execute($status);
 
         self::assertTrue($status->isCaptured(), 'The payment should report as captured');
-        self::assertSame(100, $details['balance']);
 
         // -- The wire log: exactly the calls the flow implies, in order, authenticated with the
-        // integration credentials.
+        // integration credentials — and NOT ONE capture issued by the gateway itself.
         $requests = $this->httpClient->getRequests();
-        self::assertCount(5, $requests);
+        self::assertCount(6, $requests);
 
         $expected = [
-            ['POST', '#/payments$#'],
-            ['PUT', '#/payments/2002/link$#'],
-            ['GET', '#/payments/2002$#'],
-            ['POST', '#/payments/2002/capture$#'],
-            ['GET', '#/payments/2002$#'],
+            ['POST', '#/payments$#'],           // Convert
+            ['GET', '#/payments/2002$#'],       // Capture #1: where is the payment?
+            ['PUT', '#/payments/2002/link$#'],  // Capture #1: the link
+            ['GET', '#/payments/2002$#'],       // Notify → ConfirmPayment
+            ['GET', '#/payments/2002$#'],       // Capture #2: return trip, no-op
+            ['GET', '#/payments/2002$#'],       // GetStatus
         ];
 
         foreach ($expected as $i => [$method, $pathPattern]) {
@@ -165,6 +170,72 @@ final class GatewayIntegrationTest extends TestCase
                 sprintf('Request #%d', $i),
             );
         }
+
+        self::assertTrue($this->decodeBody($requests[2])['auto_capture'], 'Capture-driven: the link captures at authorization');
+    }
+
+    /**
+     * The other flow: Authorize (auth-only window), then a later Capture through the API — the
+     * shape of a shop that settles when it ships.
+     *
+     * @test
+     */
+    public function shouldRunTheAuthorizeThenCaptureFlowThroughTheFactoryWiredGateway(): void
+    {
+        $details = new ArrayObject([
+            'quickpayPaymentId' => 2002,
+            'amount' => 100,
+            'continue_url' => 'https://shop.example/authorize?payum_token=auth',
+            'cancel_url' => 'https://shop.example/after',
+            'callback_url' => 'https://shop.example/notify',
+        ]);
+
+        // -- Authorize #1: fresh → auth-only link (the gateway option is off) → redirect.
+        $this->queuePayment(['id' => 2002, 'state' => PaymentState::Initial->value]);
+        $this->queueResponse('{"url":"https://payment.quickpay.net/payments/2002/window"}');
+
+        try {
+            $this->gateway->execute(new Authorize($details));
+            self::fail('An HttpRedirect reply should have been thrown');
+        } catch (HttpRedirect) {
+        }
+
+        $authorized = [
+            'id' => 2002,
+            'state' => PaymentState::New->value,
+            'balance' => 0,
+            'operations' => [$this->operation(OperationType::Authorize, amount: 100)],
+            'link' => ['url' => 'https://payment.quickpay.net/payments/2002/window', 'amount' => 100, 'auto_capture' => false],
+        ];
+
+        // -- Authorize #2, the return trip: authorized → no-op.
+        $this->queuePayment($authorized);
+        $this->gateway->execute(new Authorize($details));
+
+        // -- Later: Capture settles through the API.
+        $this->queuePayment($authorized);
+        $this->queuePayment(['id' => 2002, 'state' => PaymentState::Processed->value, 'balance' => 100, 'operations' => [$this->operation(OperationType::Capture, amount: 100)]]);
+        $this->gateway->execute(new Capture($details));
+
+        $requests = $this->httpClient->getRequests();
+        self::assertCount(5, $requests);
+        self::assertSame('PUT', $requests[1]->getMethod());
+        self::assertFalse($this->decodeBody($requests[1])['auto_capture'], 'Authorize: an auth-only link');
+        self::assertSame('GET', $requests[2]->getMethod(), 'Return trip: only a fetch');
+        self::assertSame('POST', $requests[4]->getMethod());
+        self::assertMatchesRegularExpression('#/payments/2002/capture$#', $requests[4]->getUri()->getPath());
+        self::assertSame(100, $this->decodeBody($requests[4])['amount']);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function decodeBody(RequestInterface $request): array
+    {
+        /** @var array<string, mixed> $decoded */
+        $decoded = json_decode((string) $request->getBody(), true, 512, \JSON_THROW_ON_ERROR);
+
+        return $decoded;
     }
 
     private function queueResponse(string $body): void

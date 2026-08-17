@@ -431,6 +431,7 @@ class QuickpayGatewayFactoryTest extends TestCase
             'payum.action.sync',
             'payum.action.convert_payment',
             'payum.action.api.confirm_payment',
+            'payum.action.api.create_payment_link',
         ] as $key) {
             self::assertArrayHasKey($key, $config, sprintf('Missing %s', $key));
         }

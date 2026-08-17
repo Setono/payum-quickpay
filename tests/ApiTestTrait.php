@@ -11,6 +11,7 @@ use Payum\Core\GatewayInterface;
 use Payum\Core\Model\Payment;
 use Psr\Http\Message\RequestInterface;
 use Setono\Payum\Quickpay\Action\Api\ConfirmPaymentAction;
+use Setono\Payum\Quickpay\Action\Api\CreatePaymentLinkAction;
 use Setono\Payum\Quickpay\Api;
 use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Client\Client;
@@ -33,6 +34,8 @@ trait ApiTestTrait
 
     protected StubGetHttpRequestAction $httpRequestAction;
 
+    protected StubTokenFactory $tokenFactory;
+
     public function setUp(): void
     {
         parent::setUp();
@@ -42,15 +45,20 @@ trait ApiTestTrait
         $this->api = $this->createApi();
 
         // A real gateway is needed so actions that dispatch sub-requests stay offline:
-        // NotifyAction -> GetHttpRequest (StubGetHttpRequestAction) and -> ConfirmPayment.
-        $confirmPaymentAction = new ConfirmPaymentAction();
-        $confirmPaymentAction->setApi($this->api);
-
+        // NotifyAction -> GetHttpRequest (StubGetHttpRequestAction) and -> ConfirmPayment;
+        // AuthorizeAction / CaptureAction -> CreatePaymentLink. The gateway injects the api into
+        // ApiAware actions itself; the token factory (an extension's job in a real gateway) is set
+        // directly on the one action that needs it.
         $this->httpRequestAction = new StubGetHttpRequestAction();
+        $this->tokenFactory = new StubTokenFactory();
+
+        $createPaymentLinkAction = new CreatePaymentLinkAction();
+        $createPaymentLinkAction->setGenericTokenFactory($this->tokenFactory);
 
         $gateway = new Gateway();
         $gateway->addApi($this->api);
-        $gateway->addAction($confirmPaymentAction);
+        $gateway->addAction(new ConfirmPaymentAction());
+        $gateway->addAction($createPaymentLinkAction);
         $gateway->addAction($this->httpRequestAction);
         $this->gateway = $gateway;
     }
@@ -61,7 +69,7 @@ trait ApiTestTrait
      * `?synchronized` flag. The client always wraps the shared mock HTTP client, so responses queued
      * on the test case are served to every Api built here.
      */
-    protected function createApi(bool $synchronized = false): Api
+    protected function createApi(bool $synchronized = false, bool $autoCapture = true): Api
     {
         return new Api(
             client: new Client('test-apikey', $this->httpClient, synchronized: $synchronized),
@@ -69,7 +77,7 @@ trait ApiTestTrait
             orderPrefix: 'ut',
             paymentMethods: 'visa',
             language: 'en',
-            autoCapture: true,
+            autoCapture: $autoCapture,
             agreementId: 266017,
         );
     }
@@ -105,6 +113,21 @@ trait ApiTestTrait
             'fee' => null,
             'operations' => [],
         ], $overrides), \JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * The `link` object nested on a payment, as Quickpay returns it after `PUT /payments/{id}/link`.
+     * `auto_capture` is the flag CaptureAction reads to decide whether Quickpay captures by itself.
+     *
+     * @return array<string, mixed>
+     */
+    protected function link(bool $autoCapture): array
+    {
+        return [
+            'url' => 'https://payment.quickpay.net/payments/1001/window',
+            'amount' => 100,
+            'auto_capture' => $autoCapture,
+        ];
     }
 
     /**

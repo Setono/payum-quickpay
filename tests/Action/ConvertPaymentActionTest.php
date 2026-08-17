@@ -57,7 +57,8 @@ class ConvertPaymentActionTest extends TestCase
         $payment = $this->createPayment();
 
         $token = new Token();
-        $token->setAfterUrl('theContinueUrl');
+        $token->setTargetUrl('theTargetUrl');
+        $token->setAfterUrl('theAfterUrl');
         $token->setGatewayName('quickpay');
 
         $convert = new Convert($payment, 'array', $token);
@@ -76,8 +77,11 @@ class ConvertPaymentActionTest extends TestCase
         self::assertSame(100, $result['amount']);
         self::assertSame('DKK', $result['currency']);
         self::assertSame('ut000000000001', $result['order_id']);
-        self::assertSame('theContinueUrl', $result['continue_url']);
-        self::assertSame('theContinueUrl', $result['cancel_url']);
+        // The customer returns to the token's TARGET url so the Authorize/Capture that sent them out
+        // re-executes and finishes the job (Payum's return-trip convention); a cancel goes straight
+        // to the after url, since nothing was done that needs finishing.
+        self::assertSame('theTargetUrl', $result['continue_url']);
+        self::assertSame('theAfterUrl', $result['cancel_url']);
 
         // Only scalars may be persisted — no SDK DTO or Payum model object leaks into the details.
         self::assertArrayNotHasKey('quickpayPayment', $result);

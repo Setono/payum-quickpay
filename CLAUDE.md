@@ -91,10 +91,12 @@ never reaches `Api`, and `null` is what keeps the parameter off the request enti
 
 Actions are the unit of behavior. Each implements `ActionInterface` plus the aware-interfaces it needs —
 `ApiAwareInterface` (via `Action/Api/ApiAwareTrait`, which types `$api` as `Api` so PHPStan can see
-through it, unlike payum/core's `mixed` version) and `GatewayAwareInterface`. Only `AuthorizeAction`
-implements `GenericTokenFactoryAwareInterface`, because only it mints a token (the notify token for
-`callback_url`); keep it that way, since that interface is the package's one remaining contact with
-payum/core's deprecated `GenericTokenFactoryInterface` (issue #3). `supports()` gates on the Payum request type **and** the model
+through it, unlike payum/core's `mixed` version) and `GatewayAwareInterface`. Only the internal
+`CreatePaymentLinkAction` implements `GenericTokenFactoryAwareInterface`, because only it mints a token
+(the notify token for `callback_url`); keep it that way, since that interface is the package's one
+remaining contact with payum/core's deprecated `GenericTokenFactoryInterface` (issue #3) — the public
+`AuthorizeAction`/`CaptureAction` delegate to it rather than implementing the interface themselves.
+`supports()` gates on the Payum request type **and** the model
 being an `ArrayAccess`. The model is normalized with `ArrayObject::ensureArrayObject($request->getModel())`;
 the `quickpayPaymentId` (int) it carries is the single source of truth — actions re-fetch the payment via
 `Api::payments()->getById()` rather than passing the model through as API params.
@@ -102,8 +104,9 @@ the `quickpayPaymentId` (int) it carries is the single source of truth — actio
 Request → Action flow (amounts are integer minor units everywhere — no conversion):
 - **Convert** → `ConvertPaymentAction` — turns a Payum `PaymentInterface` into the details array; creates
   the Quickpay payment (via `CreatePaymentRequest`) if absent and stores **only scalars** —
-  `quickpayPaymentId`, `amount`, `currency`, `order_id` — plus `continue_url`/`cancel_url` from the
-  token's after-URL. It never persists DTO/model objects. On the create path only it asserts its inputs:
+  `quickpayPaymentId`, `amount`, `currency`, `order_id` — plus `continue_url` (the token's **target**
+  url, so the customer's return re-executes the `Capture`/`Authorize` that sent them out — Payum's
+  return-trip convention) and `cancel_url` (the token's after url). It never persists DTO/model objects. On the create path only it asserts its inputs:
   Payum types `getNumber()`/`getCurrencyCode()` as `@return string` but both model properties are
   nullable, so `assertNotEmptyString()` takes `mixed` (which also stops PHPStan folding the checks away
   as always-true). A missing currency would be a `TypeError` from inside the SDK DTO; a missing number
@@ -111,10 +114,22 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   enforces Quickpay's **4–20 character** `order_id` rule on `order_prefix . number` — which also catches
   that silent case, except when the prefix alone is 4+ characters, where it would otherwise create every
   payment under the same order id.
-- **Authorize** → `AuthorizeAction` — builds a notify (callback) token into `callback_url`, creates a
-  payment link (`createLink` + `CreateLinkRequest`), and **throws `HttpRedirect`** to Quickpay's hosted
-  payment window.
-- **Capture / Refund / Cancel** → call `Api::payments()->capture/refund/cancel(...)`. Operations are
+- **Authorize / Capture, the interactive entry points** — both fetch the payment and decide from its
+  operations (`Operations::hasApproved()`/`hasPending()`), which makes them idempotent across the return
+  trip: with nothing approved and nothing pending they execute the internal **`CreatePaymentLink`**
+  request (`src/Request/Api/` + `Action/Api/CreatePaymentLinkAction`: mints the notify token into
+  `callback_url`, `PUT`s the link with the requested `auto_capture`, **throws `HttpRedirect`** to the
+  hosted window). `Capture` asks for `autoCapture: true` — "capture" for a payment nobody has paid means
+  "have Quickpay capture at authorization", which is Payum's convention and what Payum's capture
+  controller and Sylius's default checkout execute; `Authorize` passes the deprecated `auto_capture`
+  gateway option (an `Authorize` that behaves as a sale — prefer executing `Capture`). A pending
+  authorize (3-D Secure, async acquirer) is a no-op for both. `AuthorizeAction` on an approved
+  authorize (or any capture) is a no-op — the return trip. **`CaptureAction` on an approved authorize
+  never captures when the payment's link carries `auto_capture`** (`raw['link']['auto_capture']` — the
+  SDK's `Link` DTO does not model it): Quickpay is taking that money, and a capture from here could only
+  double up. Otherwise (a plain link: an `Authorize` flow settling later) it captures through the API,
+  repeatedly if asked (`capture_amount` instalments).
+- **Capture (authorized, plain link) / Refund / Cancel** → call `Api::payments()->capture/refund/cancel(...)`. Operations are
   asynchronous by default (final state arrives via the callback); the actions pass no per-call
   `synchronized` argument — the SDK client's client-wide default (from the `synchronized` option, default
   off) is the single toggle that flips them to synchronous (`?synchronized`). The `Payment` these calls
@@ -138,9 +153,11 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   body + `QuickPay-Checksum-Sha256` header (via Payum's `GetHttpRequest`), **verifies the HMAC signature**
   with the SDK `CallbackValidator`, and rejects an invalid/unsigned callback with a 400 `HttpResponse`
   before delegating to the internal `ConfirmPayment` request.
-- **ConfirmPayment** (internal, `src/Request/Api/` + `Action/Api/ConfirmPaymentAction`) — when
-  `auto_capture` is on and the latest operation is an approved authorize whose amount matches, it captures
-  automatically.
+- **ConfirmPayment** (internal, `src/Request/Api/` + `Action/Api/ConfirmPaymentAction`) — the notify
+  hook: refreshes `balance` and `state` from the payment. It **never captures** — it used to, when
+  `auto_capture` was on and the callback showed an approved authorize, which was a second capture
+  mechanism racing the link's own `auto_capture` flag (the callback could land before Quickpay had
+  recorded the capture it was already making). The link flag is the single mechanism now.
 - **Sync** → `SyncAction` — Payum's standard "refresh the details from the gateway" request. Fetches by
   `quickpayPaymentId` and writes the scalar snapshot (`balance`, `state`). A model without a
   `quickpayPaymentId` has nothing to sync, so it is a no-op rather than a throw. Every action that
@@ -192,8 +209,10 @@ source of truth for the flag.
 The custom `src/Model/*` classes are gone — responses are the SDK's readonly DTOs (`Response\Payment\
 {Payment,Operation,Link}`) plus the `PaymentState`/`OperationType` enums. The behavior that used to live
 on those models now lives in the stateless `Operations` helper over a `list<Operation>`: `latest()`,
-`isApproved()` (status code `20000`), `isApprovedOfType()`, `isLatestApproved()`, `authorizedAmount()`.
-`StatusAction` and `ConfirmPaymentAction` decisions are driven by these helpers plus the SDK enums.
+`isApproved()` (status code `20000`), `isApprovedOfType()`, `isLatestApproved()`, `latestApproved()`,
+`hasApproved()`, `hasPending()`, `authorizedAmount()`. `StatusAction` (last *approved* operation, so a
+trailing rejected/pending attempt does not mask what happened) and the `Authorize`/`Capture` entry-point
+decisions are driven by these helpers plus the SDK enums.
 
 ## End-to-end harness (`examples/e2e/`)
 
