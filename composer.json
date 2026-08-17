@@ -11,6 +11,8 @@
     "homepage": "https://setono.com",
     "require": {
         "php": ">=8.1",
+        "ext-ctype": "*",
+        "ext-filter": "*",
         "ext-hash": "*",
         "ext-json": "*",
         "payum/core": "^1.6",
