@@ -13,8 +13,6 @@
         "php": ">=8.1",
         "ext-ctype": "*",
         "ext-filter": "*",
-        "ext-hash": "*",
-        "ext-json": "*",
         "composer-runtime-api": "^2.0",
         "payum/core": "^1.7.5",
         "php-http/message-factory": "^1.0",

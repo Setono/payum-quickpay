@@ -434,6 +434,13 @@ class CaptureActionTest extends ActionTestAbstract
 
         yield 'capture pending (a retry, or a fast second instalment)' => [[$authorize, ['id' => 2, 'type' => 'capture', 'amount' => 250, 'pending' => true, 'qp_status_code' => null]], 'capture'];
         yield 'cancel pending' => [[$authorize, ['id' => 2, 'type' => 'cancel', 'amount' => 1000, 'pending' => true, 'qp_status_code' => null]], 'cancel'];
+        // A newer pending operation of a type the guard does not care about (here: an authorize made
+        // outside the gateway) must not mask a pending money operation earlier in the list.
+        yield 'capture pending behind a newer pending authorize' => [[
+            $authorize,
+            ['id' => 2, 'type' => 'capture', 'amount' => 250, 'pending' => true, 'qp_status_code' => null],
+            ['id' => 3, 'type' => 'authorize', 'amount' => 1000, 'pending' => true, 'qp_status_code' => null],
+        ], 'capture'];
     }
 
     #[Test]
