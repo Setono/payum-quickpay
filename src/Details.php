@@ -8,7 +8,7 @@ use ArrayAccess;
 use Payum\Core\Exception\LogicException;
 
 /**
- * Reads the Quickpay payment id off the details array.
+ * Reads the Quickpay-side facts off the details array: the payment id, and the payment's own callback url.
  *
  * `quickpayPaymentId` is the single source of truth for "this payment exists at Quickpay" — the
  * actions re-fetch the payment by it rather than trusting stored snapshots. Reading it through this
@@ -37,6 +37,26 @@ final class Details
     public static function hasPaymentId(ArrayAccess $details): bool
     {
         return $details->offsetExists('quickpayPaymentId') && null !== $details['quickpayPaymentId'];
+    }
+
+    /**
+     * The url an operation issued by the gateway reports back to — the payment's own notify (callback)
+     * url, minted when its payment link was created — or null if the payment never went through the
+     * window here, in which case Quickpay's default applies.
+     *
+     * Quickpay sends the callback of an API-issued capture/refund/cancel to the ACCOUNT-WIDE callback
+     * url — empty by default — not to the url on the payment link, unless the request names one
+     * (`QuickPay-Callback-Url`). Naming this url routes an operation's callback to the same per-payment
+     * endpoint the payment window's callback took, so a shop hears about its captures, refunds and
+     * cancels without configuring anything at Quickpay.
+     *
+     * @param ArrayAccess<string, mixed> $details
+     */
+    public static function callbackUrl(ArrayAccess $details): ?string
+    {
+        $url = $details->offsetExists('callback_url') ? $details['callback_url'] : null;
+
+        return is_string($url) && '' !== $url ? $url : null;
     }
 
     /**

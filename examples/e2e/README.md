@@ -160,13 +160,14 @@ a capture may still show the pre-operation state — the settled state arrives i
 
 - **Callback accepted:** Terminal A logs `CALLBACK OK` with the Payum status (`authorized`, `captured`,
   …) and the stored `quickpayPaymentId` / `order_id` / `amount`.
-- **Which url each callback used.** The log tags every callback `via=token` or `via=order_id`. Verified
-  live (2026-08): the payment-window authorize arrives `via=token` (the per-payment `callback_url` on
-  the link), while `capture` / `refund` / `cancel` arrive `via=order_id` — Quickpay sends those to the
-  **account-wide** url under manager → Settings → Integration. Leave that field empty (the default) and
-  operation callbacks are delivered nowhere at all. To see them, point it at
-  `https://<your-tunnel>/notify` for the session, and remember to clear it afterwards or Quickpay keeps
-  POSTing at a dead tunnel.
+- **Which url each callback used.** The log tags every callback `via=token` or `via=order_id`. The
+  payment-window authorize arrives `via=token` (the per-payment `callback_url` on the link) — and so do
+  the `capture` / `refund` / `cancel` callbacks for operations issued through `e2e:operate`, because the
+  gateway names that same url on each operation (`QuickPay-Callback-Url`; verified live 2026-08).
+  Without the header Quickpay would send those to the **account-wide** url under manager → Settings →
+  Integration, which is what an operation made in the manager still does; to see *those* here, point
+  that field at `https://<your-tunnel>/notify` for the session (`via=order_id`), and clear it afterwards
+  or Quickpay keeps POSTing at a dead tunnel.
 - **Callback rejected:** replay the same callback with a tampered checksum and the listener returns
   **400** and logs `CALLBACK REJECTED`. This is the security property `NotifyAction` exists for — a
   forged callback must never move a payment.

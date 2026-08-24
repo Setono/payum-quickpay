@@ -82,9 +82,35 @@ class RefundActionTest extends ActionTestAbstract
         $this->assertRequest($requests[0], 'GET', '#/payments/1001$#');
         $this->assertRequest($requests[1], 'POST', '#/payments/1001/refund$#');
         self::assertSame(750, $this->decodeBody($requests[1])['amount']);
+        self::assertFalse($requests[1]->hasHeader('QuickPay-Callback-Url'), 'No notify url in the details: Quickpay\'s default callback url applies');
 
         self::assertSame(750, $details['balance'], 'The fetched balance is persisted for the caller');
         self::assertSame(1000, $details['amount'], 'The full amount is left alone');
+    }
+
+    /**
+     * Quickpay reports an API-issued refund to the account-wide callback url (empty by default) unless
+     * the request names one. The payment's own notify url — minted when its link was created — is
+     * named, so the refund's callback lands on the same per-payment endpoint as the payment window's.
+     */
+    #[Test]
+    public function shouldRouteTheCallbackToThePaymentsOwnNotifyUrl(): void
+    {
+        $details = new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 1000, 'refund_amount' => 250, 'callback_url' => 'https://shop.example/notify?payum_token=abc']);
+
+        /** @var Refund $refund */
+        $refund = new static::$requestClass($details);
+
+        $action = new RefundAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queuePayment(['state' => PaymentState::Processed->value, 'balance' => 1000, 'operations' => [$this->operation(OperationType::Capture, amount: 1000)]]);
+        $this->queuePayment(['state' => PaymentState::Processed->value, 'balance' => 750, 'operations' => [$this->operation(OperationType::Capture, amount: 1000), $this->operation(OperationType::Refund, amount: 250)]]);
+
+        $action->execute($refund);
+
+        self::assertSame('https://shop.example/notify?payum_token=abc', $this->getRequests()[1]->getHeaderLine('QuickPay-Callback-Url'));
     }
 
     #[Test]

@@ -28,6 +28,19 @@ class DetailsTest extends TestCase
         self::assertFalse(Details::hasPaymentId(new ArrayObject([])));
     }
 
+    /**
+     * The payment's own notify url, for routing an operation's callback — or null when the payment never
+     * went through the window here (no token minted, nothing to name).
+     */
+    #[Test]
+    public function shouldReadTheCallbackUrl(): void
+    {
+        self::assertSame('https://shop.example/notify?payum_token=abc', Details::callbackUrl(new ArrayObject(['callback_url' => 'https://shop.example/notify?payum_token=abc'])));
+        self::assertNull(Details::callbackUrl(new ArrayObject([])));
+        self::assertNull(Details::callbackUrl(new ArrayObject(['callback_url' => ''])));
+        self::assertNull(Details::callbackUrl(new ArrayObject(['callback_url' => null])));
+    }
+
     #[Test]
     public function shouldReadTheId(): void
     {

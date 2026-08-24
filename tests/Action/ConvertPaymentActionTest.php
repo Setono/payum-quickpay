@@ -159,7 +159,7 @@ class ConvertPaymentActionTest extends TestCase
 
     #[Test]
     #[DataProvider('outOfRangeOrderIdProvider')]
-    public function shouldThrowWhenTheOrderIdIsOutsideQuickpaysLength(string $number, string $expected): void
+    public function shouldThrowWhenTheOrderIdIsNotOneQuickpayAccepts(string $number, string $expected): void
     {
         $payment = new Payment();
         $payment->setNumber($number);
@@ -183,14 +183,17 @@ class ConvertPaymentActionTest extends TestCase
     }
 
     /**
-     * The api under test carries the order prefix "ut", so the number contributes the rest.
+     * The api under test carries the order prefix "ut", so the number contributes the rest. The rule is
+     * the SDK's (verified live): 4–20 characters of letters, digits, space, ".", "_" and "-" — so a
+     * character Quickpay rejects fails here too, before the lookup, naming the prefix and number.
      *
      * @return iterable<string, array{string, string}>
      */
     public static function outOfRangeOrderIdProvider(): iterable
     {
-        yield 'one under the minimum' => ['1', 'The Quickpay order id "ut1" is 3 characters'];
-        yield 'one over the maximum' => [str_repeat('9', 19), 'is 21 characters'];
+        yield 'one under the minimum' => ['1', 'The Quickpay order id "ut1" (3 characters) is not one Quickpay accepts'];
+        yield 'one over the maximum' => [str_repeat('9', 19), '(21 characters) is not one Quickpay accepts'];
+        yield 'a character Quickpay rejects' => ['12/34', 'The Quickpay order id "ut12/34" (7 characters) is not one Quickpay accepts'];
     }
 
     #[Test]

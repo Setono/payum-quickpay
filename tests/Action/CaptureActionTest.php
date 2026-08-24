@@ -286,6 +286,28 @@ class CaptureActionTest extends ActionTestAbstract
         $this->assertRequest($requests[1], 'POST', '#/payments/1001/capture$#');
         self::assertSame('', $requests[1]->getUri()->getQuery(), 'Operations are asynchronous unless the gateway is configured otherwise');
         self::assertSame(100, $this->decodeBody($requests[1])['amount']);
+        // Quickpay would report this capture to the account-wide callback url (empty by default); the
+        // payment's own notify url is named on the request, so the callback lands where the payment
+        // window's did.
+        self::assertSame('thePresetCallbackUrl', $requests[1]->getHeaderLine('QuickPay-Callback-Url'));
+    }
+
+    /**
+     * A payment that never went through the window here has no notify url to name; Quickpay's default
+     * (the account-wide url) applies rather than an empty header.
+     */
+    #[Test]
+    public function shouldLeaveTheCallbackUrlToQuickpayWhenThePaymentHasNone(): void
+    {
+        $details = $this->details();
+        unset($details['callback_url']);
+
+        $this->queueAuthorized();
+        $this->queuePayment(['state' => PaymentState::Processed->value, 'operations' => [$this->operation(OperationType::Capture)]]);
+
+        $this->action()->execute($this->capture($details));
+
+        self::assertFalse($this->getRequests()[1]->hasHeader('QuickPay-Callback-Url'));
     }
 
     /**

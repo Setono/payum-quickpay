@@ -13,8 +13,8 @@ handling, and modernizes the test suite. This is a major release with breaking c
 - The SDK is built on PSR-18 / PSR-17 and discovers them via `php-http/discovery`. Make sure your
   project provides a PSR-18 client and PSR-17 factories (e.g. `composer require kriswallsmith/buzz
   nyholm/psr7`, or any other implementation).
-- `setono/quickpay-php-sdk` **`^1.1`** (stable since `1.0.0`, and 2.0 uses what 1.1 added), so **no
-  `minimum-stability` change is needed**. If
+- `setono/quickpay-php-sdk` **`^1.2`** (stable since `1.0.0`; 2.0 uses what 1.1 and 1.2 added), so
+  **no `minimum-stability` change is needed**. If
   you tracked the 2.0 alphas and added `"minimum-stability": "beta"` for the SDK's pre-releases, you can
   drop it again (assuming nothing else in your project needs it).
 
@@ -126,28 +126,31 @@ response. Ensure:
   works and is now simply redundant). A `GetHttpRequest` action of your own is left alone; make sure it
   sets `headers`.
 
-## Quickpay sends callbacks to two different places
+## Where callbacks go — operation callbacks now reach the notify token too
 
-This is not new in 2.0, but it is not obvious and nothing in the gateway hints at it. Verified against a
-live account (2026-08):
+Not new in 2.0 but not obvious, and verified against a live account (2026-08): Quickpay sends the
+callback of the payment window to the **per-payment** `callback_url` on the payment link (the Payum
+notify token url the gateway mints when it creates the link), but the callback of a `capture` /
+`refund` / `cancel` issued through the API to the **account-wide** callback url (manager → Settings →
+Integration) — which is empty by default. In 1.x, and in 2.0 up to `beta.1`, that meant the notify token
+only ever received the authorize callback, and a shop waiting to be told that its capture settled
+waited forever unless it also set the account-wide url and built an endpoint for it.
 
-| Origin | Callback goes to |
-|---|---|
-| The customer paying in the hosted payment window | the **per-payment** `callback_url` on the payment link — the Payum notify token url the gateway mints when it creates the link |
-| `capture` / `refund` / `cancel` issued through the API | the **account-wide** callback url (manager → Settings → Integration) |
+Since `2.0.0-beta.1` (SDK ≥ 1.2) the gateway names the payment's own notify url on every capture,
+refund and cancel it issues (the `QuickPay-Callback-Url` request header, which overrides the account
+default for that operation), so **their callbacks arrive on the same per-payment endpoint** as the
+payment window's, routed by Payum's token, verified by `NotifyAction`. Verified live: the operation's
+callback is delivered to the token url within a second, and Quickpay records the url and a `200` on
+the operation. There is nothing to configure — the url is the `callback_url` the details already carry
+from the link.
 
-So the gateway's notify token only ever receives the authorize callback. If the account-wide url is
-empty — the default — **operation callbacks are not delivered anywhere at all**, and a shop waiting to
-be told that its capture settled waits forever.
-
-If you rely on those confirmations, you need both halves:
-
-1. Set the account-wide callback url in Quickpay, and
-2. point it at an endpoint that resolves the payment **from the callback body**, because that url is one
-   static url for every payment and therefore cannot carry a `payum_token` — Payum's usual notify
-   routing cannot work for it. Match on `order_id` (it is `order_prefix` + the Payum payment number),
-   load your payment, and execute `Notify` against that model; `NotifyAction` needs only the model, and
-   verifies the HMAC itself either way. `examples/e2e/listen.php` does exactly this.
+The account-wide url is now only for operations made **outside** the gateway — in the Quickpay manager,
+or by your own API calls without the header. If you want to hear about those, set it and point it at an
+endpoint that resolves the payment **from the callback body** (that url is one static url for every
+payment and cannot carry a `payum_token`): match on `order_id` (`order_prefix` + the Payum payment
+number), load your payment, and execute `Notify` against that model; `NotifyAction` needs only the
+model, and verifies the HMAC itself either way. `examples/e2e/listen.php` does exactly this, and the
+Sylius plugin ships such an endpoint.
 
 Alternatively, skip callbacks for operations entirely: enable the `synchronized` option so
 capture/refund/cancel block until the transaction is settled, or poll `GetStatus`, which re-fetches from
@@ -286,7 +289,9 @@ payment; a Convert action of your own may say something more specific.
 ## Order ids are now validated before they are sent
 
 `ConvertPaymentAction` builds `order_id` as `order_prefix` + the Payum payment number, and now enforces
-Quickpay's **4–20 character** rule on the result, throwing a `LogicException` if it falls outside.
+Quickpay's rule on the result — **4–20 characters of letters, digits, space, `.`, `_` and `-`** (the
+rule the SDK verified live and enforces itself since 1.2) — throwing a `LogicException` naming the
+prefix and the number if it does not fit.
 
 Nothing that worked in 1.x stops working — Quickpay rejected those order ids anyway — but the failure
 now happens at conversion time and as a different exception type, rather than as a `ValidationException`

@@ -54,7 +54,30 @@ class CancelActionTest extends ActionTestAbstract
         // Cancel takes no body: the SDK (>= 1.1) sends an empty JSON object, which the API accepts
         // where a literal empty array would be rejected.
         self::assertSame('{}', (string) $requests[1]->getBody());
+        self::assertFalse($requests[1]->hasHeader('QuickPay-Callback-Url'), 'No notify url in the details: Quickpay\'s default callback url applies');
         self::assertSame(0, $details['balance']);
+    }
+
+    /**
+     * The payment's own notify url is named on the request, so the cancel's callback lands on the same
+     * per-payment endpoint as the payment window's instead of the account-wide url.
+     */
+    #[Test]
+    public function shouldRouteTheCallbackToThePaymentsOwnNotifyUrl(): void
+    {
+        /** @var Cancel $cancel */
+        $cancel = new static::$requestClass(new ArrayObject(['quickpayPaymentId' => 1001, 'amount' => 100, 'callback_url' => 'https://shop.example/notify?payum_token=abc']));
+
+        $action = new CancelAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+
+        $this->queuePayment(['state' => PaymentState::New->value, 'operations' => [$this->operation(OperationType::Authorize)]]);
+        $this->queuePayment(['state' => PaymentState::Processed->value, 'operations' => [$this->operation(OperationType::Authorize), $this->operation(OperationType::Cancel)]]);
+
+        $action->execute($cancel);
+
+        self::assertSame('https://shop.example/notify?payum_token=abc', $this->getRequests()[1]->getHeaderLine('QuickPay-Callback-Url'));
     }
 
     /**

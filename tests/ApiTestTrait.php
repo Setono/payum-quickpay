@@ -36,10 +36,14 @@ trait ApiTestTrait
 
     protected StubTokenFactory $tokenFactory;
 
+    /** Quickpay numbers operations per payment from 1; the fixture builder does the same. */
+    private int $nextOperationId = 1;
+
     public function setUp(): void
     {
         parent::setUp();
 
+        $this->nextOperationId = 1;
         $this->httpClient = new MockHttpClient();
 
         $this->api = $this->createApi();
@@ -134,12 +138,16 @@ trait ApiTestTrait
      * A pending operation — the shape an asynchronous operation has until Quickpay finishes
      * processing it — carries no status code yet, hence the nullable `$statusCode`.
      *
+     * Ids increase in the order operations are built, as Quickpay numbers them: "the latest
+     * operation" is the one with the highest id (the SDK's definition), so a fixture that hands
+     * every operation the same id would make that decision accidental.
+     *
      * @return array<string, mixed>
      */
     protected function operation(OperationType $type, ?string $statusCode = Operation::QP_STATUS_APPROVED, int $amount = 100, bool $pending = false): array
     {
         return [
-            'id' => 1,
+            'id' => $this->nextOperationId++,
             'type' => $type->value,
             'amount' => $amount,
             'pending' => $pending,

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Setono\Payum\Quickpay\Exception;
 
 use Payum\Core\Exception\RuntimeException;
-use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Response\Payment\Operation;
 use Setono\Quickpay\Response\Payment\Payment;
@@ -48,10 +47,10 @@ final class OperationRejectedException extends RuntimeException
      */
     public static function assertNotRejected(int $paymentId, Payment $payment, OperationType $type): void
     {
-        $operation = Operations::latestOfType($payment->operations, $type);
+        $operation = $payment->latestOperationOfType($type);
 
-        // isApproved() is false for a pending operation too; the explicit check says why it passes.
-        if (null === $operation || $operation->pending || $operation->isApproved()) {
+        // No outcome yet (pending) passes; only a completed, not-approved operation is a decline.
+        if (null === $operation || !$operation->isDeclined()) {
             return;
         }
 

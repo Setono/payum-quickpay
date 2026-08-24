@@ -14,7 +14,6 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Request\GetStatusInterface;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Details;
-use Setono\Payum\Quickpay\Operations;
 use Setono\Quickpay\Enum\OperationType;
 use Setono\Quickpay\Enum\PaymentState;
 use Setono\Quickpay\Response\Payment\Payment;
@@ -40,7 +39,6 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
         }
 
         $payment = $this->api->payments()->getById(Details::paymentId($model));
-        $operations = $payment->operations;
 
         // The payment is already in hand, so persisting the balance costs nothing — and it is the
         // number a consumer needs for refund handling, which the Payum marks cannot express.
@@ -55,7 +53,7 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
                 // Decided by the last APPROVED operation, not the last one recorded: a trailing
                 // rejected or pending attempt (say, a capture that failed) must not make an
                 // authorized payment — whose money is still held — report as failed.
-                if (Operations::isApprovedOfType(Operations::latestApproved($operations), OperationType::Authorize)) {
+                if (true === $payment->latestApprovedOperation()?->isOfType(OperationType::Authorize)) {
                     $request->markAuthorized();
                 } else {
                     $request->markFailed();
@@ -102,13 +100,17 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
      */
     private static function markFromLastApprovedOperation(GetStatusInterface $request, Payment $payment): bool
     {
-        $latestApproved = Operations::latestApproved($payment->operations);
+        $latestApproved = $payment->latestApprovedOperation();
 
-        if (Operations::isApprovedOfType($latestApproved, OperationType::Authorize)) {
+        if (null === $latestApproved) {
+            return false;
+        }
+
+        if ($latestApproved->isOfType(OperationType::Authorize)) {
             $request->markAuthorized();
-        } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Capture)) {
+        } elseif ($latestApproved->isOfType(OperationType::Capture)) {
             $request->markCaptured();
-        } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Refund)) {
+        } elseif ($latestApproved->isOfType(OperationType::Refund)) {
             // A refund does not necessarily empty the payment. Quickpay's `balance` is what is
             // still captured (captured minus refunded), so a partial refund leaves it positive
             // and the money is, in Payum's vocabulary, still captured — there is no partial
@@ -121,9 +123,10 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
             } else {
                 $request->markCaptured();
             }
-        } elseif (Operations::isApprovedOfType($latestApproved, OperationType::Cancel)) {
+        } elseif ($latestApproved->isOfType(OperationType::Cancel)) {
             $request->markCanceled();
         } else {
+            // An approved operation of a type the gateway does not map (recurring, subscribe, test).
             return false;
         }
 
