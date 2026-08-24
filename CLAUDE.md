@@ -201,8 +201,8 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
 - **Sync** → `SyncAction` — Payum's standard "refresh the details from the gateway" request. Fetches by
   `quickpayPaymentId` and writes the scalar snapshot (`balance`, `state`). A model without a
   `quickpayPaymentId` has nothing to sync, so it is a no-op rather than a throw. Every action that
-  already fetches the payment (`StatusAction`, `ConfirmPaymentAction`, and `RefundAction` on its default
-  path) also persists `balance` — it costs no extra call and it is the one figure Payum's marks cannot
+  fetches the payment — all of them, since the in-flight guard made Cancel and every Refund fetch too —
+  also persists `balance`; it costs no extra call and it is the one figure Payum's marks cannot
   express, so downstream consumers do not have to re-fetch just to learn it.
 - **GetStatus** → `StatusAction` — maps the SDK `PaymentState` + latest operation to Payum marks
   (`markCaptured`, `markRefunded`, `markAuthorized`, `markFailed`, etc.). The refund branch is **not**

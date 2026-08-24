@@ -102,10 +102,11 @@ The details array stored on a payment (the `ArrayObject` model) now contains **o
 - `2.0` stores only `quickpayPaymentId` (int) — the source of truth — plus `amount`, `currency`,
   `order_id`, `continue_url`, `cancel_url`, `callback_url`. The payment is re-fetched from Quickpay when
   needed.
-- Any action that already fetches the payment also writes **`balance`** (what is still captured, i.e.
-  captured minus refunded) back into the details: `Capture`, `Authorize`, `GetStatus`, `Notify`, the
-  new `Sync`, and `Refund` on its default path. It costs no extra API call and it is the one figure
-  Payum's status marks cannot express. `Sync` and `Notify` additionally write `state`.
+- Any action that fetches the payment — since `2.0.0-beta.1` that is every one that touches it:
+  `Capture`, `Authorize`, `Refund`, `Cancel`, `GetStatus`, `Notify` and the new `Sync` — also writes
+  **`balance`** (what is still captured, i.e. captured minus refunded) back into the details. It costs
+  no extra API call and it is the one figure Payum's status marks cannot express. `Sync` and `Notify`
+  additionally write `state`.
 
 If your code reads `$details['quickpayPayment']`, switch to fetching the payment via the SDK using
 `$details['quickpayPaymentId']`.
@@ -307,8 +308,9 @@ These were internal implementation details; they are gone in 2.0:
 
 - `Setono\Payum\Quickpay\Model\*` (`QuickpayPayment`, `QuickpayPaymentOperation`, `QuickpayPaymentLink`,
   `QuickpayModel`, `QuickpayCard`) — replaced by the SDK's `Setono\Quickpay\Response\Payment\*` DTOs and
-  the `Setono\Quickpay\Enum\{PaymentState,OperationType}` enums. State logic now lives in the
-  `Setono\Payum\Quickpay\Operations` helper.
+  the `Setono\Quickpay\Enum\{PaymentState,OperationType}` enums. The questions that used to live on those
+  models are the DTOs' own helpers since SDK 1.2 (`Payment::latestApprovedOperation()`,
+  `hasApprovedOperation()`, `hasPendingOperation()`, `Operation::isApproved()`/`isDeclined()`, …).
 - `Setono\Payum\Quickpay\Api` is no longer an HTTP client. It is now an immutable value object wrapping
   the SDK `Setono\Quickpay\Client\ClientInterface` and the gateway options (`payments()`, `getClient()`,
   `isAutoCapture()`, `createCallbackValidator()`, …). Its old `getPayment()` / `capturePayment()` /

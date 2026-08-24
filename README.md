@@ -217,7 +217,7 @@ uses. `quickpayPaymentId` is the single source of truth — everything else is a
 | `continue_url` | `Convert` | The token's **target** url: the customer returns to it, and the `Capture`/`Authorize` that sent them out runs again to finish. |
 | `cancel_url` | `Convert` | The token's after url. |
 | `callback_url` | `Capture`, `Authorize` | The payment's notify token url — on the link, and named on every capture/refund/cancel the gateway issues so their callbacks arrive there too. |
-| `balance` | every action that fetches the payment: `Capture`, `Authorize`, `GetStatus`, `Sync`, `Notify`, `Refund` (default path) | **What is still captured** — captured minus refunded. |
+| `balance` | every action that fetches the payment — all of them: `Capture`, `Authorize`, `Refund`, `Cancel`, `GetStatus`, `Sync`, `Notify` | **What is still captured** — captured minus refunded. |
 | `state` | `Sync`, `Notify` | Quickpay's own payment state. |
 | `capture_amount`, `refund_amount` | *you* | Optional partial-operation amounts; see below. |
 
