@@ -88,25 +88,45 @@ It also swaps payum's plain-PHP `GetHttpRequestAction` (the core config's defaul
 `populateConfig()` runs) for the package's `HeaderAwareGetHttpRequestAction` — only when the configured
 value is payum's *exact* class, so PayumBundle's Symfony bridge and anything a consumer chose stay put;
 without that, a plain-PHP Payum rejected every callback as unsigned unless the consumer knew to wire it.
-Required options are just `api_key` and `private_key`. Three 1.x names — `apikey`, `privatekey` and
-`agreement` — remain as deprecated aliases, mapped by `aliasDeprecatedOptions()` **before** the defaults
-are applied; after that, `api_key` exists as `''` and there is no way to tell the consumer only supplied
-the old name. They are aliased rather than dropped (unlike the misspelled `syncronized`, which nobody had
-meaningfully set) because Sylius stores the gateway config keyed by these names, so a hard rename would
-break every existing shop. `agreement` is the one to be most careful with: it is optional, so a name that
-stops being read fails **silently** — the link is created without an agreement id and Quickpay falls back
-to the account default. Other options (`payment_methods`, `auto_capture`,
-`order_prefix`, `language`, `synchronized`, `agreement_id` → link `agreementId`, `branding_id`) are
-defaulted. The closure constructs the SDK `Client` from the api key **and the `synchronized` flag** (or
+Required options are just `api_key` and `private_key`.
+
+**What an option means is decided in one place: `GatewayOptions` (`src/GatewayOptions.php`)**, a public,
+immutable value object with typed `public readonly` values and a private constructor, so every instance
+went through the rules. The `payum.api` closure is `GatewayOptions::fromConfig($config->getArrayCopy())`
+and then builds `Api` from its values; consumers (the Sylius plugin first: its form, doctor, save
+validation and callback endpoint) call the same `fromConfig()` to read a stored configuration without
+building a gateway. It creates no client and makes no request. Never re-implement an option rule outside
+it; a new option starts there. It:
+- applies the three deprecated 1.x names (`apikey`, `privatekey`, `agreement`) when the current name is
+  absent **or null** (`withCurrentNames()`, public: renames and drops the old keys, validates nothing);
+  null means "unset" everywhere, as Payum's `defaults()` already treated it. They are aliased rather
+  than dropped (unlike the misspelled `syncronized`, which nobody had meaningfully set) because Sylius
+  stores the gateway config keyed by these names, so a hard rename would break every existing shop.
+  `agreement` is the one to be most careful with: it is optional, so a name that stops being read fails
+  **silently**, with the link created without an agreement id and Quickpay falling back to the account default;
+- applies `GatewayOptions::DEFAULTS` (also what the factory publishes as `payum.default_options`,
+  unchanged);
+- normalizes: booleans by PHP's bool filter (`'yes'`, `'false'`, `''` → false; `'abc'` is a violation,
+  since a cast would invert `"false"`); ids (`agreement_id` → link `agreementId`, `branding_id`) as a
+  positive int or digit string, blank → `null` (`'1e3'`, `0`, `12.0` are violations); `payment_methods`
+  as a string **or** a list of strings, trimmed and comma-joined, blank → `null` (a `(string)` cast of a
+  list would send the literal `Array`, an allowlist of one unknown method that rejects every payment);
+  string options by today's `(string)` cast of a scalar, a non-scalar being a violation. `null` is what
+  keeps a parameter off the request entirely, so the empty-string Payum defaults never reach `Api`;
+- requires a non-empty `api_key`/`private_key` (Payum's `empty()` sense, so `'0'` is missing);
+- ignores keys it does not know (`payum.*`, `quickpay.client`, Sylius' `use_authorize`);
+- collects **every** violation and throws `Exception\InvalidGatewayOptions` (extends Payum's
+  `LogicException`, so old catches still work; `getViolations()` is option name → message).
+
+`GatewayOptions::usesDeprecatedOptions()` says whether a config still sets a 1.x name or `auto_capture`
+(non-null). The factory still renames (via `withCurrentNames()`) **before** applying the defaults to the
+config: after that, `api_key` exists as `''`, which is not null and so would beat `apikey`.
+
+The closure constructs the SDK `Client` from the api key **and the `synchronized` flag** (or
 accepts a prebuilt `Setono\Quickpay\Client\ClientInterface` via the optional `quickpay.client` option —
 used by tests). Because `synchronized` is a constructor-only default on the SDK client, an injected
 client whose `isSynchronized()` disagrees with the gateway option is rejected with a `LogicException`
-rather than silently overriding it. `payment_methods` accepts a string **or** a list of strings and is
-normalized to Quickpay's comma-separated form by `normalizePaymentMethods()` — a `(string)` cast of a
-list would have sent the literal `Array`, which reads as an allowlist of one unknown method and rejects
-every payment; anything that is neither shape throws rather than being coerced. Empty configuration
-normalizes to `null` — as `agreement_id` and `branding_id` already did — so the empty-string Payum default
-never reaches `Api`, and `null` is what keeps the parameter off the request entirely.
+rather than silently overriding it.
 
 ### Actions (`src/Action/`)
 

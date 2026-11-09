@@ -56,7 +56,7 @@ final class Api
      * named is rejected.
      *
      * `null` — not `''` — is what leaves the payment unrestricted: it keeps the parameter off the
-     * request entirely, so the account's own configuration applies. {@see QuickpayGatewayFactory}
+     * request entirely, so the account's own configuration applies. {@see GatewayOptions}
      * normalizes empty configuration to `null` for that reason.
      *
      * @see https://learn.quickpay.net/tech-talk/appendixes/payment-methods/ for the format and the

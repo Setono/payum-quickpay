@@ -44,7 +44,50 @@ Integration — used to verify callback signatures). Other options are optional:
 | `branding_id`     | `''`    | Optional payment-window branding id.                                 |
 
 The 1.x names `apikey`, `privatekey` and `agreement` are still accepted as deprecated aliases, so an
-existing gateway configuration keeps working. They will be removed in 3.0.
+existing gateway configuration keeps working. A 1.x name applies when the current name is absent **or
+null**, as the defaults do; a current name that is set wins. They will be removed in 3.0.
+
+An invalid configuration fails when the gateway is built, with a
+`Setono\Payum\Quickpay\Exception\InvalidGatewayOptions` (a `LogicException`) that lists **every** invalid
+option at once, not just the first.
+
+### Reading a stored configuration — `GatewayOptions`
+
+If you store gateway configurations (a Sylius payment method does), don't re-implement the rules above to
+validate or read one. `GatewayOptions` reads a configuration by exactly the rules the gateway is built
+from (the factory builds its `Api` from it), and it creates no client and makes no request:
+
+```php
+use Setono\Payum\Quickpay\Exception\InvalidGatewayOptions;
+use Setono\Payum\Quickpay\GatewayOptions;
+
+try {
+    $options = GatewayOptions::fromConfig($gatewayConfig->getConfig());
+} catch (InvalidGatewayOptions $e) {
+    $e->getViolations(); // ['agreement_id' => 'The "agreement_id" option must be a positive integer …', …]
+}
+
+$options->apiKey;          // string, never empty
+$options->privateKey;      // string, never empty
+$options->orderPrefix;     // string
+$options->paymentMethods;  // ?string: Quickpay's comma-separated form, null = no restriction
+$options->language;        // string
+$options->autoCapture;     // bool
+$options->synchronized;    // bool
+$options->agreementId;     // ?int: null = the account's default agreement
+$options->brandingId;      // ?int: null = the account's default branding
+```
+
+`fromConfig()` applies the deprecated names, then the defaults, then normalizes every option. Booleans
+take PHP's bool filter (`'yes'`, `'false'`, `0`, …), ids must be positive integers or digit strings, and
+`payment_methods` may be a string or a list (`['visa', ' mobilepay ']` gives `visa,mobilepay`). Blank
+values mean "not configured". Keys it doesn't know, such as Payum's `payum.*`, are ignored. Two helpers
+cover migrating a stored configuration:
+
+```php
+GatewayOptions::withCurrentNames($config);     // the 1.x names renamed to the current ones and dropped; nothing validated
+GatewayOptions::usesDeprecatedOptions($config); // true if a 1.x name or `auto_capture` is still set
+```
 
 The factory name is exposed as a constant, so consumers looking gateways up by `factoryName`, tagging
 services, or guarding "is this a Quickpay payment?" need not repeat the literal:

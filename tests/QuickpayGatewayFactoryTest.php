@@ -23,6 +23,7 @@ use ReflectionException;
 use ReflectionProperty;
 use Setono\Payum\Quickpay\Api;
 use Setono\Payum\Quickpay\Bridge\PlainPhp\Action\HeaderAwareGetHttpRequestAction;
+use Setono\Payum\Quickpay\Exception\InvalidGatewayOptions;
 use Setono\Payum\Quickpay\QuickpayGatewayFactory;
 use Setono\Quickpay\Client\Client;
 use stdClass;
@@ -349,6 +350,44 @@ class QuickpayGatewayFactoryTest extends TestCase
         );
     }
 
+    /**
+     * Null is "unset" for the defaults, so it is for the aliases too: a stored config carrying the
+     * current name as null next to the 1.x one is read from the 1.x one.
+     */
+    #[Test]
+    public function shouldReadTheDeprecatedNamesWhenTheCurrentOnesAreNull(): void
+    {
+        $api = self::createApi(new QuickpayGatewayFactory(), [
+            'private_key' => null,
+            'privatekey' => 'old-private-key',
+            'agreement_id' => null,
+            'agreement' => 7,
+        ]);
+
+        self::assertSame('old-private-key', $api->getPrivateKey());
+        self::assertSame(7, $api->getAgreementId());
+    }
+
+    #[Test]
+    public function shouldReportEveryInvalidOptionWhenTheGatewayIsBuilt(): void
+    {
+        try {
+            (new QuickpayGatewayFactory())->create([
+                'private_key' => '0',
+                'payment_methods' => 42,
+                'synchronized' => 'abc',
+                'agreement_id' => '1e3',
+                'branding_id' => 0,
+            ]);
+            self::fail('The gateway was built');
+        } catch (InvalidGatewayOptions $e) {
+            self::assertEqualsCanonicalizing(
+                ['api_key', 'private_key', 'payment_methods', 'synchronized', 'agreement_id', 'branding_id'],
+                array_keys($e->getViolations()),
+            );
+        }
+    }
+
     #[Test]
     public function shouldPreferTheCurrentNamesWhenBothAreGiven(): void
     {
@@ -405,7 +444,10 @@ class QuickpayGatewayFactoryTest extends TestCase
      */
     #[Test]
     #[DataProvider('apiKeyOptionProvider')]
-    public function shouldAuthenticateTheClientWithTheConfiguredApiKey(string $option): void
+    /**
+     * @param array<string, mixed> $credentials
+     */
+    public function shouldAuthenticateTheClientWithTheConfiguredApiKey(array $credentials): void
     {
         $httpClient = new MockHttpClient();
         $httpClient->addResponse(new Response(200, [], '{"msg":"pong"}'));
@@ -415,10 +457,7 @@ class QuickpayGatewayFactoryTest extends TestCase
         Psr18ClientDiscovery::prependStrategy(MockClientDiscoveryStrategy::class);
 
         try {
-            $config = (new QuickpayGatewayFactory())->createConfig([
-                $option => 'the-api-key',
-                'private_key' => 'the-private-key',
-            ]);
+            $config = (new QuickpayGatewayFactory())->createConfig($credentials + ['private_key' => 'the-private-key']);
 
             $api = $config['payum.api'](ArrayObject::ensureArrayObject($config));
             self::assertInstanceOf(Api::class, $api);
@@ -436,12 +475,14 @@ class QuickpayGatewayFactoryTest extends TestCase
     }
 
     /**
-     * @return iterable<string, array{string}>
+     * @return iterable<string, array{array<string, mixed>}>
      */
     public static function apiKeyOptionProvider(): iterable
     {
-        yield 'api_key' => ['api_key'];
-        yield 'deprecated apikey' => ['apikey'];
+        yield 'api_key' => [['api_key' => 'the-api-key']];
+        yield 'deprecated apikey' => [['apikey' => 'the-api-key']];
+        yield 'deprecated apikey next to a null api_key' => [['api_key' => null, 'apikey' => 'the-api-key']];
+        yield 'api_key next to the deprecated apikey it beats' => [['api_key' => 'the-api-key', 'apikey' => 'old-api-key']];
     }
 
     /**
@@ -569,6 +610,30 @@ class QuickpayGatewayFactoryTest extends TestCase
         $config = $factory->createConfig();
         self::assertIsArray($config);
         self::assertNotEmpty($config);
+    }
+
+    /**
+     * Payum's generic tooling (PayumBundle's config form among it) reads these, so they stay exactly
+     * what they were before `GatewayOptions` took over the rules.
+     */
+    #[Test]
+    public function shouldPublishPayumsDefaultAndRequiredOptions(): void
+    {
+        $config = (new QuickpayGatewayFactory())->createConfig();
+
+        self::assertSame([
+            'api_key' => '',
+            'private_key' => '',
+            'payment_methods' => '',
+            'auto_capture' => 0,
+            'order_prefix' => '',
+            'language' => 'en',
+            'synchronized' => false,
+            'agreement_id' => '',
+            'branding_id' => '',
+        ], $config['payum.default_options']);
+        self::assertSame(['api_key', 'private_key'], $config['payum.required_options']);
+        self::assertSame('en', $config['language'], 'The defaults are applied to the config, as before');
     }
 
     #[Test]
