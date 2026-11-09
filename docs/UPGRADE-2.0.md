@@ -51,9 +51,10 @@ handling, and modernizes the test suite. This is a major release with breaking c
   used to throw at the first one. It now throws
   `Setono\Payum\Quickpay\Exception\InvalidGatewayOptions` with all of them in the message and as a map
   from option name to message (`getViolations()`). It is still a `LogicException`, Payum's and PHP's,
-  so existing catches keep working; only the message wording changed. An option that is not a scalar
-  where a string belongs (an array or object `order_prefix`, say) is now one of those violations,
-  instead of an "Array to string conversion" warning or a cast of the object.
+  so existing catches keep working; only the message wording changed. A value the old `(string)` cast
+  could not take where a string belongs (an array `order_prefix`, say, or an object without
+  `__toString()`) is now one of those violations, instead of an "Array to string conversion" warning
+  or an `Error`.
 - **`Setono\Payum\Quickpay\GatewayOptions` is new** (after `2.0.0-rc.1`): it reads a stored configuration
   by the gateway's own rules without building the gateway. See the README.
 - **New options:** `synchronized` (run capture/refund/cancel synchronously instead of relying on the

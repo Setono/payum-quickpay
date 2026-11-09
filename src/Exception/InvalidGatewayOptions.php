@@ -17,11 +17,25 @@ use Payum\Core\Exception\LogicException;
 final class InvalidGatewayOptions extends LogicException
 {
     /**
-     * @param non-empty-array<string, string> $violations a message per invalid option, keyed by the option's current name
+     * @param non-empty-array<string, string> $violations
      */
-    public function __construct(private readonly array $violations)
+    private function __construct(private readonly array $violations)
     {
         parent::__construct(sprintf('Invalid Quickpay gateway options: %s', implode('; ', $violations)));
+    }
+
+    /**
+     * Throws if there is any violation.
+     *
+     * @param array<string, string> $violations a message per invalid option, keyed by the option's current name
+     *
+     * @throws self
+     */
+    public static function assertNoViolations(array $violations): void
+    {
+        if ([] !== $violations) {
+            throw new self($violations);
+        }
     }
 
     /**

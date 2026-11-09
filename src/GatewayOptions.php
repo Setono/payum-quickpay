@@ -97,7 +97,7 @@ final class GatewayOptions
             apiKey: self::requireString('api_key', $config['api_key'], $violations),
             privateKey: self::requireString('private_key', $config['private_key'], $violations),
             orderPrefix: self::normalizeString('order_prefix', $config['order_prefix'], $violations),
-            paymentMethods: self::normalizePaymentMethods($config['payment_methods'], $violations),
+            paymentMethods: self::normalizePaymentMethods('payment_methods', $config['payment_methods'], $violations),
             language: self::normalizeString('language', $config['language'], $violations),
             autoCapture: self::normalizeBool('auto_capture', $config['auto_capture'], $violations),
             synchronized: self::normalizeBool('synchronized', $config['synchronized'], $violations),
@@ -105,9 +105,7 @@ final class GatewayOptions
             brandingId: self::normalizeId('branding_id', $config['branding_id'], $violations),
         );
 
-        if ([] !== $violations) {
-            throw new InvalidGatewayOptions($violations);
-        }
+        InvalidGatewayOptions::assertNoViolations($violations);
 
         return $options;
     }
@@ -138,19 +136,23 @@ final class GatewayOptions
     /**
      * Whether the configuration still sets a deprecated gateway option: one of the 1.x names, or
      * `auto_capture`, which is deprecated as a whole (execute `Capture` instead of `Authorize`). A null
-     * value is unset, so it does not count.
+     * value is unset, so it does not count — and neither does `auto_capture` that is off: off is its
+     * default, published in `payum.default_options`, so it is in every configuration seeded from those,
+     * and dropping it in 3.0 changes nothing. One that cannot be read as a boolean counts.
      *
      * @param array<array-key, mixed> $config
      */
     public static function usesDeprecatedOptions(array $config): bool
     {
-        foreach ([...array_keys(self::DEPRECATED_NAMES), 'auto_capture'] as $option) {
+        foreach (array_keys(self::DEPRECATED_NAMES) as $option) {
             if (null !== ($config[$option] ?? null)) {
                 return true;
             }
         }
 
-        return false;
+        $violations = [];
+
+        return self::normalizeBool('auto_capture', $config['auto_capture'] ?? false, $violations) || [] !== $violations;
     }
 
     /**
@@ -171,14 +173,15 @@ final class GatewayOptions
     }
 
     /**
-     * The string options have always been read with a `(string)` cast, so a scalar keeps working as it
-     * does at the gateway. A non-scalar is a violation — the cast would have sent `Array`, or thrown.
+     * The string options have always been read with a `(string)` cast, so a scalar or a `Stringable` keeps
+     * working as it does at the gateway. Anything else is a violation — the cast would have sent `Array`,
+     * or thrown.
      *
      * @param array<string, string> $violations
      */
     private static function normalizeString(string $option, mixed $value, array &$violations): string
     {
-        if (is_scalar($value)) {
+        if (is_scalar($value) || $value instanceof \Stringable) {
             return (string) $value;
         }
 
@@ -266,7 +269,7 @@ final class GatewayOptions
      *
      * @param array<string, string> $violations
      */
-    private static function normalizePaymentMethods(mixed $value, array &$violations): ?string
+    private static function normalizePaymentMethods(string $option, mixed $value, array &$violations): ?string
     {
         if (is_string($value)) {
             $value = trim($value);
@@ -274,25 +277,14 @@ final class GatewayOptions
             return '' !== $value ? $value : null;
         }
 
-        if (!is_array($value)) {
-            $violations['payment_methods'] = sprintf(
-                'The "payment_methods" option must be a string or a list of strings, got %s',
-                self::describe($value),
-            );
-
-            return null;
-        }
-
+        $got = is_array($value) ? null : self::describe($value);
         $methods = [];
 
-        foreach ($value as $method) {
+        foreach (is_array($value) ? $value : [] as $method) {
             if (!is_string($method)) {
-                $violations['payment_methods'] = sprintf(
-                    'The "payment_methods" option must be a string or a list of strings, but the list contains %s',
-                    self::describe($method),
-                );
+                $got = 'a list containing ' . self::describe($method);
 
-                return null;
+                break;
             }
 
             $method = trim($method);
@@ -300,6 +292,12 @@ final class GatewayOptions
             if ('' !== $method) {
                 $methods[] = $method;
             }
+        }
+
+        if (null !== $got) {
+            $violations[$option] = sprintf('The "%s" option must be a string or a list of strings, got %s', $option, $got);
+
+            return null;
         }
 
         return [] !== $methods ? implode(',', $methods) : null;

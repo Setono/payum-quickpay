@@ -86,7 +86,7 @@ cover migrating a stored configuration:
 
 ```php
 GatewayOptions::withCurrentNames($config);     // the 1.x names renamed to the current ones and dropped; nothing validated
-GatewayOptions::usesDeprecatedOptions($config); // true if a 1.x name or `auto_capture` is still set
+GatewayOptions::usesDeprecatedOptions($config); // true if a 1.x name is still set, or `auto_capture` is on
 ```
 
 The factory name is exposed as a constant, so consumers looking gateways up by `factoryName`, tagging

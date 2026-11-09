@@ -56,9 +56,10 @@ class QuickpayGatewayFactory extends GatewayFactory
         ]);
 
         if (!$config->offsetExists('payum.api')) {
-            // The 1.x names are renamed before the defaults are applied: once `api_key` exists as `''`
-            // there is no telling that the consumer only supplied `apikey`.
-            $config->exchangeArray(GatewayOptions::withCurrentNames($config->getArrayCopy()));
+            // The current names are filled in from the 1.x ones before the defaults are applied: once
+            // `api_key` exists as `''` there is no telling that the consumer only supplied `apikey`.
+            // replace() only adds, so the 1.x keys stay in the config as they always have.
+            $config->replace(GatewayOptions::withCurrentNames($config->getArrayCopy()));
 
             $config['payum.default_options'] = GatewayOptions::DEFAULTS;
             $config->defaults($config['payum.default_options']);
@@ -69,6 +70,9 @@ class QuickpayGatewayFactory extends GatewayFactory
 
             $config['payum.api'] = static function (ArrayObject $config): Api {
                 $options = GatewayOptions::fromConfig($config->getArrayCopy());
+
+                // GatewayOptions has enforced the credentials; this is for any option a subclass added.
+                $config->validateNotEmpty($config['payum.required_options']);
 
                 // Consumers (and the test suite) may inject a preconfigured SDK client — e.g. one
                 // built around a specific PSR-18 client — via the "quickpay.client" option.

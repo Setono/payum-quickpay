@@ -17,6 +17,8 @@ use stdClass;
 
 final class GatewayOptionsTest extends TestCase
 {
+    private const CREDENTIALS = ['api_key' => 'the-api-key', 'private_key' => 'the-private-key'];
+
     #[Test]
     public function shouldApplyTheDefaultsToAConfigWithOnlyTheCredentials(): void
     {
@@ -173,6 +175,20 @@ final class GatewayOptionsTest extends TestCase
         self::assertStringContainsString('must be a string or a list of strings', $violations['payment_methods']);
     }
 
+    #[Test]
+    public function shouldNameWhatIsWrongWithThePaymentMethods(): void
+    {
+        self::assertSame(
+            ['payment_methods' => 'The "payment_methods" option must be a string or a list of strings, got 42'],
+            self::violationsOf(['payment_methods' => 42]),
+        );
+        self::assertSame(
+            ['payment_methods' => 'The "payment_methods" option must be a string or a list of strings, got a list containing 42'],
+            self::violationsOf(['payment_methods' => ['creditcard', 42, true]]),
+            'The first offending entry is named',
+        );
+    }
+
     /**
      * @return iterable<string, array{mixed}>
      */
@@ -255,8 +271,28 @@ final class GatewayOptionsTest extends TestCase
         self::assertSame('en', $options->language, 'Null is unset, so the default applies');
     }
 
+    /**
+     * An object that casts to a string always worked under the gateway's `(string)` cast, so it still does.
+     */
     #[Test]
-    public function shouldRejectAStringOptionThatIsNotAScalar(): void
+    public function shouldReadAStringableStringOptionAsAString(): void
+    {
+        $prefix = new class() implements \Stringable {
+            public function __toString(): string
+            {
+                return 'shop-';
+            }
+        };
+
+        self::assertSame('shop-', self::fromValidConfig(['order_prefix' => $prefix])->orderPrefix);
+    }
+
+    /**
+     * What the cast could not take: an array became the literal `Array` (with a warning), any other object
+     * threw an `Error`.
+     */
+    #[Test]
+    public function shouldRejectAStringOptionThatCannotBeReadAsAString(): void
     {
         $violations = self::violationsOf(['order_prefix' => ['shop-'], 'language' => new stdClass()]);
 
@@ -418,8 +454,25 @@ final class GatewayOptionsTest extends TestCase
         yield 'agreement' => [['agreement' => 7], true];
         yield 'a 1.x name next to the current one it loses to' => [['api_key' => 'A', 'apikey' => 'old'], true];
         yield 'auto_capture, the only deprecated option' => [['api_key' => 'A', 'private_key' => 'P', 'auto_capture' => 1], true];
-        yield 'auto_capture stored as its default' => [['auto_capture' => 0], true];
+        yield 'auto_capture spelled true' => [['auto_capture' => 'yes'], true];
+        yield 'auto_capture that cannot be read as a boolean' => [['auto_capture' => 'abc'], true];
+        yield 'auto_capture off, as its default 0' => [['auto_capture' => 0], false];
+        yield 'auto_capture off, spelled "false"' => [['auto_capture' => 'false'], false];
+        yield 'auto_capture off, as the empty string' => [['auto_capture' => ''], false];
         yield 'null deprecated options are unset' => [['apikey' => null, 'agreement' => null, 'auto_capture' => null], false];
+    }
+
+    /**
+     * `auto_capture` is in Payum's published default options, so a configuration seeded from them carries
+     * it — off. Dropping an option that is off changes nothing, so it must not count, or such a
+     * configuration would be flagged forever.
+     */
+    #[Test]
+    public function shouldNotFlagAConfigSeededFromThePublishedDefaults(): void
+    {
+        $config = (new QuickpayGatewayFactory())->createConfig(['api_key' => 'A', 'private_key' => 'P']);
+
+        self::assertFalse(GatewayOptions::usesDeprecatedOptions($config));
     }
 
     /**
@@ -464,7 +517,7 @@ final class GatewayOptionsTest extends TestCase
      */
     private static function fromValidConfig(array $options): GatewayOptions
     {
-        return GatewayOptions::fromConfig($options + ['api_key' => 'the-api-key', 'private_key' => 'the-private-key']);
+        return GatewayOptions::fromConfig($options + self::CREDENTIALS);
     }
 
     /**
@@ -477,7 +530,7 @@ final class GatewayOptionsTest extends TestCase
     private static function violationsOf(array $options): array
     {
         try {
-            GatewayOptions::fromConfig($options + ['api_key' => 'the-api-key', 'private_key' => 'the-private-key']);
+            GatewayOptions::fromConfig($options + self::CREDENTIALS);
         } catch (InvalidGatewayOptions $e) {
             return $e->getViolations();
         }

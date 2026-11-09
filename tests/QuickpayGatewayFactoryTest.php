@@ -388,6 +388,43 @@ class QuickpayGatewayFactoryTest extends TestCase
         }
     }
 
+    /**
+     * The gateway config used to come back with both spellings, so it still does — the current name is
+     * added, the 1.x one is not taken away.
+     */
+    #[Test]
+    public function shouldKeepTheDeprecatedNamesInTheGatewayConfig(): void
+    {
+        $config = (new QuickpayGatewayFactory())->createConfig(['apikey' => 'A', 'privatekey' => 'P', 'agreement' => 7]);
+
+        self::assertSame('A', $config['apikey']);
+        self::assertSame('A', $config['api_key']);
+        self::assertSame(7, $config['agreement']);
+        self::assertSame(7, $config['agreement_id']);
+    }
+
+    /**
+     * `GatewayOptions` enforces the two credentials; a required option a subclass adds to the published
+     * `payum.required_options` is still enforced the way Payum always has.
+     */
+    #[Test]
+    public function shouldEnforceARequiredOptionASubclassAdds(): void
+    {
+        $factory = new class() extends QuickpayGatewayFactory {
+            protected function populateConfig(ArrayObject $config): void
+            {
+                parent::populateConfig($config);
+
+                $config['payum.required_options'] = [...$config['payum.required_options'], 'merchant_name'];
+            }
+        };
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('merchant_name');
+
+        self::createApi($factory, []);
+    }
+
     #[Test]
     public function shouldPreferTheCurrentNamesWhenBothAreGiven(): void
     {
@@ -441,12 +478,11 @@ class QuickpayGatewayFactoryTest extends TestCase
      * empty user, the key as password. Discovery is pointed at a shared mock client for the test, which
      * is exactly how the factory builds the client in production (from the key, via php-http/discovery),
      * and it pins that the deprecated `apikey` spelling reaches the same place.
+     *
+     * @param array<string, mixed> $credentials
      */
     #[Test]
     #[DataProvider('apiKeyOptionProvider')]
-    /**
-     * @param array<string, mixed> $credentials
-     */
     public function shouldAuthenticateTheClientWithTheConfiguredApiKey(array $credentials): void
     {
         $httpClient = new MockHttpClient();
