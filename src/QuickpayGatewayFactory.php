@@ -56,21 +56,12 @@ class QuickpayGatewayFactory extends GatewayFactory
         ]);
 
         if (!$config->offsetExists('payum.api')) {
-            self::aliasDeprecatedOptions($config);
+            // The current names are filled in from the 1.x ones before the defaults are applied: once
+            // `api_key` exists as `''` there is no telling that the consumer only supplied `apikey`.
+            // replace() only adds, so the 1.x keys stay in the config as they always have.
+            $config->replace(GatewayOptions::withCurrentNames($config->getArrayCopy()));
 
-            $config['payum.default_options'] = [
-                'api_key' => '',
-                'private_key' => '',
-                'payment_methods' => '',
-                'auto_capture' => 0,
-                'order_prefix' => '',
-                'language' => 'en',
-                'synchronized' => false,
-                // optional: maps to CreateLinkRequest::agreementId
-                'agreement_id' => '',
-                // optional: maps to the Quickpay branding id on the payment link
-                'branding_id' => '',
-            ];
+            $config['payum.default_options'] = GatewayOptions::DEFAULTS;
             $config->defaults($config['payum.default_options']);
             $config['payum.required_options'] = [
                 'api_key',
@@ -78,14 +69,15 @@ class QuickpayGatewayFactory extends GatewayFactory
             ];
 
             $config['payum.api'] = static function (ArrayObject $config): Api {
-                $config->validateNotEmpty($config['payum.required_options']);
+                $options = GatewayOptions::fromConfig($config->getArrayCopy());
 
-                $synchronized = self::normalizeBool('synchronized', $config['synchronized']);
+                // GatewayOptions has enforced the credentials; this is for any option a subclass added.
+                $config->validateNotEmpty($config['payum.required_options']);
 
                 // Consumers (and the test suite) may inject a preconfigured SDK client — e.g. one
                 // built around a specific PSR-18 client — via the "quickpay.client" option.
                 // Otherwise we build one from the api key and let php-http/discovery find a client.
-                $client = $config['quickpay.client'] ?? new Client((string) $config['api_key'], synchronized: $synchronized);
+                $client = $config['quickpay.client'] ?? new Client($options->apiKey, synchronized: $options->synchronized);
                 if (!$client instanceof ClientInterface) {
                     throw new LogicException(sprintf(
                         'The "quickpay.client" option must be an instance of %s',
@@ -96,23 +88,23 @@ class QuickpayGatewayFactory extends GatewayFactory
                 // The SDK client carries the synchronized flag as a client-wide default, and it can
                 // only be set on its constructor. An injected client that disagrees with the gateway
                 // option would silently win, so reject the mismatch instead.
-                if ($client->isSynchronized() !== $synchronized) {
+                if ($client->isSynchronized() !== $options->synchronized) {
                     throw new LogicException(sprintf(
                         'The injected "quickpay.client" is %ssynchronized, but the gateway is configured with "synchronized" = %s. Construct the client with the same value.',
                         $client->isSynchronized() ? '' : 'not ',
-                        $synchronized ? 'true' : 'false',
+                        $options->synchronized ? 'true' : 'false',
                     ));
                 }
 
                 return new Api(
                     client: $client,
-                    privateKey: (string) $config['private_key'],
-                    orderPrefix: (string) $config['order_prefix'],
-                    paymentMethods: self::normalizePaymentMethods($config['payment_methods']),
-                    language: (string) $config['language'],
-                    autoCapture: self::normalizeBool('auto_capture', $config['auto_capture']),
-                    agreementId: self::normalizeId('agreement_id', $config['agreement_id']),
-                    brandingId: self::normalizeId('branding_id', $config['branding_id']),
+                    privateKey: $options->privateKey,
+                    orderPrefix: $options->orderPrefix,
+                    paymentMethods: $options->paymentMethods,
+                    language: $options->language,
+                    autoCapture: $options->autoCapture,
+                    agreementId: $options->agreementId,
+                    brandingId: $options->brandingId,
                 );
             };
         }
@@ -141,163 +133,5 @@ class QuickpayGatewayFactory extends GatewayFactory
             GetHttpRequestAction::class === get_class($config['payum.action.get_http_request'])) {
             $config['payum.action.get_http_request'] = new HeaderAwareGetHttpRequestAction();
         }
-    }
-
-    /**
-     * The option names say what they are: the credentials are `api_key` and `private_key` (snake_case,
-     * like `payment_methods`, `auto_capture`, `order_prefix`), and `agreement_id` matches its sibling
-     * `branding_id` — both are optional integer payment-link ids. The 1.x spellings `apikey`,
-     * `privatekey` and `agreement` still work.
-     *
-     * They are aliased rather than dropped because Sylius stores the gateway configuration as JSON keyed
-     * by exactly these names, so a hard rename would break every existing shop until its stored config
-     * was migrated. Unlike the misspelled `syncronized` that 2.0 removed outright — an option nobody had
-     * meaningfully set — these are load-bearing, and `agreement` fails *silently* if missed: it is
-     * optional, so a stale key resolves to `null` and the payment link is simply created without an
-     * agreement id, quietly falling back to the account default. The aliases are deprecated and go in 3.0.
-     *
-     * Must run before the defaults are applied: once `api_key` exists (as `''`), there is no longer any
-     * way to tell that the consumer only supplied the old spelling.
-     *
-     * @param ArrayObject<string, mixed> $config
-     */
-    private static function aliasDeprecatedOptions(ArrayObject $config): void
-    {
-        foreach ([
-            'apikey' => 'api_key',
-            'privatekey' => 'private_key',
-            'agreement' => 'agreement_id',
-        ] as $deprecated => $current) {
-            if ($config->offsetExists($deprecated) && !$config->offsetExists($current)) {
-                $config[$current] = $config[$deprecated];
-            }
-        }
-    }
-
-    /**
-     * The boolean options (`auto_capture`, `synchronized`) accept booleans plus the unambiguous
-     * scalar spellings a stored or YAML-sourced config produces: `1`/`0` (int or string),
-     * `"true"`/`"false"`, and the empty string (a Payum config artifact, read as false). Anything
-     * else throws rather than being coerced: the old casts turned the string `"true"` into FALSE
-     * (`(int) "true"` is 0) and `"false"` into TRUE — an inverted setting with nothing in the
-     * configuration that looks wrong.
-     *
-     * @throws LogicException if the value cannot be unambiguously read as a boolean
-     */
-    private static function normalizeBool(string $option, mixed $value): bool
-    {
-        if (is_bool($value)) {
-            return $value;
-        }
-
-        // Absent-but-set: a stored config may carry null where the form field was empty. Like the
-        // empty string, it reads as "not configured", i.e. the option's default of false.
-        if (null === $value) {
-            return false;
-        }
-
-        if (is_scalar($value)) {
-            $normalized = filter_var($value, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
-
-            if (null !== $normalized) {
-                return $normalized;
-            }
-        }
-
-        throw new LogicException(sprintf(
-            'The "%s" option must be a boolean (or an unambiguous scalar such as 1/0/"true"/"false"), got %s',
-            $option,
-            is_scalar($value) ? var_export($value, true) : get_debug_type($value),
-        ));
-    }
-
-    /**
-     * The id options (`agreement_id`, `branding_id`) are optional positive integers. Empty
-     * configuration — null, `''`, or a blank string — is `null`, which keeps the parameter off the
-     * payment link entirely. Anything that is not a positive integer (or an integer string) throws:
-     * the old `(int)` cast turned a typo like `"abc"` into agreement id 0 and sent that.
-     *
-     * @throws LogicException if the value is neither empty nor a positive integer
-     */
-    private static function normalizeId(string $option, mixed $value): ?int
-    {
-        if (null === $value) {
-            return null;
-        }
-
-        if (is_string($value)) {
-            $value = trim($value);
-
-            if ('' === $value) {
-                return null;
-            }
-
-            if (ctype_digit($value)) {
-                $value = (int) $value;
-            }
-        }
-
-        if (!is_int($value) || $value <= 0) {
-            throw new LogicException(sprintf(
-                'The "%s" option must be a positive integer (or an integer string), got %s',
-                $option,
-                is_scalar($value) ? var_export($value, true) : get_debug_type($value),
-            ));
-        }
-
-        return $value;
-    }
-
-    /**
-     * Quickpay wants `payment_methods` as one comma-separated string (see {@see Api::getPaymentMethods()}),
-     * but a list is the natural way to write it in YAML or a stored gateway-config blob. Casting a list
-     * with `(string)` would raise an "Array to string conversion" warning and send the literal `Array`,
-     * which Quickpay reads as an allowlist naming one unknown method — every payment would then be
-     * rejected, with nothing in the configuration that looks wrong. So accept both shapes, and reject
-     * anything else outright rather than coercing it into a silently broken restriction.
-     *
-     * Empty configuration — the default `''`, an empty list, or a list of blanks — becomes `null`, the
-     * value that leaves the restriction off the request altogether. The empty string is a Payum config
-     * artifact and stops here, exactly as `agreement_id` and `branding_id` do.
-     *
-     * @throws LogicException if the option is neither a string nor a list of strings
-     */
-    private static function normalizePaymentMethods(mixed $paymentMethods): ?string
-    {
-        if (null === $paymentMethods) {
-            return null;
-        }
-
-        if (is_string($paymentMethods)) {
-            $paymentMethods = trim($paymentMethods);
-
-            return '' !== $paymentMethods ? $paymentMethods : null;
-        }
-
-        if (!is_array($paymentMethods)) {
-            throw new LogicException(sprintf(
-                'The "payment_methods" option must be a string or a list of strings, %s given',
-                get_debug_type($paymentMethods),
-            ));
-        }
-
-        $methods = [];
-
-        foreach ($paymentMethods as $paymentMethod) {
-            if (!is_string($paymentMethod)) {
-                throw new LogicException(sprintf(
-                    'The "payment_methods" option must be a string or a list of strings, but the list contains %s',
-                    get_debug_type($paymentMethod),
-                ));
-            }
-
-            $paymentMethod = trim($paymentMethod);
-
-            if ('' !== $paymentMethod) {
-                $methods[] = $paymentMethod;
-            }
-        }
-
-        return [] !== $methods ? implode(',', $methods) : null;
     }
 }
