@@ -300,7 +300,9 @@ reused for a new payment.)
 The lookup is one `GET /payments?order_id=…` per *creating* Convert; a model that already carries a
 `quickpayPaymentId` makes no request, as before. The create request now also carries Quickpay's
 `shopsystem` (`setono/payum-quickpay` + the installed version), so the manager shows what created a
-payment; a Convert action of your own may say something more specific.
+payment. To say something more specific, or to send addresses, a basket and shipping, describe the order
+on your payment model (`DescribedPaymentInterface`, see the README's *Describing the order*) rather than
+writing a Convert action of your own.
 
 ## Order ids are now validated before they are sent
 
