@@ -96,7 +96,7 @@ final class GatewayOptions
         $options = new self(
             apiKey: self::requireString('api_key', $config['api_key'], $violations),
             privateKey: self::requireString('private_key', $config['private_key'], $violations),
-            orderPrefix: self::normalizeString('order_prefix', $config['order_prefix'], $violations),
+            orderPrefix: self::normalizeOrderPrefix('order_prefix', $config['order_prefix'], $violations),
             paymentMethods: self::normalizePaymentMethods('payment_methods', $config['payment_methods'], $violations),
             language: self::normalizeString('language', $config['language'], $violations),
             autoCapture: self::normalizeBool('auto_capture', $config['auto_capture'], $violations),
@@ -188,6 +188,32 @@ final class GatewayOptions
         $violations[$option] = sprintf('The "%s" option must be a string, got %s', $option, self::describe($value));
 
         return '';
+    }
+
+    /**
+     * The order prefix starts every Quickpay order id ({@see OrderId}), so it may only hold what Quickpay
+     * accepts there, leaving room for the payment number. A prefix that can never start an order id is
+     * rejected here, where the option is set, rather than by every checkout's convert. Whether it fits a
+     * particular number is {@see OrderId::of()}'s to say: the gateway doesn't know how long its payment
+     * numbers get.
+     *
+     * @param array<string, string> $violations
+     */
+    private static function normalizeOrderPrefix(string $option, mixed $value, array &$violations): string
+    {
+        $value = self::normalizeString($option, $value, $violations);
+
+        if (!isset($violations[$option]) && 1 !== preg_match(OrderId::PREFIX_PATTERN, $value)) {
+            $violations[$option] = sprintf(
+                'The "%s" option must be at most %d letters, digits, spaces, ".", "_" or "-": it starts the Quickpay '
+                . 'order id, which is 4–20 such characters with the payment number, got %s',
+                $option,
+                OrderId::MAX_PREFIX_LENGTH,
+                self::describe($value),
+            );
+        }
+
+        return $value;
     }
 
     /**

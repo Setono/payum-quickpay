@@ -37,7 +37,7 @@ Integration — used to verify callback signatures). Other options are optional:
 | `private_key`     | —       | **Required.** Private key; used to verify the callback HMAC.         |
 | `auto_capture`    | `0`     | **Deprecated.** Makes an `Authorize` flow capture on authorization; execute `Capture` instead. |
 | `payment_methods` | `''`    | Restrict the payment-window methods (e.g. `creditcard`). See below.  |
-| `order_prefix`    | `''`    | Prepended to the Payum payment number to form the Quickpay order id. |
+| `order_prefix`    | `''`    | Prepended to the Payum payment number to form the Quickpay order id: at most 19 letters, digits, spaces, `.`, `_` or `-`. See [Order ids](#order-ids--orderid). |
 | `language`        | `en`    | Payment-window language.                                             |
 | `synchronized`    | `false` | Run capture/refund/cancel synchronously; a decline then throws (see below). |
 | `agreement_id`    | `''`    | Optional payment-window agreement id.                                |
@@ -138,6 +138,42 @@ The gateway accepts either shape, so a list is fine where that reads better:
 // or
 'payment_methods' => ['creditcard', '!jcb', '!visa-us'],
 ```
+
+### Order ids — `OrderId`
+
+Every Quickpay payment carries an `order_id`: the `order_prefix` followed by the Payum payment number.
+Quickpay accepts **4–20 letters, digits, spaces, `.`, `_` or `-`** (the SDK's
+`CreatePaymentRequest::ORDER_ID_PATTERN`, verified live), and requires it to be unique on the account,
+so give each shop and environment sharing an account its own prefix. `OrderId` holds the mapping both
+ways, and the gateway uses nothing else:
+
+```php
+use Setono\Payum\Quickpay\Exception\InvalidOrderId;
+use Setono\Payum\Quickpay\OrderId;
+
+OrderId::of('shop-', '000000123');            // 'shop-000000123'
+OrderId::numberIn('shop-000000123', 'shop-'); // '000000123'; null under another prefix
+
+try {
+    OrderId::of('shop-2026-', '000000123456');
+} catch (InvalidOrderId $e) {
+    $e->orderId; // 'shop-2026-000000123456', 22 characters: Quickpay refuses it
+    $e->prefix;  // 'shop-2026-'
+    $e->number;  // '000000123456'
+}
+```
+
+- **The gateway option.** `order_prefix` may only hold those characters, and at most 19 of them
+  (`OrderId::MAX_PREFIX_LENGTH`), leaving room for a number. A longer prefix, or one with another
+  character, is a violation of `GatewayOptions`, so the gateway isn't built from it.
+- **The order id.** Whether a prefix fits *your* payment numbers is `OrderId::of()`'s to say: the
+  gateway doesn't know how long they get. `Convert` builds every order id with it, before anything is
+  sent, and lets `InvalidOrderId` (a Payum `LogicException`) through, naming the prefix and the number.
+  To catch a prefix too long for your numbers before the first checkout does, call `OrderId::of()` with
+  one of your real payment numbers where the prefix is set.
+- **Reading a number back.** A callback sent to the account-wide callback url carries no Payum token
+  (see *Callbacks*), so the payment is found by its `order_id`: `OrderId::numberIn()` gives the payment
+  number under each prefix you use.
 
 ## Usage
 
@@ -293,8 +329,8 @@ names the payment's own notify url on every capture, refund and cancel it issues
 verified and routed like the payment window's. Nothing to configure. Only operations issued *outside*
 the gateway — in the Quickpay manager, or your own API calls — still go to the account-wide url; if you
 want to hear about those, set it and give it an endpoint that resolves the payment from the callback
-body's `order_id` (`order_prefix` + the Payum payment number) and executes `Notify` against that model
-(`examples/e2e/listen.php` does exactly this). Alternatively, `synchronized` makes the operations block
+body's `order_id` (`order_prefix` + the Payum payment number, which `OrderId::numberIn()` reads back) and
+executes `Notify` against that model (`examples/e2e/listen.php` does exactly this). Alternatively, `synchronized` makes the operations block
 until settled — a decline then throws (see below) — or poll with `Sync`/`GetStatus`.
 
 **A declined operation is not an HTTP error.** Quickpay answers `2xx` and puts the outcome on the

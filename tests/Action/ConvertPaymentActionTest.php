@@ -15,6 +15,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Action\ConvertPaymentAction;
+use Setono\Payum\Quickpay\Exception\InvalidOrderId;
 use Setono\Payum\Quickpay\Model\DescribedPayment;
 use Setono\Payum\Quickpay\Model\OrderDescription;
 use Setono\Payum\Quickpay\Tests\ApiTestTrait;
@@ -283,7 +284,7 @@ class ConvertPaymentActionTest extends TestCase
         $action->setGateway($this->gateway);
         $action->setApi($this->api);
 
-        $this->expectException(LogicException::class);
+        $this->expectException(InvalidOrderId::class);
         $this->expectExceptionMessage($expected);
 
         try {

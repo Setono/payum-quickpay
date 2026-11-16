@@ -354,6 +354,22 @@ The same guard also rejects a payment with no number at all. That used to degrad
 concatenation produced an order id consisting of nothing but the prefix, which with a prefix of 4+
 characters is *valid*, so every such payment was created under the same order id.
 
+Changed after `2.0.0-rc.3`:
+
+- **`Setono\Payum\Quickpay\OrderId` is new.** It holds the mapping both ways: `of($prefix, $number)`
+  builds the order id, and `numberIn($orderId, $prefix)` reads the number back, e.g. for a callback sent
+  to the account-wide url. The convert builds every order id with `of()`. See the README, *Order ids*.
+- **The exception is now `Setono\Payum\Quickpay\Exception\InvalidOrderId`.** It is still a Payum
+  `LogicException`, so existing catches keep working, and it carries `prefix`, `number` and `orderId`.
+  The message now quotes the prefix and the number as well.
+- **An `order_prefix` that can never start an order id is a gateway option violation.** That is a
+  prefix with a character Quickpay refuses, or longer than 19 characters (`OrderId::MAX_PREFIX_LENGTH`,
+  which leaves room for one character of number). The gateway used to be built from it and fail every
+  `Convert`. Now building the gateway throws `InvalidGatewayOptions`, so its captures, refunds, cancels
+  and callbacks fail too until the prefix is fixed. No payment can ever have been created under such a
+  prefix, since Quickpay refuses it, but one created under an earlier prefix can still need capturing,
+  so fix a stored one before upgrading. `GatewayOptions::fromConfig()` tells you.
+
 ## Removed / changed classes
 
 These were internal implementation details; they are gone in 2.0:

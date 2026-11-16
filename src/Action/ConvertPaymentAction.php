@@ -17,6 +17,7 @@ use Payum\Core\Request\Convert;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
 use Setono\Payum\Quickpay\Model\DescribedPaymentInterface;
 use Setono\Payum\Quickpay\Model\OrderDescription;
+use Setono\Payum\Quickpay\OrderId;
 use Setono\Quickpay\Request\Payment\CreatePaymentRequest;
 use Setono\Quickpay\Request\Payment\Shopsystem;
 use Setono\Quickpay\Response\Payment\Payment;
@@ -48,7 +49,9 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
             // unaffected.
             $number = self::assertNotEmptyString($paymentModel->getNumber(), 'number');
             $currency = self::assertNotEmptyString($paymentModel->getCurrencyCode(), 'currency code', $number);
-            $orderId = self::assertOrderId($this->api->getOrderPrefix() . $number);
+            // Checked before the lookup, so the exception names the two parts the caller controls, the
+            // prefix and the number, rather than a field they never set directly
+            $orderId = OrderId::of($this->api->getOrderPrefix(), $number);
 
             $payment = $this->findReusablePayment($orderId, $currency)
                 ?? $this->createPayment($paymentModel, $orderId, $currency);
@@ -88,7 +91,7 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
      * The two fail differently without this. A missing currency reaches the non-nullable
      * {@see CreatePaymentRequest::$currency} and blows up as a `TypeError` raised inside the DTO,
      * naming neither the payment nor the cause. A missing number is worse: it is concatenated, so it
-     * degrades silently — see {@see self::assertOrderId()}.
+     * degrades silently into the bare prefix, the same order id for every payment — see {@see OrderId::of()}.
      *
      * @throws LogicException if the payment carries no usable value
      */
@@ -234,32 +237,5 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         return InstalledVersions::isInstalled(self::PACKAGE)
             ? (InstalledVersions::getPrettyVersion(self::PACKAGE) ?? 'unknown')
             : 'unknown';
-    }
-
-    /**
-     * The gateway builds `order_id` by concatenating the `order_prefix` option with the Payum payment
-     * number, and Quickpay accepts 4–20 characters of letters, digits, space, `.`, `_` and `-` — the
-     * rule the SDK verified live and enforces in {@see CreatePaymentRequest::ORDER_ID_PATTERN}. It is
-     * checked here, before the lookup and with the SDK's own pattern, so that the exception names the
-     * two things the caller actually controls — the prefix and the number — rather than a field they
-     * never set directly. It also catches an empty number: the concatenation would degrade to the bare
-     * prefix, which, when the prefix alone is 4+ characters, is a *valid* order id, so every such
-     * payment would be created under the SAME order id with nothing complaining at all.
-     *
-     * @throws LogicException if the resulting order id is not one Quickpay accepts
-     */
-    private static function assertOrderId(string $orderId): string
-    {
-        if (1 !== preg_match(CreatePaymentRequest::ORDER_ID_PATTERN, $orderId)) {
-            throw new LogicException(sprintf(
-                'The Quickpay order id "%s" (%d characters) is not one Quickpay accepts: 4–20 characters of '
-                . 'letters, digits, space, ".", "_" and "-". It is built from the "order_prefix" gateway '
-                . 'option and the Payum payment number — adjust the prefix so the two together fit.',
-                $orderId,
-                strlen($orderId),
-            ));
-        }
-
-        return $orderId;
     }
 }
