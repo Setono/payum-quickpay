@@ -12,8 +12,11 @@ use Setono\Quickpay\Request\Payment\Shopsystem;
 /**
  * What Quickpay is told about the order when the gateway creates its payment: the addresses, the
  * basket, shipping and the shopsystem, as the SDK's own request objects. Quickpay shows them on the
- * payment in its manager. The description is informational: it never changes the amount, the currency
- * or the order id, which come from the Payum payment and the gateway options.
+ * payment in its manager. The description never changes the amount, the currency or the order id,
+ * which come from the Payum payment and the gateway options, but some payment methods check it:
+ * Klarna requires a basket, and the basket plus the shipping amount to equal the payment's amount;
+ * Resurs requires a basket. So give each basket item's price per unit including VAT, as Quickpay's
+ * `item_price` is, and the shipping amount including VAT, so that they add up to the total amount.
  *
  * Not to be confused with Payum's {@see \Payum\Core\Model\PaymentInterface::getDescription()}, a
  * one-line string this gateway does not send.

@@ -260,9 +260,20 @@ under the same order id (see *Retrying a checkout* above), and a payment whose d
 whatever the payment describes now. A Payum payment that does not implement the interface creates
 exactly as before: order id, currency and the gateway's own shopsystem, nothing else.
 
-The description is informational. It never changes what is charged: the amount, the currency and the
-order id still come from the Payum payment and `order_prefix`. Nor is it Payum's `getDescription()`, a
-one-line string the gateway does not send.
+The description never changes what is charged: the amount, the currency and the order id still come
+from the Payum payment and `order_prefix`. But Quickpay's manager isn't the only reader: some payment
+methods check it. Klarna requires a basket, and requires the basket plus `shipping[amount]` to equal the
+payment's amount ([acquirer details](https://learn.quickpay.net/tech-talk/appendixes/acquirer-details/));
+Resurs requires a basket. So make them add up to the total amount:
+
+- `BasketItem::$itemPrice` is the price **per unit, including VAT**, in minor units, as Quickpay's
+  `item_price` is, and `$vatRate` a fraction (`0.25` for 25 %);
+- `Shipping::$amount` includes VAT too;
+- the items' quantities times their prices, plus the shipping amount, equal the payment's total amount.
+  An adjustment such as a discount or a fee can be an item of its own; Quickpay accepts a negative
+  `item_price`.
+
+Nor is the description Payum's `getDescription()`, a one-line string the gateway does not send.
 
 ### Callbacks
 
