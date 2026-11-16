@@ -301,6 +301,53 @@ final class GatewayOptionsTest extends TestCase
     }
 
     /**
+     * The order prefix starts every Quickpay order id, so one that can never start one is rejected where the
+     * option is set, not by every checkout's convert.
+     *
+     * @return iterable<string, array{mixed, string}>
+     */
+    public static function orderPrefixesThatCanNeverStartAnOrderId(): iterable
+    {
+        yield 'a character Quickpay refuses' => ['qp#', "'qp#'"];
+        yield 'a character outside ASCII' => ['øl_', "'øl_'"];
+        yield 'a slash' => ['shop/', "'shop/'"];
+        yield 'one longer than 19' => [str_repeat('p', 20), "'" . str_repeat('p', 20) . "'"];
+    }
+
+    #[Test]
+    #[DataProvider('orderPrefixesThatCanNeverStartAnOrderId')]
+    public function shouldRejectAnOrderPrefixThatCanNeverStartAnOrderId(mixed $orderPrefix, string $described): void
+    {
+        self::assertSame(
+            ['order_prefix' => sprintf(
+                'The "order_prefix" option must be at most 19 letters, digits, spaces, ".", "_" or "-": it starts the '
+                . 'Quickpay order id, which is 4–20 such characters with the payment number, got %s',
+                $described,
+            )],
+            self::violationsOf(['order_prefix' => $orderPrefix]),
+        );
+    }
+
+    /**
+     * @return iterable<string, array{mixed, string}>
+     */
+    public static function orderPrefixesThatCanStartAnOrderId(): iterable
+    {
+        yield 'none' => ['', ''];
+        yield 'unset' => [null, ''];
+        yield 'every character Quickpay accepts' => ['Az 09._-', 'Az 09._-'];
+        yield 'the longest' => [str_repeat('p', 19), str_repeat('p', 19)];
+        yield 'a number stored as an int' => [2026, '2026'];
+    }
+
+    #[Test]
+    #[DataProvider('orderPrefixesThatCanStartAnOrderId')]
+    public function shouldAcceptAnOrderPrefixThatCanStartAnOrderId(mixed $orderPrefix, string $expected): void
+    {
+        self::assertSame($expected, self::fromValidConfig(['order_prefix' => $orderPrefix])->orderPrefix);
+    }
+
+    /**
      * Fix them all in one go rather than one per attempt — and still catchable as before.
      */
     #[Test]
