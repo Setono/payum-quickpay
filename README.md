@@ -148,6 +148,8 @@ Payum's requests the way Payum's own controllers — and Sylius — expect:
 
 1. **`Convert`** turns your Payum payment into the details array and creates the payment at Quickpay —
    or picks up the one that already exists under the same order id, if nobody has paid it (see below).
+   A payment that describes its order sends that description with the create (see *Describing the
+   order*).
 2. **`Capture`** or **`Authorize`** against the fresh payment creates the payment link and
    **redirects the customer to the Quickpay payment window** (Payum's `HttpRedirect` reply). Which
    one you execute is how you say what the window should do once the card is authorized:
@@ -206,6 +208,61 @@ captured, refunded, cancelled — is never adopted silently: `Convert` throws a 
 because it is either this order's earlier payment that really was paid (carry its `quickpayPaymentId`
 over) or another shop or environment sharing the account under a prefix that should not be shared
 (give each its own `order_prefix`). Either way that is your call, not a claim of money.
+
+### Describing the order — `DescribedPaymentInterface`
+
+Quickpay shows on each payment in its manager what the payment is for: the invoice and shipping
+addresses, the basket, shipping, and the **shopsystem** (the integration that created it). The gateway
+sends these when `Convert` creates the payment, if your payment model describes the order — no Convert
+action of your own needed:
+
+- implement `Setono\Payum\Quickpay\Model\DescribedPaymentInterface` on your own payment model: Payum's
+  `PaymentInterface` plus `getOrderDescription(): OrderDescription`; or
+- use the ready `Setono\Payum\Quickpay\Model\DescribedPayment`: Payum's `Payment` with
+  `setOrderDescription()`. Its description is empty until you set one.
+
+`Setono\Payum\Quickpay\Model\OrderDescription` is an immutable value holding the SDK's own request
+objects (`Setono\Quickpay\Request\Payment\*`), every part optional. A part left out is not sent.
+
+| Argument | Type | Sent as |
+|----------|------|---------|
+| `invoiceAddress` | `?Address` | `invoice_address` |
+| `shippingAddress` | `?Address` | `shipping_address` |
+| `basket` | `list<BasketItem>`, empty by default | `basket` |
+| `shipping` | `?Shipping` | `shipping` |
+| `shopsystem` | `?Shopsystem` | `shopsystem`; `null` leaves the gateway naming itself (`setono/payum-quickpay` and its installed version) |
+
+```php
+<?php
+
+use Setono\Payum\Quickpay\Model\DescribedPayment;
+use Setono\Payum\Quickpay\Model\OrderDescription;
+use Setono\Quickpay\Request\Payment\Address;
+use Setono\Quickpay\Request\Payment\BasketItem;
+use Setono\Quickpay\Request\Payment\Shipping;
+use Setono\Quickpay\Request\Payment\Shopsystem;
+
+$payment = new DescribedPayment();
+$payment->setNumber('000123');
+$payment->setCurrencyCode('DKK');
+$payment->setTotalAmount(14900); // what is charged: minor units, as always
+$payment->setOrderDescription(new OrderDescription(
+    invoiceAddress: new Address(name: 'Ada Lovelace', street: 'Algade 1', city: 'Aalborg', zipCode: '9000', countryCode: 'DNK', email: 'ada@example.com'),
+    basket: [new BasketItem(qty: 1, itemNo: 'MUG', itemName: 'Mug', itemPrice: 9900, vatRate: 0.25)],
+    shipping: new Shipping(amount: 5000, vatRate: 0.25),
+    shopsystem: new Shopsystem(name: 'acme/shop', version: '1.4.0'), // optional
+));
+```
+
+**When it is sent: when `Convert` creates the Quickpay payment, and only then.** A payment picked up
+under the same order id (see *Retrying a checkout* above), and a payment whose details already carry a
+`quickpayPaymentId`, keep the description they were created with: `Convert` sends no update for them,
+whatever the payment describes now. A Payum payment that does not implement the interface creates
+exactly as before: order id, currency and the gateway's own shopsystem, nothing else.
+
+The description is informational. It never changes what is charged: the amount, the currency and the
+order id still come from the Payum payment and `order_prefix`. Nor is it Payum's `getDescription()`, a
+one-line string the gateway does not send.
 
 ### Callbacks
 

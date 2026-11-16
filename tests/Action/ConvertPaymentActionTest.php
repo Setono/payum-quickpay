@@ -15,8 +15,14 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Setono\Payum\Quickpay\Action\ConvertPaymentAction;
+use Setono\Payum\Quickpay\Model\DescribedPayment;
+use Setono\Payum\Quickpay\Model\OrderDescription;
 use Setono\Payum\Quickpay\Tests\ApiTestTrait;
 use Setono\Quickpay\Enum\PaymentState;
+use Setono\Quickpay\Request\Payment\Address;
+use Setono\Quickpay\Request\Payment\BasketItem;
+use Setono\Quickpay\Request\Payment\Shipping;
+use Setono\Quickpay\Request\Payment\Shopsystem;
 use stdClass;
 
 /**
@@ -90,21 +96,126 @@ class ConvertPaymentActionTest extends TestCase
         }
 
         // Find-or-create: an exact order_id lookup first, then the create — which carries only
-        // order_id + currency (+ the shopsystem).
+        // order_id + currency (+ the shopsystem): a plain Payum payment describes no order, so no
+        // addresses, basket or shipping.
         $requests = $this->getRequests();
         self::assertCount(2, $requests);
         $this->assertRequest($requests[0], 'GET', '#/payments$#');
         self::assertSame('order_id=ut000000000001&page=1&page_size=1', urldecode($requests[0]->getUri()->getQuery()));
         $this->assertRequest($requests[1], 'POST', '#/payments$#');
         $body = $this->decodeBody($requests[1]);
+        self::assertSame(['order_id', 'currency', 'shopsystem'], array_keys($body));
         self::assertSame('ut000000000001', $body['order_id']);
         self::assertSame('DKK', $body['currency']);
-        self::assertArrayNotHasKey('card', $body);
-        self::assertArrayNotHasKey('payment', $body);
         // The integration identifies itself: Quickpay records `shopsystem` on the payment.
         self::assertSame('setono/payum-quickpay', $body['shopsystem']['name']);
         self::assertIsString($body['shopsystem']['version']);
         self::assertNotSame('', $body['shopsystem']['version']);
+    }
+
+    // -- The order description --------------------------------------------------------------
+
+    /**
+     * An integration describes the order through its payment model, and the convert sends that
+     * description with the create: Quickpay shows it on the payment in the manager.
+     */
+    #[Test]
+    public function shouldSendADescribedPaymentsOrderDescriptionWithTheCreate(): void
+    {
+        $convert = new Convert($this->createDescribedPayment(self::orderDescription()), 'array');
+
+        $this->queueResponse('[]');
+        $this->queuePayment(['id' => 1001, 'order_id' => 'ut000000000001']);
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+        $action->execute($convert);
+
+        $requests = $this->getRequests();
+        self::assertCount(2, $requests);
+        $this->assertRequest($requests[1], 'POST', '#/payments$#');
+        $body = $this->decodeBody($requests[1]);
+
+        self::assertSame('ut000000000001', $body['order_id']);
+        self::assertSame('DKK', $body['currency']);
+        self::assertSame([
+            'name' => 'Ada Lovelace',
+            'company_name' => 'Analytical Engines',
+            'street' => 'Algade 1',
+            'city' => 'Aalborg',
+            'zip_code' => '9000',
+            'country_code' => 'DNK',
+            'email' => 'ada@example.com',
+        ], $body['invoice_address']);
+        self::assertSame([
+            'name' => 'Charles Babbage',
+            'street' => 'Bispensgade 2',
+            'city' => 'Aalborg',
+            'zip_code' => '9000',
+            'country_code' => 'DNK',
+        ], $body['shipping_address']);
+        self::assertSame([
+            ['qty' => 2, 'item_no' => 'MUG', 'item_name' => 'Mug Blue', 'item_price' => 30, 'vat_rate' => 0.25],
+            ['qty' => 1, 'item_no' => 'CARD', 'item_name' => 'Postcard', 'item_price' => 20, 'vat_rate' => 0.25],
+        ], $body['basket']);
+        self::assertSame(['amount' => 20, 'vat_rate' => 0.25], $body['shipping']);
+        // A description without a shopsystem leaves the gateway naming itself.
+        self::assertSame('setono/payum-quickpay', $body['shopsystem']['name']);
+    }
+
+    /**
+     * An integration that describes the order can name itself instead: Quickpay support then sees the
+     * integration that created the payment, not just the gateway underneath it.
+     */
+    #[Test]
+    public function shouldSendTheDescriptionsShopsystemInsteadOfTheGatewaysOwn(): void
+    {
+        $convert = new Convert($this->createDescribedPayment(new OrderDescription(
+            shopsystem: new Shopsystem(name: 'acme/shop-plugin', version: '3.1.4'),
+        )), 'array');
+
+        $this->queueResponse('[]');
+        $this->queuePayment(['id' => 1001, 'order_id' => 'ut000000000001']);
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+        $action->execute($convert);
+
+        $requests = $this->getRequests();
+        self::assertCount(2, $requests);
+        $this->assertRequest($requests[1], 'POST', '#/payments$#');
+        self::assertSame(['name' => 'acme/shop-plugin', 'version' => '3.1.4'], $this->decodeBody($requests[1])['shopsystem']);
+    }
+
+    /**
+     * The ready described payment describes nothing until a description is set, and then creates
+     * exactly as a plain Payum payment does.
+     */
+    #[Test]
+    public function shouldCreateADescribedPaymentWithoutADescriptionAsAPlainOne(): void
+    {
+        $payment = new DescribedPayment();
+        $payment->setNumber('000000000001');
+        $payment->setTotalAmount(100);
+        $payment->setCurrencyCode('DKK');
+
+        $convert = new Convert($payment, 'array');
+
+        $this->queueResponse('[]');
+        $this->queuePayment(['id' => 1001, 'order_id' => 'ut000000000001']);
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+        $action->execute($convert);
+
+        $requests = $this->getRequests();
+        self::assertCount(2, $requests);
+        $body = $this->decodeBody($requests[1]);
+        self::assertSame(['order_id', 'currency', 'shopsystem'], array_keys($body));
+        self::assertSame('setono/payum-quickpay', $body['shopsystem']['name']);
     }
 
     #[Test]
@@ -415,5 +526,84 @@ class ConvertPaymentActionTest extends TestCase
 
         self::assertSame(555, $result['quickpayPaymentId']);
         self::assertCount(0, $this->getRequests(), 'No create request should be issued');
+    }
+
+    /**
+     * A Quickpay payment is described once, when it is created. One picked up under the same order id
+     * keeps the description it was created with: the convert sends neither a create nor an update for
+     * it, whatever the payment now describes.
+     */
+    #[Test]
+    public function shouldIgnoreTheDescriptionWhenItPicksUpAnExistingPayment(): void
+    {
+        $convert = new Convert($this->createDescribedPayment(self::orderDescription()), 'array');
+
+        $this->queueResponse('[' . $this->paymentJson(['id' => 4242, 'order_id' => 'ut000000000001', 'state' => PaymentState::Initial->value]) . ']');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+        $action->execute($convert);
+
+        /** @var array<string, mixed> $result */
+        $result = $convert->getResult();
+        self::assertSame(4242, $result['quickpayPaymentId']);
+
+        $requests = $this->getRequests();
+        self::assertCount(1, $requests, 'Only the lookup — no create, no update');
+        $this->assertRequest($requests[0], 'GET', '#/payments$#');
+    }
+
+    /**
+     * A payment that already carries its Quickpay payment id was described when it was created; the
+     * convert does not send the description again.
+     */
+    #[Test]
+    public function shouldIgnoreTheDescriptionWhenTheQuickpayPaymentAlreadyExists(): void
+    {
+        $payment = $this->createDescribedPayment(self::orderDescription());
+        $payment->setDetails(['quickpayPaymentId' => 555, 'currency' => 'DKK']);
+
+        $convert = new Convert($payment, 'array');
+
+        $action = new ConvertPaymentAction();
+        $action->setGateway($this->gateway);
+        $action->setApi($this->api);
+        $action->execute($convert);
+
+        /** @var array<string, mixed> $result */
+        $result = $convert->getResult();
+        self::assertSame(555, $result['quickpayPaymentId']);
+        self::assertCount(0, $this->getRequests(), 'No create, no update');
+    }
+
+    /**
+     * An order with every part described except the shopsystem.
+     */
+    private static function orderDescription(): OrderDescription
+    {
+        return new OrderDescription(
+            invoiceAddress: new Address(name: 'Ada Lovelace', companyName: 'Analytical Engines', street: 'Algade 1', city: 'Aalborg', zipCode: '9000', countryCode: 'DNK', email: 'ada@example.com'),
+            shippingAddress: new Address(name: 'Charles Babbage', street: 'Bispensgade 2', city: 'Aalborg', zipCode: '9000', countryCode: 'DNK'),
+            basket: [
+                new BasketItem(qty: 2, itemNo: 'MUG', itemName: 'Mug Blue', itemPrice: 30, vatRate: 0.25),
+                new BasketItem(qty: 1, itemNo: 'CARD', itemName: 'Postcard', itemPrice: 20, vatRate: 0.25),
+            ],
+            shipping: new Shipping(amount: 20, vatRate: 0.25),
+        );
+    }
+
+    /**
+     * The trait's payment (number 000000000001, 100 DKK), described.
+     */
+    private function createDescribedPayment(OrderDescription $description): DescribedPayment
+    {
+        $payment = new DescribedPayment();
+        $payment->setNumber('000000000001');
+        $payment->setTotalAmount(100);
+        $payment->setCurrencyCode('DKK');
+        $payment->setOrderDescription($description);
+
+        return $payment;
     }
 }

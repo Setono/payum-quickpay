@@ -67,7 +67,8 @@ gateway's review (quickpay-php-sdk#22, #25) — `Operation::isApproved()` (not p
 highest operation id — the test fixtures number operations for that reason); `Link::$autoCapture`;
 `callbackUrl:` on `capture()/refund()/cancel()` (the `QuickPay-Callback-Url` header); `Shopsystem` on
 the create request (`ConvertPaymentAction` identifies the integration as `setono/payum-quickpay` +
-installed version via Composer's runtime API); `PaymentsEndpoint::findByOrderId()` for the
+installed version via Composer's runtime API, unless an order description names its own);
+`PaymentsEndpoint::findByOrderId()` for the
 find-or-create in `Convert`; and `CreatePaymentRequest::ORDER_ID_PATTERN` (4–20 of `[A-Za-z0-9 ._-]`,
 which `Convert` checks first with a message naming the prefix and number). The package's own
 `Operations` helper is gone — everything reads off the DTOs. `cache:` on the SDK `Client` is reachable
@@ -157,7 +158,8 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   approved on it (`findReusablePayment()`: initial/declined/authorize-in-flight; the currency must
   match). One with an approved operation is a `LogicException` naming it — never adopt money silently:
   it is either this order's earlier paid payment or another environment's under a shared prefix. Otherwise
-  it creates the payment (via `CreatePaymentRequest`, with `Shopsystem` = this package + version) and stores **only scalars** —
+  it creates the payment (via `CreatePaymentRequest`, with `Shopsystem` = this package + version, plus a
+  described source's order description: see *The order description* below) and stores **only scalars** —
   `quickpayPaymentId`, `amount`, `currency`, `order_id` — plus `continue_url` (the token's **target**
   url, so the customer's return re-executes the `Capture`/`Authorize` that sent them out — Payum's
   return-trip convention) and `cancel_url` (the token's after url). It never persists DTO/model objects. On the create path only it asserts its inputs:
@@ -279,9 +281,30 @@ actions need (`getOrderPrefix()`, `getPaymentMethods()`, `getLanguage()`, `isAut
 `isSynchronized()` is not a state of its own — it reads through to the wrapped client, so there is one
 source of truth for the flag.
 
+### The order description (`src/Model/`)
+
+The seam that lets an integration tell Quickpay what the order consists of without copying the convert.
+`Model\OrderDescription` is a final value with `public readonly` parts, all
+the SDK's own request objects and all optional: `?Address $invoiceAddress`, `?Address
+$shippingAddress`, `list<BasketItem> $basket` (default `[]`), `?Shipping $shipping`, `?Shopsystem
+$shopsystem` (null = the gateway names itself). `Model\DescribedPaymentInterface` extends Payum's
+`PaymentInterface` with `getOrderDescription(): OrderDescription`; `Model\DescribedPayment` extends
+Payum's `Payment` with an empty description until `setOrderDescription()`.
+
+`ConvertPaymentAction::supports()` is unchanged (any Payum `PaymentInterface`). Only its create half,
+`createPayment()`, reads the description: a described source's addresses, basket and shipping go into
+the `CreatePaymentRequest`, and its shopsystem replaces the gateway's own when set. A payment picked up
+by `findReusablePayment()`, or one whose details already carry a `quickpayPaymentId`, keeps the
+description it was created with: no update request is sent (Quickpay's PATCH cannot update the basket
+anyway). A plain Payum payment creates exactly as before (order id, currency, the gateway's shopsystem).
+The description is informational: amount, currency and order id still come from the Payum payment and
+`order_prefix`. "Order description" is not Payum's `getDescription()` string, which the gateway does not
+send. Tests: `ConvertPaymentActionTest`, through `ApiTestTrait`, asserting the create body.
+
 ### Reading a payment (no helper class of our own)
 
-The custom `src/Model/*` classes are gone — responses are the SDK's readonly DTOs (`Response\Payment\
+The 1.x `src/Model/*` response classes are gone (`src/Model/` now holds only the order description,
+above) — responses are the SDK's readonly DTOs (`Response\Payment\
 {Payment,Operation,Link}`) plus the `PaymentState`/`OperationType` enums — and so is the package's
 interim `Operations` helper: since SDK 1.2 the DTOs answer the questions the actions ask.
 `StatusAction` decides from `Payment::latestApprovedOperation()` (so a trailing rejected/pending
