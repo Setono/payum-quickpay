@@ -15,6 +15,8 @@ use Payum\Core\GatewayAwareTrait;
 use Payum\Core\Model\PaymentInterface;
 use Payum\Core\Request\Convert;
 use Setono\Payum\Quickpay\Action\Api\ApiAwareTrait;
+use Setono\Payum\Quickpay\Model\DescribedPaymentInterface;
+use Setono\Payum\Quickpay\Model\OrderDescription;
 use Setono\Quickpay\Request\Payment\CreatePaymentRequest;
 use Setono\Quickpay\Request\Payment\Shopsystem;
 use Setono\Quickpay\Response\Payment\Payment;
@@ -49,15 +51,7 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
             $orderId = self::assertOrderId($this->api->getOrderPrefix() . $number);
 
             $payment = $this->findReusablePayment($orderId, $currency)
-                ?? $this->api->payments()->create(new CreatePaymentRequest(
-                    orderId: $orderId,
-                    currency: $currency,
-                    // Quickpay's "shopsystem" is what the payment was created with — it shows in the
-                    // manager and tells Quickpay support which integration they are looking at. A
-                    // shop's own Convert action (the Sylius plugin has one) can say something more
-                    // specific.
-                    shopsystem: new Shopsystem(name: self::PACKAGE, version: self::version()),
-                ));
+                ?? $this->createPayment($paymentModel, $orderId, $currency);
 
             $details['quickpayPaymentId'] = $payment->id;
             $details['order_id'] = $payment->orderId;
@@ -202,6 +196,32 @@ class ConvertPaymentAction implements ActionInterface, ApiAwareInterface, Gatewa
         }
 
         return $existing;
+    }
+
+    /**
+     * Find-or-create, the create half. A {@see DescribedPaymentInterface} source's order description
+     * goes with the create — and only here: a payment that already exists, or one picked up by
+     * {@see self::findReusablePayment()}, keeps the description it was created with, and no update is
+     * sent for it.
+     */
+    private function createPayment(PaymentInterface $paymentModel, string $orderId, string $currency): Payment
+    {
+        $description = $paymentModel instanceof DescribedPaymentInterface
+            ? $paymentModel->getOrderDescription()
+            : new OrderDescription();
+
+        return $this->api->payments()->create(new CreatePaymentRequest(
+            orderId: $orderId,
+            currency: $currency,
+            invoiceAddress: $description->invoiceAddress,
+            shippingAddress: $description->shippingAddress,
+            basket: $description->basket,
+            shipping: $description->shipping,
+            // Quickpay's "shopsystem" is what the payment was created with — it shows in the manager and
+            // tells Quickpay support which integration they are looking at. An integration describing
+            // the order can name itself; otherwise the gateway does.
+            shopsystem: $description->shopsystem ?? new Shopsystem(name: self::PACKAGE, version: self::version()),
+        ));
     }
 
     /**
