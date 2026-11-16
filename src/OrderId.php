@@ -31,10 +31,6 @@ final class OrderId
      */
     public const PREFIX_PATTERN = '/^[A-Za-z0-9 ._-]{0,19}$/';
 
-    private function __construct()
-    {
-    }
-
     /**
      * The order id of the payment numbered `$number` under the order prefix `$prefix`
      *
