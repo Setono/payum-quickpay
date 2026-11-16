@@ -6,6 +6,10 @@ handling, and modernizes the test suite. This is a major release with breaking c
 
 ## Requirements
 
+- **PHP 8.1 or newer** (the last 1.x release, 1.5.0, still ran on PHP 7.4), and Composer 2
+  (`composer-runtime-api ^2.0`: the gateway reads its own installed version through Composer's runtime
+  API). The `ctype` and `filter` extensions are now declared requirements. They are enabled by default,
+  but some minimal PHP builds leave them out.
 - `payum/core` **1.7.5 or newer** (`^1.7.5`, was `^1.6`). That is the release that marks
   `GetHttpRequest` `#[\AllowDynamicProperties]`; the `headers` property the callback verification reads
   is a dynamic one, and on older payum/core every callback would raise a "creation of dynamic property"
@@ -17,6 +21,24 @@ handling, and modernizes the test suite. This is a major release with breaking c
   **no `minimum-stability` change is needed**. If
   you tracked the 2.0 alphas and added `"minimum-stability": "beta"` for the SDK's pre-releases, you can
   drop it again (assuming nothing else in your project needs it).
+
+## The namespace is now `Setono\Payum\Quickpay`
+
+The brand is spelled *Quickpay* throughout 2.0, to match the SDK's `Setono\Quickpay` namespace:
+
+| 1.x | 2.0 |
+|-----|-----|
+| `Setono\Payum\QuickPay\…` | `Setono\Payum\Quickpay\…` |
+| `Setono\Payum\QuickPay\QuickPayGatewayFactory` | `Setono\Payum\Quickpay\QuickpayGatewayFactory` |
+
+PHP itself ignores the case of class names, but Composer's autoloader does not: it matches the namespace
+prefix exactly, so the 1.x spelling no longer loads at all. Update every reference, including the
+gateway factory class in your service configuration (PayumBundle's `GatewayFactoryBuilder` argument; see
+the README's Sylius section).
+
+The **factory name** is unchanged (`quickpay`, now also available as `QuickpayGatewayFactory::NAME`),
+so stored gateway configurations and anything that looks gateways up by factory name keep working. Only
+the factory *title* changed, from `QuickPay` to `Quickpay`.
 
 ## Gateway options
 
@@ -113,11 +135,19 @@ new internal `CreatePaymentLinkAction` (`payum.action.api.create_payment_link`),
 
 The details array stored on a payment (the `ArrayObject` model) now contains **only scalars**:
 
-- `1.x` stored a hydrated `quickpayPayment` **object** alongside `quickpayPaymentId`.
+- `1.x` stored a hydrated `quickpayPayment` **object** alongside `quickpayPaymentId`, and the Payum
+  payment model itself under `payment`.
 - `2.0` stores only `quickpayPaymentId` (int) — the source of truth — plus `amount`, `currency`,
   `order_id`, `continue_url`, `cancel_url`, `callback_url`. The payment is re-fetched from Quickpay when
   needed.
-- Any action that fetches the payment — since `2.0.0-beta.1` that is every one that touches it:
+- **The details are no longer sent to Quickpay as request parameters.** 1.x passed the whole details
+  array with every call (creating the payment, the link, capture, refund, cancel), so any extra key you
+  put there, such as `basket`, `invoice_address`, `shipping_address`, `shipping`, `variables` or
+  `text_on_statement`, reached Quickpay. 2.0 sends only the fields the gateway builds itself. Send
+  addresses, the basket and shipping by describing the order on your payment model
+  (`DescribedPaymentInterface`, see the README's *Describing the order*). Other parameters are not sent
+  any more; open an issue if you need one.
+- Any action that fetches the payment — since `2.0.0-rc.1` that is every one that touches it:
   `Capture`, `Authorize`, `Refund`, `Cancel`, `GetStatus`, `Notify` and the new `Sync` — also writes
   **`balance`** (what is still captured, i.e. captured minus refunded) back into the details. It costs
   no extra API call and it is the one figure Payum's status marks cannot express. `Sync` and `Notify`
@@ -152,7 +182,7 @@ Integration) — which is empty by default. In 1.x, and in 2.0 up to `beta.1`, t
 only ever received the authorize callback, and a shop waiting to be told that its capture settled
 waited forever unless it also set the account-wide url and built an endpoint for it.
 
-Since `2.0.0-beta.1` (SDK ≥ 1.2) the gateway names the payment's own notify url on every capture,
+Since `2.0.0-rc.1` (SDK ≥ 1.2) the gateway names the payment's own notify url on every capture,
 refund and cancel it issues (the `QuickPay-Callback-Url` request header, which overrides the account
 default for that operation), so **their callbacks arrive on the same per-payment endpoint** as the
 payment window's, routed by Payum's token, verified by `NotifyAction`. Verified live: the operation's
@@ -223,7 +253,7 @@ An unqualified `Refund` now fetches the payment and refunds its `balance`, which
 refundable amount. Nothing left to refund throws a `LogicException` naming the payment and the balance,
 rather than surfacing Quickpay's generic validation error.
 
-An explicit `refund_amount` is used as given. (Since `2.0.0-beta.1` it no longer skips the fetch — see
+An explicit `refund_amount` is used as given. (Since `2.0.0-rc.1` it no longer skips the fetch — see
 the next section — but it is never second-guessed against the balance.)
 
 ## One money operation at a time
@@ -298,11 +328,16 @@ reused for a new payment.)
 | a payment in another currency | throws a `LogicException` — the payment is what Quickpay charges in |
 
 The lookup is one `GET /payments?order_id=…` per *creating* Convert; a model that already carries a
-`quickpayPaymentId` makes no request, as before. The create request now also carries Quickpay's
-`shopsystem` (`setono/payum-quickpay` + the installed version), so the manager shows what created a
-payment. To say something more specific, or to send addresses, a basket and shipping, describe the order
-on your payment model (`DescribedPaymentInterface`, see the README's *Describing the order*) rather than
-writing a Convert action of your own.
+`quickpayPaymentId` makes no request, as before. Re-converting such a model checks its currency,
+though (since `2.0.0-beta.1`): if the Payum payment's currency no longer matches the stored `currency`,
+`Convert` throws a `LogicException` instead of overwriting it, because a Quickpay payment cannot change
+currency. Cancel it and convert a new payment.
+
+The create request now also carries Quickpay's `shopsystem` (`setono/payum-quickpay` + the installed
+version), so the manager shows what created a payment. To say something more specific, or to send
+addresses, a basket and shipping, describe the order on your payment model (`DescribedPaymentInterface`,
+new after `2.0.0-rc.2`; see the README's *Describing the order*) rather than writing a Convert action of
+your own.
 
 ## Order ids are now validated before they are sent
 
@@ -323,15 +358,20 @@ characters is *valid*, so every such payment was created under the same order id
 
 These were internal implementation details; they are gone in 2.0:
 
-- `Setono\Payum\Quickpay\Model\*` (`QuickpayPayment`, `QuickpayPaymentOperation`, `QuickpayPaymentLink`,
-  `QuickpayModel`, `QuickpayCard`) — replaced by the SDK's `Setono\Quickpay\Response\Payment\*` DTOs and
-  the `Setono\Quickpay\Enum\{PaymentState,OperationType}` enums. The questions that used to live on those
-  models are the DTOs' own helpers since SDK 1.2 (`Payment::latestApprovedOperation()`,
-  `hasApprovedOperation()`, `hasPendingOperation()`, `Operation::isApproved()`/`isDeclined()`, …).
+- The 1.x response models `Setono\Payum\QuickPay\Model\{QuickPayPayment, QuickPayPaymentOperation,
+  QuickPayPaymentLink, QuickPayModel, QuickpayCard}` — replaced by the SDK's
+  `Setono\Quickpay\Response\Payment\*` DTOs and the `Setono\Quickpay\Enum\{PaymentState,OperationType}`
+  enums. The questions that used to live on those models are the DTOs' own helpers since SDK 1.2
+  (`Payment::latestApprovedOperation()`, `hasApprovedOperation()`, `hasPendingOperation()`,
+  `Operation::isApproved()`/`isDeclined()`, …). The `Model` namespace now holds only the new order
+  description (`OrderDescription`, `DescribedPaymentInterface`, `DescribedPayment`).
 - `Setono\Payum\Quickpay\Api` is no longer an HTTP client. It is now an immutable value object wrapping
   the SDK `Setono\Quickpay\Client\ClientInterface` and the gateway options (`payments()`, `getClient()`,
-  `isAutoCapture()`, `createCallbackValidator()`, …). Its old `getPayment()` / `capturePayment()` /
-  `checksum()` / `assertValidResponse()` methods were removed.
+  `isAutoCapture()`, `createCallbackValidator()`, …), constructed with named arguments rather than an
+  options array. Its 1.x methods were removed: the HTTP ones (`getPayment()`, `getPayments()`,
+  `createPaymentLink()`, `authorizePayment()`, `capturePayment()`, `refundPayment()`,
+  `cancelPayment()`), `validateChecksum()`, `getOption()` and the static `checksum()` /
+  `assertValidResponse()`.
 
 ## Injecting a custom SDK client
 

@@ -284,7 +284,7 @@ the gateway — in the Quickpay manager, or your own API calls — still go to t
 want to hear about those, set it and give it an endpoint that resolves the payment from the callback
 body's `order_id` (`order_prefix` + the Payum payment number) and executes `Notify` against that model
 (`examples/e2e/listen.php` does exactly this). Alternatively, `synchronized` makes the operations block
-until settled — a decline then throws (see above) — or poll with `Sync`/`GetStatus`.
+until settled — a decline then throws (see below) — or poll with `Sync`/`GetStatus`.
 
 **A declined operation is not an HTTP error.** Quickpay answers `2xx` and puts the outcome on the
 operation, so the SDK does not throw for it. Asynchronously (the default) the response only says the

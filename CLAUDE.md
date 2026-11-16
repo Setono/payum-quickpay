@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `setono/payum-quickpay` is a [Payum](https://github.com/Payum/Payum) gateway that integrates the
 [Quickpay](https://quickpay.net) payment provider (a Danish PSP). It is a library — there is no
 runnable application — consumed by projects that wire it into Payum (commonly Sylius shops). The
-package targets **PHP >= 8.1** and the Quickpay API **v10**.
+package targets **PHP >= 8.1** and the Quickpay API **v10**. The namespace is `Setono\Payum\Quickpay\`;
+1.x used `Setono\Payum\QuickPay\` (and `QuickPayGatewayFactory`), so 1.x history and tags spell it that way.
 
 ## Commands
 
@@ -41,9 +42,11 @@ binaries live in `vendor/bin`, and the user's shell aliases (`ca`, `cf`, etc.) m
 
 The dev toolchain is inlined directly into `require-dev` (PHPStan + extensions, PHPUnit, Rector,
 Infection, ECS via `sylius-labs/coding-standard`, shipmonk, `php-http/mock-client`) rather than pulled
-via a meta-package. CI (`.github/workflows/build.yaml`) runs the matrix on **PHP 8.1–8.5** — `unit-tests`
-on both `lowest` and `highest` Composer resolutions, everything else on `highest` — plus dedicated
-`code-coverage` (Codecov) and `mutation-tests` (Infection) jobs on PHP 8.3.
+via a meta-package. CI (`.github/workflows/build.yaml`) runs `unit-tests` and `static-code-analysis` on
+**PHP 8.1–8.5** (unit tests on both `lowest` and `highest` Composer resolutions, analysis on `highest`),
+`coding-standards` (including `composer validate --strict` and `normalize --dry-run`) and
+`dependency-analysis` on 8.1 only, plus dedicated `code-coverage` (Codecov) and `mutation-tests`
+(Infection) jobs on PHP 8.3.
 
 ## Architecture
 
@@ -169,9 +172,11 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   is worse, degrading silently to an order id that is nothing but the prefix. `assertOrderId()` then
   enforces Quickpay's **4–20 character** `order_id` rule on `order_prefix . number` — which also catches
   that silent case, except when the prefix alone is 4+ characters, where it would otherwise create every
-  payment under the same order id.
+  payment under the same order id. A model that already carries a `quickpayPaymentId` makes no request,
+  but `assertCurrencyUnchanged()` throws if the Payum currency no longer matches the stored `currency`:
+  a Quickpay payment cannot change currency, and overwriting the stored value would misread the amount.
 - **Authorize / Capture, the interactive entry points** — both fetch the payment and decide from its
-  operations (`Operations::hasApproved()`/`hasPending()`), which makes them idempotent across the return
+  operations (`Payment::hasApprovedOperation()`/`hasPendingOperation()`), which makes them idempotent across the return
   trip: with nothing approved and nothing pending they execute the internal **`CreatePaymentLink`**
   request (`src/Request/Api/` + `Action/Api/CreatePaymentLinkAction`: mints the notify token into
   `callback_url`, `PUT`s the link with the requested `auto_capture`, **throws `HttpRedirect`** to the
@@ -194,8 +199,8 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   `synchronized` argument — the SDK client's client-wide default (from the `synchronized` option, default
   off) is the single toggle that flips them to synchronous (`?synchronized`). The `Payment` these calls
   return is used for exactly one thing: `OperationRejectedException::assertNotRejected()` reads the
-  newest operation of the type just issued (`Operations::latestOfType()`) and throws if it has an
-  outcome that is not approved. A decline is a **2xx** — the SDK maps only HTTP status to exceptions —
+  newest operation of the type just issued (`Payment::latestOperationOfType()`) and throws if it
+  `isDeclined()` (has an outcome that is not approved). A decline is a **2xx** — the SDK maps only HTTP status to exceptions —
   so without that check a synchronized decline returned like an approval. On the async path the
   operation is `pending` (the payment is a snapshot taken when the operation was queued, with
   pre-operation `state`/`balance`), so nothing fires and `StatusAction` re-fetches instead of trusting
@@ -232,8 +237,9 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   fetches the payment — all of them, since the in-flight guard made Cancel and every Refund fetch too —
   also persists `balance`; it costs no extra call and it is the one figure Payum's marks cannot
   express, so downstream consumers do not have to re-fetch just to learn it.
-- **GetStatus** → `StatusAction` — maps the SDK `PaymentState` + latest operation to Payum marks
-  (`markCaptured`, `markRefunded`, `markAuthorized`, `markFailed`, etc.). The refund branch is **not**
+- **GetStatus** → `StatusAction` — maps the SDK `PaymentState` + the latest *approved* operation to
+  Payum marks (`markCaptured`, `markRefunded`, `markAuthorized`, `markFailed`, etc.); a model with no
+  `quickpayPaymentId` is `markNew` without a request. The refund branch is **not**
   decided by the operation alone: it consults the payment's `balance` (captured minus refunded), so a
   partial refund stays `markCaptured` and only a zero balance is `markRefunded`. Payum has no partial
   mark, and reporting a partly refunded payment as fully refunded is a lie a shop acts on. A null
@@ -247,8 +253,9 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
 
 Payum's `Capture`/`Refund` requests carry no amount, so the details array is the only channel a caller
 has for a **partial** operation. `Amounts::forOperation($details, 'refund_amount')` reads the per-operation
-override key when present and falls back to `amount`, rejecting anything non-numeric or non-positive.
-The keys are `capture_amount` and `refund_amount`.
+override key when present and falls back to `amount`; `Amounts::amount()` reads `amount` alone (the link
+amount). Both accept only a positive integer or integer string, so a fractional value throws instead of
+being truncated. The keys are `capture_amount` and `refund_amount`.
 
 **`RefundAction` does not use that fallback.** With no explicit `refund_amount` it fetches the payment
 and refunds the `balance`, because falling back to the full `amount` is guaranteed to be rejected once
@@ -326,9 +333,10 @@ create + link + status), `e2e:listen` (built-in server serving the Payum token u
 
 Two things it encodes that are easy to get wrong:
 - It registers the package's `Bridge/PlainPhp/Action/HeaderAwareGetHttpRequestAction` via
-  `addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])` — payum/core's plain-PHP
+  `addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])`. payum/core's plain-PHP
   bridge does **not** populate `GetHttpRequest::$headers`, so outside Symfony every callback would be
-  rejected as unsigned. The harness is the reference for that wiring.
+  rejected as unsigned. The factory now makes that swap by itself, so the registration is redundant. It
+  stays as the reference for a consumer who wires their own `GetHttpRequest` action.
 - `listen.php` handles **both** callback shapes: everything the gateway is party to — the payment
   window's callback and, since the operations name the notify url, the capture/refund/cancel ones —
   carries a `payum_token`; a callback sent to the account-wide url (an operation made in the manager)
@@ -357,8 +365,11 @@ uses Prophecy for gateway/token doubles. Its `$requestClass`/`$actionClass` are 
 (redeclared per subclass) because the shared data providers read them and PHPUnit calls providers
 statically. Test metadata is PHPUnit **attributes** (`#[Test]`, `#[DataProvider]`), not docblock
 annotations — the suite runs with zero PHPUnit deprecations on 10.5 and is ready for 11/12 whenever the
-constraint is bumped. `ConvertPaymentActionTest` stands alone because Payum's `Convert`
-is not a `Generic` request. `NotifyAction`'s callback verification is tested via
+constraint is bumped. `ConvertPaymentActionTest` extends `TestCase` directly because Payum's `Convert`
+is not a `Generic` request, and so do the internal-request tests (`tests/Action/Api/`).
+`GatewayIntegrationTest` runs requests through a gateway built by the real `QuickpayGatewayFactory`,
+which catches a mis-registered action that the hand-built action tests would miss.
+`NotifyAction`'s callback verification is tested via
 `tests/StubGetHttpRequestAction` (feeds a raw body + checksum header into `GetHttpRequest`).
 
 Two important Valinor gotchas when writing fixtures: the SDK mapper is strict, so a payment JSON must
