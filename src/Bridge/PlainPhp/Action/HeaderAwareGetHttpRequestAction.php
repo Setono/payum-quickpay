@@ -15,8 +15,11 @@ use Payum\Core\Request\GetHttpRequest;
  * {@see \Setono\Payum\Quickpay\Action\NotifyAction} reads the `QuickPay-Checksum-Sha256` header off
  * `GetHttpRequest::$headers` to verify the callback signature, and among payum/core's bridges only
  * the Symfony one sets that property. The plain-PHP bridge leaves it unset — so on a plain-PHP Payum
- * every callback is rejected as unsigned with a `400`, silently, for every payment. Register this
- * action in its place:
+ * every callback would be rejected as unsigned with a `400`, silently, for every payment.
+ *
+ * {@see \Setono\Payum\Quickpay\QuickpayGatewayFactory} therefore puts this action in place of payum's
+ * plain-PHP one whenever it finds that exact class, so a plain-PHP Payum needs no wiring. Registering
+ * it explicitly still works, and is redundant:
  *
  *     (new PayumBuilder())
  *         ->addCoreGatewayFactoryConfig([
@@ -24,7 +27,7 @@ use Payum\Core\Request\GetHttpRequest;
  *         ])
  *
  * Symfony (and therefore Sylius) consumers need none of this — payum's Symfony bridge populates the
- * headers already.
+ * headers already, and the factory leaves it alone.
  *
  * The headers are rebuilt from `$_SERVER` rather than read via `getallheaders()`: that function
  * exists only on some SAPIs, and the polyfills that fill the gap are old and pass `$_SERVER` values

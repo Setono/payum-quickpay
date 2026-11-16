@@ -38,11 +38,16 @@ window with `auto_capture` on the link, so Quickpay captures the moment the card
 
 `NotifyAction` reads the `QuickPay-Checksum-Sha256` header off `GetHttpRequest::$headers`, and among
 payum/core's bridges **only the Symfony one populates that property**. The plain-PHP bridge does not,
-so a plain-PHP consumer that wires nothing extra has every callback rejected as unsigned with a `400`.
+so without help every callback on a plain-PHP Payum would be rejected as unsigned with a `400`.
 
-`HeaderAwareGetHttpRequestAction` in this directory is the ~20 lines that fix it, registered via
-`addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])` in `bootstrap.php`. If you
-integrate this gateway outside Symfony, you need the equivalent — see `docs/UPGRADE-2.0.md`.
+The package ships the fix,
+`src/Bridge/PlainPhp/Action/HeaderAwareGetHttpRequestAction.php`, a subclass of payum's plain-PHP
+action that rebuilds the headers from `$_SERVER`. The gateway factory puts it in place of payum's own
+action by itself, so a plain-PHP consumer wires nothing. `bootstrap.php` still registers it explicitly via
+`addCoreGatewayFactoryConfig(['payum.action.get_http_request' => ...])`. That is redundant, and it is
+kept as the reference for a consumer who configures a `GetHttpRequest` action of their own, which
+must set `headers`. A callback logged as `CALLBACK OK` proves the headers arrived. See
+`docs/UPGRADE-2.0.md`.
 
 ## Prerequisites
 
