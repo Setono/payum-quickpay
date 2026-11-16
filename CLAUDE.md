@@ -73,7 +73,7 @@ the create request (`ConvertPaymentAction` identifies the integration as `setono
 installed version via Composer's runtime API, unless an order description names its own);
 `PaymentsEndpoint::findByOrderId()` for the
 find-or-create in `Convert`; and `CreatePaymentRequest::ORDER_ID_PATTERN` (4–20 of `[A-Za-z0-9 ._-]`,
-which `Convert` checks first with a message naming the prefix and number). The package's own
+which `OrderId::of()` checks for `Convert`, with a message naming the prefix and number). The package's own
 `Operations` helper is gone — everything reads off the DTOs. `cache:` on the SDK `Client` is reachable
 through the `quickpay.client` option (build the client with it) rather than a gateway option of its
 own, so the package does not have to depend on Valinor's cache interface. Since 1.1 an empty body
@@ -118,6 +118,10 @@ it; a new option starts there. It:
   string options by today's `(string)` cast of a scalar or `Stringable`, anything else (an array, a plain
   object) being a violation. `null` is what
   keeps a parameter off the request entirely, so the empty-string Payum defaults never reach `Api`;
+- rejects an `order_prefix` that can never start an order id: a character outside Quickpay's order id
+  set, or more than `OrderId::MAX_PREFIX_LENGTH` (19) characters (`OrderId::PREFIX_PATTERN`, pinned
+  against the SDK's `ORDER_ID_PATTERN` character by character in `OrderIdTest`). Whether it fits a given
+  number is `OrderId::of()`'s to say;
 - requires a non-empty `api_key`/`private_key` (Payum's `empty()` sense, so `'0'` is missing);
 - ignores keys it does not know (`payum.*`, `quickpay.client`, Sylius' `use_authorize`);
 - collects **every** violation and throws `Exception\InvalidGatewayOptions` (extends Payum's
@@ -169,9 +173,10 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   Payum types `getNumber()`/`getCurrencyCode()` as `@return string` but both model properties are
   nullable, so `assertNotEmptyString()` takes `mixed` (which also stops PHPStan folding the checks away
   as always-true). A missing currency would be a `TypeError` from inside the SDK DTO; a missing number
-  is worse, degrading silently to an order id that is nothing but the prefix. `assertOrderId()` then
-  enforces Quickpay's **4–20 character** `order_id` rule on `order_prefix . number` — which also catches
-  that silent case, except when the prefix alone is 4+ characters, where it would otherwise create every
+  is worse, degrading silently to an order id that is nothing but the prefix. `OrderId::of()` then
+  builds the order id and enforces Quickpay's **4–20 character** `order_id` rule on it, throwing
+  `Exception\InvalidOrderId` (a Payum `LogicException` carrying `prefix`, `number` and `orderId`); it
+  also refuses an empty number, which would otherwise, with a prefix of 4+ characters, create every
   payment under the same order id. A model that already carries a `quickpayPaymentId` makes no request,
   but `assertCurrencyUnchanged()` throws if the Payum currency no longer matches the stored `currency`:
   a Quickpay payment cannot change currency, and overwriting the stored value would misread the amount.
@@ -220,7 +225,8 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   (verified live: delivered within a second, `callback_success: true` on the operation). Only operations
   made outside the gateway (manager, raw API) still hit the account-wide url; that url is static for
   every payment and cannot carry a `payum_token`, so an endpoint for it must resolve the payment from
-  the body's `order_id` (`order_prefix` + payum number) and execute `Notify` against that model —
+  the body's `order_id` (`order_prefix` + payum number; `OrderId::numberIn()` reads the number back) and
+  execute `Notify` against that model —
   `NotifyAction` needs only the model. See `examples/e2e/listen.php` and `docs/UPGRADE-2.0.md`. It
   fetches the raw
   body + `QuickPay-Checksum-Sha256` header (via Payum's `GetHttpRequest`), **verifies the HMAC signature**
