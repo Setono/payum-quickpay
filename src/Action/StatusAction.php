@@ -52,11 +52,13 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
             case PaymentState::New:
                 // Decided by the last APPROVED operation, not the last one recorded: a trailing
                 // rejected or pending attempt (say, a capture that failed) must not make an
-                // authorized payment — whose money is still held — report as failed.
+                // authorized payment — whose money is still held — report as anything else. Without
+                // an approved authorize nothing was approved yet, so the payment is still payable,
+                // as after a declined attempt (`rejected` below).
                 if (true === $payment->latestApprovedOperation()?->isOfType(OperationType::Authorize)) {
                     $request->markAuthorized();
                 } else {
-                    $request->markFailed();
+                    $request->markNew();
                 }
 
                 break;
@@ -74,6 +76,13 @@ class StatusAction implements ActionInterface, ApiAwareInterface, GatewayAwareIn
 
                 break;
             case PaymentState::Rejected:
+                // A declined attempt, and Quickpay keeps the payment open: the payment window offers the
+                // customer another try on the same payment (verified live: `rejected` became `new` after
+                // an approved retry). Still payable, so new, not failed: a consumer that fails it on the
+                // decline would never see the approved retry.
+                $request->markNew();
+
+                break;
             case PaymentState::Invalid:
                 $request->markFailed();
 

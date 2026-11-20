@@ -307,6 +307,29 @@ pre-operation balance. `GetStatus` used to answer `pending` for that; it now ans
 already been approved (`authorized` with a capture queued, `captured` with a refund queued) and says
 `pending` only when nothing has been approved yet.
 
+## A declined attempt is no longer a failed payment
+
+> Changed after `2.0.0-rc.4`.
+
+`StatusAction` used to mark a payment **failed** when Quickpay reported it
+`rejected`, or `new` without an approved authorize. That is what a declined card leaves, but Quickpay
+keeps the payment open: the payment window asks the customer to try again and takes the next card on the
+same payment (verified live: `rejected` became `new` after an approved retry). A shop that acted on the
+failed mark, say by failing its own payment on the decline's callback, never saw the approved retry, and
+Quickpay held money for an order the shop showed as unpaid.
+
+| Quickpay state | Before | Now |
+|---|---|---|
+| `rejected` | `failed` | `new` |
+| `new`, no approved authorize | `failed` | `new` |
+| `new`, an approved authorize after a declined one | `authorized` | `authorized`, unchanged |
+| `invalid` | `failed` | `failed`, unchanged |
+
+If your code treats `STATUS_FAILED` as the customer's last word, a declined attempt no longer reaches it:
+the payment stays `new` until an attempt is approved or you give up on it. `Authorize` and `Capture`
+already treated a declined attempt like a fresh payment, so sending the customer back to the window
+works as before.
+
 ## `Convert` finds or creates — a retried checkout no longer fails on a duplicate order id
 
 > Changed after `2.0.0-beta.1`.

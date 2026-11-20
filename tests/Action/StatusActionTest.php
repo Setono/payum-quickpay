@@ -71,8 +71,12 @@ class StatusActionTest extends ActionTestAbstract
         self::assertTrue($request->isAuthorized(), 'Request should be marked as authorized');
     }
 
+    /**
+     * Quickpay's `new` normally means authorized; without an approved authorize, nothing was approved
+     * yet, so the payment is still payable, as after a declined attempt.
+     */
     #[Test]
-    public function shouldMarkNewWithRejectedAuthorizeAsFailed(): void
+    public function shouldMarkNewWithOnlyADeclinedAuthorizeAsNew(): void
     {
         $this->queuePayment([
             'state' => PaymentState::New->value,
@@ -82,7 +86,7 @@ class StatusActionTest extends ActionTestAbstract
         $request = $this->statusRequest();
         $this->executeStatus($request);
 
-        self::assertTrue($request->isFailed(), 'Request should be marked as failed');
+        self::assertTrue($request->isNew(), 'Request should be marked as new');
     }
 
     /**
@@ -158,15 +162,44 @@ class StatusActionTest extends ActionTestAbstract
         ], 750, GetHumanStatus::STATUS_CAPTURED];
     }
 
+    /**
+     * A declined attempt leaves the payment `rejected`, but Quickpay keeps it open: the payment window
+     * offers the customer another try on the same payment (verified live, 2026-11: `rejected` became
+     * `new` after an approved retry). The payment is still payable, so it is new, not failed.
+     */
     #[Test]
-    public function shouldMarkRejectedAsFailed(): void
+    public function shouldMarkADeclinedAttemptAsNew(): void
     {
-        $this->queuePayment(['state' => PaymentState::Rejected->value]);
+        $this->queuePayment([
+            'state' => PaymentState::Rejected->value,
+            'operations' => [$this->operation(OperationType::Authorize, '40000')],
+        ]);
 
         $request = $this->statusRequest();
         $this->executeStatus($request);
 
-        self::assertTrue($request->isFailed(), 'Request should be marked as failed');
+        self::assertTrue($request->isNew(), 'Request should be marked as new');
+    }
+
+    /**
+     * The customer's next try in the same payment window, approved: what the declined attempt left new is
+     * now authorized.
+     */
+    #[Test]
+    public function shouldMarkAnApprovedRetryAfterADeclinedAttemptAsAuthorized(): void
+    {
+        $this->queuePayment([
+            'state' => PaymentState::New->value,
+            'operations' => [
+                $this->operation(OperationType::Authorize, '40000'),
+                $this->operation(OperationType::Authorize),
+            ],
+        ]);
+
+        $request = $this->statusRequest();
+        $this->executeStatus($request);
+
+        self::assertTrue($request->isAuthorized(), 'Request should be marked as authorized');
     }
 
     #[Test]
@@ -318,14 +351,14 @@ class StatusActionTest extends ActionTestAbstract
     }
 
     #[Test]
-    public function shouldMarkNewWithoutAnyOperationsAsFailed(): void
+    public function shouldMarkNewWithoutAnyOperationsAsNew(): void
     {
         $this->queuePayment(['state' => PaymentState::New->value, 'operations' => []]);
 
         $request = $this->statusRequest();
         $this->executeStatus($request);
 
-        self::assertTrue($request->isFailed(), 'Request should be marked as failed');
+        self::assertTrue($request->isNew(), 'Request should be marked as new');
     }
 
     /**

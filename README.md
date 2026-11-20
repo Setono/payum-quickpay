@@ -245,6 +245,14 @@ because it is either this order's earlier payment that really was paid (carry it
 over) or another shop or environment sharing the account under a prefix that should not be shared
 (give each its own `order_prefix`). Either way that is your call, not a claim of money.
 
+**A declined attempt is not a failed payment.** When the card is declined, Quickpay reports the payment
+as `rejected`, but it keeps it open: the payment window tells the customer to try again and takes the
+next card on the same payment (verified live, 2026-11: `rejected` became `new` after an approved retry).
+So `GetStatus` answers `new` for a payment with nothing approved yet, whether Quickpay says `rejected` or
+`new`, and the approved retry is `authorized` (or `captured`) on that same payment. A shop that failed
+its payment on the decline's callback would never see the retry's money. Only Quickpay's `invalid`
+answers `failed`.
+
 ### Describing the order — `DescribedPaymentInterface`
 
 Quickpay shows on each payment in its manager what the payment is for: the invoice and shipping
