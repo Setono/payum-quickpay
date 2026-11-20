@@ -254,6 +254,11 @@ Request → Action flow (amounts are integer minor units everywhere — no conve
   (verified live 2026-08: a captured payment reads `pending` for the ~second its refund takes, with the
   pre-operation balance). So `pending`, like `processed`, is decided from the last *approved* operation
   (`markFromLastApprovedOperation()`) and is `markPending` only when nothing has been approved yet.
+  **A declined attempt is `markNew`, not `markFailed`**: a declined card leaves Quickpay's state
+  `rejected` (or `new` without an approved authorize), but the payment window offers the customer
+  another try on the same payment (verified live 2026-11: `rejected` became `new` after an approved
+  retry). A consumer that failed its payment on the decline's callback never saw the retry's money.
+  Only `invalid` is `markFailed`.
 
 ### Amounts (`src/Amounts.php`)
 

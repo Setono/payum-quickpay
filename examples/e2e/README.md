@@ -191,7 +191,9 @@ a capture may still show the pre-operation state — the settled state arrives i
   `ValidationException` ("Payment is not in a valid state for cancel") rather than pretending to
   succeed — the money is still held, and the caller needs to know.
 - **Status mapping:** compare `status` against the payment in the Quickpay manager across the card
-  scenarios above — approved, rejected, capture-rejected.
+  scenarios above — approved, rejected, capture-rejected. A rejected card answers `new`, not
+  `failed`: the window offers another try on the same payment, and paying `1000 0000 0000 0008` there
+  next turns it `authorized`.
 
 ## Security
 
